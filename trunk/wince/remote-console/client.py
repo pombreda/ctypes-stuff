@@ -6,6 +6,8 @@ PS1 = "PocketPC>>> "
 PS2 = "PocketPC... "
 
 def client():
+    # An interactive Python interpreter that gets input from a socket,
+    # and sends output to this socket.
     try:
         HOST, PORT = sys.argv[1], int(sys.argv[2])
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -37,27 +39,21 @@ def client():
         sys.ps1 = PS1
         sys.ps2 = PS2
 
-        banner = "Python %s on %s\n(Remote Console on %s)" % (sys.version, sys.platform, (HOST, PORT))
+        banner = "Python %s on %s\n(Remote Console on %s)" % \
+                 (sys.version, sys.platform, (HOST, PORT))
 
-        # Replace the builtin raw_input (which doesn't work on CE anyway),
-        # to make pdb work.
+        # Replace the builtin raw_input (which doesn't work on CE
+        # anyway), to make pdb work.
         import __builtin__
         __builtin__.raw_input = readfunc
+        __builtin__.input = lambda: eval(readfunc())
 
         code.interact(banner=banner, readfunc=readfunc)
 
-        if hasattr(__builtin__, "_"):
-            del __builtin__._
-        globals().clear()
-
-        # The console sets these attributes on errors. Prevent they
-        # survive the thread.
-        try: del sys.last_type
-        except AttributeError: pass
-        try: del sys.last_value
-        except AttributeError: pass
-        try: del sys.last_traceback
-        except AttributeError: pass
+        # Clear everything that may contain objects to avoid possible
+        # problems when shutting down
+        sys.last_type = sys.last_value = sys.last_traceback = \
+                        __builtin__._ = None
 
     except SystemExit:
         raise
