@@ -36,14 +36,16 @@ ctypes.windll.rapi.CeCloseHandle.errcheck = errcheck
 ctypes.windll.rapi.CeDeleteFile.errcheck = errcheck
 ctypes.windll.rapi.CeCreateProcess.errcheck = errcheck
 
-class ConnectError(Exception):
-    pass
+##class ConnectError(Exception):
+##    pass
+
+ConnectError = SystemExit
 
 def WFSO_errcheck(result, func, arguments):
     if result == win32con.WAIT_TIMEOUT:
-        raise ConnectError("WAIT_TIMEOUT")
+        raise ConnectError("connection timeout")
     elif result == win32con.WAIT_ABANDONED:
-        raise ConnectError("WAIT_ABANDONED")
+        raise ConnectError("connection abandoned")
     
 ctypes.windll.kernel32.WaitForSingleObject.errcheck = WFSO_errcheck
 
@@ -81,8 +83,9 @@ def server():
 
     # start the client process on the PocketPC
     own_ip = socket.gethostbyname(socket.gethostname())
+    args = u"/new %s %s %s" % (unicode(REMOTE_CLIENT), own_ip, PORT)
     ctypes.windll.rapi.CeCreateProcess(unicode(REMOTE_EXE),
-                                       u"/new %s %s %s" % (unicode(REMOTE_CLIENT), own_ip, PORT),
+                                       args,
                                        None, None,
                                        False, 0, None, None,
                                        None, None)
