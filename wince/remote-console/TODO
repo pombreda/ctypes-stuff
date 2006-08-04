@@ -1,0 +1,5 @@
+When text is copied into the console, client.py reads more than a single
+line per call.
+
+When ^C is hit in server.py, the server is terminated.  Instead, the
+client should be interrupted (or whatever is possible to implement).
