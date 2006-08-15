@@ -120,13 +120,46 @@ reserved_map = { }
 for r in reserved:
     reserved_map[r.lower()] = r
 
+def add_typedef_name(name):
+    reserved_map[name] = "TYPEID"
+
+# Hm.  A token that can change it's type after it has been created.
+#
+# This is a workaround for the following issue. Consider this C code:
+#
+#     typedef int SOMETHING;
+#     SOMETHING *func();
+#
+# The second occurrence of SOMETHING is pulled out of the lexer before
+# the first one makes it into the reserved_map table, so it is still
+# of type 'ID', not 'TYPEID'.  Inserting a dummy declaration like
+#     int ___;
+# would also make this problem go away, but that's not possible.
+#
+# I'm not sure where the problem really is: Does lex.py too much
+# lookahead, or does yacc.py too much lookahead? Can it be avoided
+# somehow?  The above is really a hack, but seems to work.
+#
+class MagicID(object):
+    def __init__(self, t):
+        self.value = t.value
+        self.lexer = t.lexer
+        self.lineno = t.lineno
+
+    def _get_type(self):
+        return reserved_map.get(self.value,"ID")
+    type = property(_get_type)
+
 def t_ID(t):
     r'[A-Za-z_][\w_]*'
-    t.type = reserved_map.get(t.value,"ID")
-    return t
+    if 0:
+        t.type = reserved_map.get(t.value,"ID")
+        return t
+    else:
+        return MagicID(t)
 
 # Integer literal
-t_ICONST = r'\d+([uU]|[lL]|[uU][lL]|[lL][uU])?'
+t_ICONST = r'0[xX][0-9a-fA-F]+([uU]|[lL]|[uU][lL]|[lL][uU])? | \d+([uU]|[lL]|[uU][lL]|[lL][uU])?'
 
 # Floating literal
 t_FCONST = r'((\d+)(\.\d+)(e(\+|-)?(\d+))? | (\d+)e(\+|-)?(\d+))([lL]|[fF])?'
