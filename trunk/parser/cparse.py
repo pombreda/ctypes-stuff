@@ -848,15 +848,26 @@ def p_empty(t):
     pass
 
 def p_error(t):
-    print "Whoa. We're hosed"
+    print "Whoa. We're hosed: line %d, token '%s' (%s)" % (t.lineno, t.value, t.type)
+    while 1:
+        try:
+            result = raw_input("Continue [Y/n]?")
+        except KeyboardInterrupt:
+            raise SystemExit(1)
+        if result in "yY" or not result:
+            return
+        if result in "nN":
+            raise SystemExit(1)
+        
 
-import profile
+##import profile
+##profile.run("yacc.yacc(method='LALR')")
 # Build the grammar
 
-yacc.yacc(method='LALR')
+if __name__ == "__main__":
+    import sys
 
-#profile.run("yacc.yacc(method='LALR')")
-
-
+    yacc.yacc(method='LALR')
+    yacc.parse(open(sys.argv[1]).read())
 
 
