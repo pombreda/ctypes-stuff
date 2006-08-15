@@ -3,6 +3,17 @@
 #
 # Simple parser for ANSI C.  Based on the grammar in K&R, 2nd Ed.
 # -----------------------------------------------------------------------------
+#
+# Copyied from PLY's ansic example, then hacked upon.
+#
+# Problems:
+#
+# - See comment in clex.py (typedef added too late to symbol table)
+#
+# - Is not able to parse this code (how should that be resolved ?):
+#
+#     typedef struct _IO_FILE _IO_FILE;
+#     extern struct _IO_FILE *stdin;
 
 import yacc
 import clex
@@ -52,11 +63,14 @@ def p_function_definition_4(t):
 
 def p_declaration_1(t):
     'declaration : declaration_specifiers init_declarator_list SEMI'
-    pass
+    if "typedef" in t[1]:
+        for name in t[2]:
+            clex.add_typedef_name(name)
+##            print "#TYPEDEF", name
 
 def p_declaration_2(t):
     'declaration : declaration_specifiers SEMI'
-    pass
+##    print "B", t[1], t.slice
 
 # declaration-list:
 
@@ -71,27 +85,27 @@ def p_declaration_list_2(t):
 # declaration-specifiers
 def p_declaration_specifiers_1(t):
     'declaration_specifiers : storage_class_specifier declaration_specifiers'
-    pass
+    t[0] = (t[1],) + t[2]
 
 def p_declaration_specifiers_2(t):
     'declaration_specifiers : type_specifier declaration_specifiers'
-    pass
+    t[0] = (t[1],) + t[2]
 
 def p_declaration_specifiers_3(t):
     'declaration_specifiers : type_qualifier declaration_specifiers'
-    pass
+    t[0] = (t[1],) + t[2]
 
 def p_declaration_specifiers_4(t):
     'declaration_specifiers : storage_class_specifier'
-    pass
+    t[0] = (t[1],)
 
 def p_declaration_specifiers_5(t):
     'declaration_specifiers : type_specifier'
-    pass
+    t[0] = (t[1],)
 
 def p_declaration_specifiers_6(t):
     'declaration_specifiers : type_qualifier'
-    pass
+    t[0] = (t[1],)
 
 # storage-class-specifier
 def p_storage_class_specifier(t):
@@ -101,7 +115,7 @@ def p_storage_class_specifier(t):
                                | EXTERN
                                | TYPEDEF
                                '''
-    pass
+    t[0] = t[1]
 
 # type-specifier:
 def p_type_specifier(t):
@@ -118,13 +132,13 @@ def p_type_specifier(t):
                       | enum_specifier
                       | TYPEID
                       '''
-    pass
+    t[0] = t[1]
 
 # type-qualifier:
 def p_type_qualifier(t):
     '''type_qualifier : CONST
                       | VOLATILE'''
-    pass
+    t[0] = t[1]
 
 # struct-or-union-specifier
 
@@ -161,21 +175,21 @@ def p_struct_declaration_list_2(t):
 
 def p_init_declarator_list_1(t):
     'init_declarator_list : init_declarator'
-    pass
+    t[0] = (t[1],)
 
 def p_init_declarator_list_2(t):
     'init_declarator_list : init_declarator_list COMMA init_declarator'
-    pass
+    t[0] = t[1] + (t[2],)
 
 # init-declarator
 
 def p_init_declarator_1(t):
     'init_declarator : declarator'
-    pass
+    t[0] = t[1]
 
 def p_init_declarator_2(t):
     'init_declarator : declarator EQUALS initializer'
-    pass
+    t[0] = t[1]
 
 # struct-declaration:
 
@@ -261,37 +275,37 @@ def p_enumerator_2(t):
 
 def p_declarator_1(t):
     'declarator : pointer direct_declarator'
-    pass
+    t[0] = t[2]
 
 def p_declarator_2(t):
     'declarator : direct_declarator'
-    pass
+    t[0] = t[1]
 
 # direct-declarator:
 
 def p_direct_declarator_1(t):
     'direct_declarator : ID'
-    pass
+    t[0] = t[1]
 
 def p_direct_declarator_2(t):
     'direct_declarator : LPAREN declarator RPAREN'
-    pass
+    t[0] = t[2]
 
 def p_direct_declarator_3(t):
     'direct_declarator : direct_declarator LBRACKET constant_expression_opt RBRACKET'
-    pass
+    t[0] = t[1]
 
 def p_direct_declarator_4(t):
     'direct_declarator : direct_declarator LPAREN parameter_type_list RPAREN '
-    pass
+    t[0] = t[1]
 
 def p_direct_declarator_5(t):
     'direct_declarator : direct_declarator LPAREN identifier_list RPAREN '
-    pass
+    t[0] = t[1]
 
 def p_direct_declarator_6(t):
     'direct_declarator : direct_declarator LPAREN RPAREN '
-    pass
+    t[0] = t[1]
 
 # pointer:
 def p_pointer_1(t):
@@ -869,5 +883,3 @@ if __name__ == "__main__":
 
     yacc.yacc(method='LALR')
     yacc.parse(open(sys.argv[1]).read())
-
-
