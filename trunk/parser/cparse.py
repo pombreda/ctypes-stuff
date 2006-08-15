@@ -179,7 +179,7 @@ def p_init_declarator_list_1(t):
 
 def p_init_declarator_list_2(t):
     'init_declarator_list : init_declarator_list COMMA init_declarator'
-    t[0] = t[1] + (t[2],)
+    t[0] = t[1] + (t[3],)
 
 # init-declarator
 
