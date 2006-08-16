@@ -941,9 +941,10 @@ def p_error(t):
             raise SystemExit(1)
         
 
+# Precedence for ambiguous grammar elements.
 precedence = (
-    ('left', 'IF', 'ELSE'),
-    )
+    ('right', 'ELSE'),
+)
 
 ##import profile
 ##profile.run("yacc.yacc(method='LALR')")
