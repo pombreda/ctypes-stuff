@@ -2,18 +2,36 @@
 # cparse.py
 #
 # Simple parser for ANSI C.  Based on the grammar in K&R, 2nd Ed.
-# -----------------------------------------------------------------------------
 #
 # Copyied from PLY's ansic example, then hacked upon.
 #
-# Problems:
+# -----------------------------------------------------------------------------
 #
-# - See comment in clex.py (typedef added too late to symbol table)
+# Problems:
 #
 # - Is not able to parse this code (how should that be resolved ?):
 #
 #     typedef struct _IO_FILE _IO_FILE;
 #     extern struct _IO_FILE *stdin;
+#
+#
+#
+# Solved problems:
+#
+# - See comment in clex.py (typedef added too late to symbol table)
+#
+# - Allows unnamed structure fields ('unnamed-structure-fields' variable).
+#
+# - Does now allow a comma after the last enum value definition,
+#   (use the 'allow-extra-enum-comma' configuration variable):
+#
+#     enum something { FIRST=0, SECOND=1, };
+#
+parser_config = {
+    'unnamed-structure-fields': True,
+    'allow-extra-enum-comma': True,
+    '_MSC' : True,
+    }.get
 
 import yacc
 import clex
@@ -66,7 +84,7 @@ def p_declaration_1(t):
     if "typedef" in t[1]:
         for name in t[2]:
             clex.add_typedef_name(name)
-##            print "#TYPEDEF", name
+##        print "#TYPEDEF", t[2]
 
 def p_declaration_2(t):
     'declaration : declaration_specifiers SEMI'
@@ -108,7 +126,7 @@ def p_declaration_specifiers_6(t):
     t[0] = (t[1],)
 
 # storage-class-specifier
-def p_storage_class_specifier(t):
+def p_storage_class_specifier_2(t):
     '''storage_class_specifier : AUTO
                                | REGISTER
                                | STATIC
@@ -116,6 +134,26 @@ def p_storage_class_specifier(t):
                                | TYPEDEF
                                '''
     t[0] = t[1]
+
+if parser_config("_MSC"):
+    def p_storage_class_specifier_3(t):
+        'storage_class_specifier : __DECLSPEC LPAREN extended_decl_modifier_seq RPAREN'
+
+    def p_storage_class_specifier_4(t):
+        'storage_class_specifier : __DECLSPEC LPAREN RPAREN'
+
+    def p_extended_decl_modifier_seq_1(t):
+        'extended_decl_modifier_seq : extended_decl_modifier'
+
+    def p_extended_decl_modifier_seq_2(t):
+        'extended_decl_modifier_seq : extended_decl_modifier_seq extended_decl_modifier'
+
+    def p_extended_decl_modifier(t):
+        '''extended_decl_modifier : THREAD
+                                  | NAKED
+                                  | DLLIMPORT
+                                  | DLLEXPORT
+                                  | NORETURN'''
 
 # type-specifier:
 def p_type_specifier(t):
@@ -225,6 +263,10 @@ def p_struct_declarator_list_2(t):
     'struct_declarator_list : struct_declarator_list COMMA struct_declarator'
     pass
 
+if parser_config("unnamed-structure-fields"):
+    def p_struct_declarator_list_3(t):
+        'struct_declarator_list : empty'
+
 # struct-declarator:
 
 def p_struct_declarator_1(t):
@@ -248,6 +290,15 @@ def p_enum_specifier_1(t):
 def p_enum_specifier_2(t):
     'enum_specifier : ENUM LBRACE enumerator_list RBRACE'
     pass
+
+if parser_config("allow-extra-enum-comma"):
+    def p_enum_specifier_1b(t):
+        'enum_specifier : ENUM ID LBRACE enumerator_list COMMA RBRACE'
+        pass
+
+    def p_enum_specifier_2b(t):
+        'enum_specifier : ENUM LBRACE enumerator_list COMMA RBRACE'
+        pass
 
 def p_enum_specifier_3(t):
     'enum_specifier : ENUM ID'
