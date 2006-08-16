@@ -180,9 +180,13 @@ t_SCONST = r'\"([^\\\n]|(\\.))*?\"'
 t_CCONST = r'(L)?\'([^\\\n]|(\\.))*?\''
 
 # Comments
-def t_comment(t):
+def t_comment_1(t):
     r' /\*(.|\n)*?\*/'
     t.lineno += t.value.count('\n')
+
+def t_comment_2(t):
+    r' //.*\n'
+    t.lineno += 1
 
 # Preprocessor directive (ignored)
 def t_preprocessor(t):
