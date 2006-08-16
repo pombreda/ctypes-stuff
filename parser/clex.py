@@ -12,7 +12,11 @@ reserved = (
     'ELSE', 'ENUM', 'EXTERN', 'FLOAT', 'FOR', 'GOTO', 'IF', 'INT', 'LONG', 'REGISTER',
     'RETURN', 'SHORT', 'SIGNED', 'SIZEOF', 'STATIC', 'STRUCT', 'SWITCH', 'TYPEDEF',
     'UNION', 'UNSIGNED', 'VOID', 'VOLATILE', 'WHILE',
+# MSVC specific symbols
+    'THREAD', '__DECLSPEC', 'NAKED', 'DLLIMPORT', 'DLLEXPORT',
+    'NORETURN'
     )
+
 
 tokens = reserved + (
     # Literals (identifier, integer constant, float constant, string constant, char const)
@@ -49,6 +53,11 @@ tokens = reserved + (
 
 # Completely ignored characters
 t_ignore           = ' \t\x0c'
+
+def t_INT_64(t):
+    r'__int64'
+    t.type = 'INT'
+    return t
 
 # Newlines
 def t_NEWLINE(t):
