@@ -941,6 +941,10 @@ def p_error(t):
             raise SystemExit(1)
         
 
+precedence = (
+    ('left', 'IF', 'ELSE'),
+    )
+
 ##import profile
 ##profile.run("yacc.yacc(method='LALR')")
 # Build the grammar
