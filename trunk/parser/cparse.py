@@ -8,15 +8,19 @@
 # -----------------------------------------------------------------------------
 #
 # Problems:
+# - repeated typedefs like these:
+#       typedef const CHAR *LPCSTR, *PCSTR;
+#       typedef const CHAR *LPCSTR, *PCSTR;
 #
-# - Is not able to parse this code (how should that be resolved ?):
+#   Adding 'direct_declarator : TYPEID' accepts these, but
+#   creates 6 shift/reduce and 24 reduce/reduce conflicts.
+#
+# Solved problems:
+#
+# - Is now able to parse this code (see p_struct_or_union_specifier_ 1A and 3A):
 #
 #     typedef struct _IO_FILE _IO_FILE;
 #     extern struct _IO_FILE *stdin;
-#
-#
-#
-# Solved problems:
 #
 # - See comment in clex.py (typedef added too late to symbol table)
 #
@@ -190,6 +194,18 @@ def p_struct_or_union_specifier_2(t):
 
 def p_struct_or_union_specifier_3(t):
     'struct_or_union_specifier : struct_or_union ID'
+    pass
+
+# these two rules handle cases like:
+#     typedef struct _IO_FILE _IO_FILE;
+#     extern struct _IO_FILE *stdin;
+# In these cases TYPEID is not really a TYPEID but an ID!
+def p_struct_or_union_specifier_1A(t):
+    'struct_or_union_specifier : struct_or_union TYPEID LBRACE struct_declaration_list RBRACE'
+    pass
+
+def p_struct_or_union_specifier_3A(t):
+    'struct_or_union_specifier : struct_or_union TYPEID'
     pass
 
 # struct-or-union:
