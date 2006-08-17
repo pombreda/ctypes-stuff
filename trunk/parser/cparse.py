@@ -83,8 +83,24 @@ def p_function_definition_4(t):
 
 # declaration:
 
+# This technique is from Holub, Compiler design in C, page 536ff.
+# The grammar rule we need is this:
+#
+#    'declaration : declaration_specifiers init_declarator_list SEMI'
+#
+# but we need to add typedefs into the symbol table BEFORE the SEMI
+# token has been matched by the parser.  The ext_def_helper grammar rule
+# allows to insert an action before the SEMI token.
+#
+# The problem would occur with code like this:
+#    typedef int itype;
+#    itype x;
+
 def p_declaration_1(t):
-    'declaration : declaration_specifiers init_declarator_list SEMI'
+    'declaration : typedef_helper SEMI'
+
+def p_ext_def(t):
+    'typedef_helper : declaration_specifiers init_declarator_list'
     if "typedef" in t[1]:
         for name in t[2]:
             clex.add_typedef_name(name)
@@ -92,7 +108,6 @@ def p_declaration_1(t):
 
 def p_declaration_2(t):
     'declaration : declaration_specifiers SEMI'
-##    print "B", t[1], t.slice
 
 # declaration-list:
 
