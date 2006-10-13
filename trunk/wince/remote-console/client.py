@@ -55,6 +55,8 @@ def client():
         sys.last_type = sys.last_value = sys.last_traceback = \
                         __builtin__._ = None
 
+    except socket.error:
+        raise SystemExit
     except SystemExit:
         raise
     except:
