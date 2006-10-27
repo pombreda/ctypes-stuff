@@ -4,6 +4,8 @@
 #
 # A script to look up keywords in the Python manuals index
 #
+# Moved to SVN repository at http://ctypes-stuff.googlecode.com/svn/trunk/misc/pyhelp.cgi
+#
 # Revision 1.22  2003/08/07 17:33:16  thomas
 # Revert back to the state of 1.19, added Python 2.3, and changed to 2.3 as default.
 #
@@ -78,7 +80,7 @@ import sys, os
 if __name__ == '__main__':
     __file__ = sys.argv[0]
 
-__version__ = "$Rev$"
+__version__ = "$Rev$"[6:-3]
 
 
 DOCMAP = {
