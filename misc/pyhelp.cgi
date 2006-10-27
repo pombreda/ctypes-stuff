@@ -80,7 +80,7 @@ import sys, os
 if __name__ == '__main__':
     __file__ = sys.argv[0]
 
-__version__ = "$Rev$"[6:-3]
+__version__ = "$Rev$"[6:-2]
 
 
 DOCMAP = {
