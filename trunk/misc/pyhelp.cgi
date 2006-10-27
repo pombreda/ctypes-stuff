@@ -4,7 +4,11 @@
 #
 # A script to look up keywords in the Python manuals index
 #
-# Moved to SVN repository at http://ctypes-stuff.googlecode.com/svn/trunk/misc/pyhelp.cgi
+# 2006/10/27
+#   Moved to SVN repository at http://ctypes-stuff.googlecode.com/svn/trunk/misc/pyhelp.cgi
+#   Updated for Python 2.5.
+#
+################################################################
 #
 # Revision 1.22  2003/08/07 17:33:16  thomas
 # Revert back to the state of 1.19, added Python 2.3, and changed to 2.3 as default.
@@ -263,7 +267,7 @@ def cgi_help():
 
         print "Documentation version:"
         print '<select name="version">'
-        for vers in ["current", "2.4", "2.3", "2.2", "2.1", "2.0", "devel"]:
+        for vers in ["current", "2.5", "2.4", "2.3", "2.2", "2.1", "2.0", "devel"]:
             if form.has_key("version") and form["version"].value == vers:
                 print '<option value="%s" SELECTED>%s' % (vers, vers)
             else:
