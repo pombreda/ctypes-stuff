@@ -84,18 +84,12 @@ __version__ = "$Rev$"[6:-2]
 
 
 DOCMAP = {
-##    "2.0": "http://www.python.org/doc/2.0/",
-##    "2.1": "http://www.python.org/doc/2.1/",
-##    "2.2": "http://www.python.org/doc/2.2/",
-##    "2.3": "http://www.python.org/doc/2.3/",
-##    "2.4": "http://www.python.org/doc/2.4/",
-##    "devel": "http://www.python.org/dev/",
-##    "current": "http://www.python.org/doc/current/",
     "2.0": "http://www.python.org/doc/2.0/",
     "2.1": "http://www.python.org/doc/2.1/",
     "2.2": "http://www.python.org/doc/2.2/",
     "2.3": "http://www.python.org/doc/2.3/",
-    "2.4": "http://docs.python.org/",
+    "2.4": "http://www.python.org/doc/2.4/",
+    "2.5": "http://www.python.org/doc/2.5/",
     "current": "http://docs.python.org/",
     "devel": "http://docs.python.org/dev/",
 
@@ -107,6 +101,7 @@ DOCMAP = {
     }
 INDEXPAGE = "genindex.html" # XXX Only valid for 2.0 and above
 SECTIONS = "api/ ref/ lib/".split()
+DEFAULT_VERSION = "2.5"
 
 # modified from an example in the eff-bot guide to the Python Library...
 class Parser(htmllib.HTMLParser):
@@ -348,7 +343,7 @@ def main():
         print "Usage: %s [-b] [-r] [-v version] topic" % sys.argv[0]
         sys.exit(1)
 
-    version = "2.4"
+    version = DEFAULT_VERSION
     regexp = 0
     rebuild = 0
 
