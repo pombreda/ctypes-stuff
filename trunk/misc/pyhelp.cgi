@@ -78,7 +78,7 @@ import sys, os
 if __name__ == '__main__':
     __file__ = sys.argv[0]
 
-__version__ = "$Revision: 1.22 $"[11:-2]
+__version__ = "$Rev$"
 
 
 DOCMAP = {
@@ -327,7 +327,7 @@ alt="Powered by Python" width="55" height="22"></a>
         print '''
 <br><small>Download this script/module:<a href="%s?action=download">%s</a>, version %s.
 <br>Please send any comments/suggestions to
-<a href="mailto:theller@python.net">Thomas Heller</a>.</small>
+<a href="mailto:theller@ctypes.org">Thomas Heller</a>.</small>
 ''' % (os.path.basename(__file__), os.path.basename(__file__), __version__)
 
     print "</BODY></HTML>"
