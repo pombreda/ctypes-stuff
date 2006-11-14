@@ -1,1 +1,3 @@
 A C source code / header file parser in pure Python.  Needs PLY.
+
+Note:  fnorb contains a cpp implementation in pure Python.
