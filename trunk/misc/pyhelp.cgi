@@ -4,6 +4,10 @@
 #
 # A script to look up keywords in the Python manuals index
 #
+# 2006/11/17
+#   Fixed a html inject issue by using cgi.escape in the correct places.
+#   Thanks to Bernd Essl for the heads-up.
+#
 # 2006/10/27
 #   Moved to SVN repository at http://ctypes-stuff.googlecode.com/svn/trunk/misc/pyhelp.cgi
 #   Updated for Python 2.5.
@@ -260,7 +264,7 @@ def cgi_help():
         print "<form action=%s method=GET>" % os.path.basename(__file__)
         print "<b>Python Keyword</b>"
         if form.has_key("keyword"):
-            print '<input name="keyword" value="%s">' % form["keyword"].value
+            print '<input name="keyword" value="%s">' % cgi.escape(form["keyword"].value, True)
         else:
             print '<input name="keyword">'
         print '<input type="submit" value="search">'
@@ -297,7 +301,7 @@ def cgi_help():
         if not brief:
             print "<hr>"
             topic = form["keyword"].value
-            print "<p><b>%d search results for '%s':</b></p>" % (len(v), topic)
+            print "<p><b>%d search results for '%s':</b></p>" % (len(v), cgi.escape(topic))
             for topic, url in v:
                 print '<b><a href="%s">%s</a><br></b>\n' % (url, topic)
         else:
@@ -306,7 +310,7 @@ def cgi_help():
             for topic, url in v:
                 # Next hm. class=... has no effect. Which stylesheet to use?
                 print '<a class="text-link" href="%s" target="_content">%s</a><br>\n' \
-                      % (url, topic)
+                      % (url, cgi.escape(topic))
             print '</small>'
 
     if not brief:
