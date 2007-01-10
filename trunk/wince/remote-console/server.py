@@ -1,5 +1,5 @@
 # Thomas Heller 20060109
-# Remote console for PocketPC
+# Remote Python console for PocketPC
 #
 import socket, sys, threading, random, time
 import ctypes, ctypes.wintypes
@@ -8,10 +8,13 @@ import win32con
 PORT = random.choice(xrange(20000, 20999))    # port used for communication
 
 # full path to python executable on the pocket device
-REMOTE_EXE = ur'\Program Files\Python24\python.exe'
+REMOTE_EXE = ur'\Program Files\Python%s\python.exe'
 
-# full path to client.py script on the pocket device
-REMOTE_CLIENT = ur"\Temp\_script%s.py" % PORT
+DEFAULT_VERSION = '25' # Default Python version to start on the PPC,
+                       # can be overridden from the command line
+
+# full path to temporary client.py script on the pocket device
+REMOTE_CLIENT = ur'\Temp\_script%s.py' % PORT
 
 TIMEOUT = 5000 # rapi init timeout in milliseconds
 
@@ -51,7 +54,7 @@ ctypes.windll.kernel32.WaitForSingleObject.errcheck = WFSO_errcheck
 
 ################################################################
 
-def server():
+def server(version):
     # Init rapi, then transfer the client script data to the pocket pc.
     rapiinit = RAPIINIT()
     ctypes.oledll.rapi.CeRapiInitEx(ctypes.byref(rapiinit))
@@ -84,7 +87,7 @@ def server():
     # start the client process on the PocketPC
     own_ip = socket.gethostbyname(socket.gethostname())
     args = u"/new %s %s %s" % (unicode(REMOTE_CLIENT), own_ip, PORT)
-    ctypes.windll.rapi.CeCreateProcess(unicode(REMOTE_EXE),
+    ctypes.windll.rapi.CeCreateProcess(unicode(REMOTE_EXE % version),
                                        args,
                                        None, None,
                                        False, 0, None, None,
@@ -141,4 +144,10 @@ def server():
         ctypes.oledll.rapi.CeRapiUninit()
 
 if __name__ == "__main__":
-    server()
+    import getopt
+    opts, args = getopt.getopt(sys.argv[1:], "v:")
+    version = DEFAULT_VERSION
+    for o, a in opts:
+        if o == "-v":
+            version = a
+    server(version)
