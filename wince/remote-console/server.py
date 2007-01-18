@@ -3,7 +3,6 @@
 #
 import socket, sys, threading, random, time
 import ctypes, ctypes.wintypes
-import win32con
 
 PORT = random.choice(xrange(20000, 20999))    # port used for communication
 
@@ -44,31 +43,48 @@ ctypes.windll.rapi.CeCreateProcess.errcheck = errcheck
 
 ConnectError = SystemExit
 
+# Windows api constants (instead of including win32con)
+WAIT_TIMEOUT = 258
+WAIT_ABANDONED = 128
+GENERIC_WRITE = 1073741824
+CREATE_ALWAYS = 2
+
 def WFSO_errcheck(result, func, arguments):
-    if result == win32con.WAIT_TIMEOUT:
+    if result == WAIT_TIMEOUT:
         raise ConnectError("connection timeout")
-    elif result == win32con.WAIT_ABANDONED:
+    elif result == WAIT_ABANDONED:
         raise ConnectError("connection abandoned")
     
 ctypes.windll.kernel32.WaitForSingleObject.errcheck = WFSO_errcheck
 
 ################################################################
 
+def get_client_data():
+    if hasattr(sys, "frozen"):
+        kernel32 = ctypes.windll.kernel32
+        hrsrc = kernel32.FindResourceA(None, 1, 1000)
+        hglob = kernel32.LoadResource(None, hrsrc)
+        kernel32.LockResource.restype = ctypes.c_char_p
+        return kernel32.LockResource(hglob)
+    else:
+        return open("client.py").read()
+
+
 def server(version):
     # Init rapi, then transfer the client script data to the pocket pc.
     rapiinit = RAPIINIT()
     ctypes.oledll.rapi.CeRapiInitEx(ctypes.byref(rapiinit))
 
+    client_script_data = get_client_data()
     # Wait for connection (with timeout)
     ctypes.windll.kernel32.WaitForSingleObject(rapiinit.heRapiInit, TIMEOUT)
-        
+
     # transfer the client script
-    client_script_data = open("client.py", "rb").read()
     handle = ctypes.windll.rapi.CeCreateFile(REMOTE_CLIENT,
-                                             win32con.GENERIC_WRITE,
+                                             GENERIC_WRITE,
                                              0,
                                              None,
-                                             win32con.CREATE_ALWAYS,
+                                             CREATE_ALWAYS,
                                              0,
                                              None)
     written = ctypes.wintypes.DWORD()
