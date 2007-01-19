@@ -1,4 +1,5 @@
 import os, sys, socket, struct, getopt, time, random
+import ctypes
 from client import make_packet, read_packets
 import rapi
 
@@ -37,17 +38,27 @@ Options and arguments (and corresponding environment variables):
 -i     : inspect interactively after running script, (also PYTHONINSPECT=x)
          and force prompts, even if stdin does not appear to be a terminal
 -m mod : run library module as a script (terminates option list)
--v ver : use Python version <ver> on the PDA, default is to use the
-         same version running the console
+-v ver : use Python version <ver> on the PDA, default is 2.5
 file   : program read from script file
 -      : program read from stdin (default; interactive mode if a tty)
 arg ...: arguments passed to program in sys.argv[1:]
 """ % sys.argv[0]
 
+def get_client_data():
+    if hasattr(sys, "frozen"):
+        kernel32 = ctypes.windll.kernel32
+        hrsrc = kernel32.FindResourceA(None, 1, 1000)
+        hglob = kernel32.LoadResource(None, hrsrc)
+        kernel32.LockResource.restype = ctypes.c_char_p
+        return kernel32.LockResource(hglob)
+    else:
+        path = os.path.join(os.path.dirname(__file__), "client.py")
+        return open(path).read()
+
 def main(args=sys.argv[1:]):
     # Parse arguments
     opts, args = getopt.getopt(args, "c:him:v:")
-    remote_exe = REMOTE_EXE % (sys.version_info[0], sys.version_info[1])
+    remote_exe = REMOTE_EXE % (2, 5)
     for o, a in opts:
         if o == "-h":
             usage()
@@ -66,8 +77,7 @@ def main(args=sys.argv[1:]):
         rapi.Init()
     except rapi.ConnectError, details:
         raise SystemExit("Error: %s" % details)
-    rapi.CopyFile(os.path.join(os.path.dirname(__file__), "client.py"),
-                  client_script)
+    rapi.WriteFile(client_script, get_client_data())
 
     # Run script on the PDA, and run the console
     try:
@@ -79,7 +89,7 @@ def main(args=sys.argv[1:]):
         # It may not be possible immediately to delete the client
         # script file on the pocket PC, it remains open until the
         # Python process has finished; so try several times.
-        for i in range(10):
+        for _ in range(10):
             try:
                 rapi.DeleteFile(client_script)
             except WindowsError:

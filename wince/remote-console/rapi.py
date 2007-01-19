@@ -66,6 +66,24 @@ def CopyFile(src, dst):
     ctypes.windll.rapi.CeCloseHandle(handle)
     assert written.value == len(data)
 
+def WriteFile(pathname, data):
+    # copy local file to remote system via rapi calls
+    handle = ctypes.windll.rapi.CeCreateFile(unicode(pathname),
+                                             GENERIC_WRITE,
+                                             0,
+                                             None,
+                                             CREATE_ALWAYS,
+                                             0,
+                                             None)
+    written = ctypes.wintypes.DWORD()
+    ctypes.windll.rapi.CeWriteFile(handle,
+                                   data,
+                                   len(data),
+                                   ctypes.byref(written),
+                                   None)
+    ctypes.windll.rapi.CeCloseHandle(handle)
+    assert written.value == len(data)
+
 def CreateProcess(exepath, args):
     # start the a remote process
     ctypes.windll.rapi.CeCreateProcess(unicode(exepath),
