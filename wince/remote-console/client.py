@@ -26,7 +26,9 @@ def read_packets(conn):
 
 ################################################################
 
-def client(host, port):
+def interact(host, port, command):
+    # If command is None, start an interactive interpreter.
+    # If command is != None, execute it, then return.
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((host, port))
 
@@ -67,7 +69,15 @@ def client(host, port):
         sys.stderr = Output(sys.stderr)
         sys.stdout = Output(sys.stdout)
 
-        code.interact(banner=banner, readfunc=readfunc)
+        if command is None:
+            code.interact(banner=banner, readfunc=readfunc)
+        else:
+            try:
+                exec command in globals()
+            except SystemExit:
+                raise
+            except Exception:
+                import traceback; traceback.print_exc()
     finally:
         sys.stderr = sys.__stderr__
         sys.stdout = sys.__stderr__
@@ -76,15 +86,17 @@ def client(host, port):
 
 import getopt
 
-def main(args=sys.argv[1:]):
-    opts, args = getopt.getopt(args, "h:p:")
-    host, port = ("localhost", 10000)
+def main():
+    # First two command line args are how to connect to the console:
+    host = sys.argv[1]
+    port = int(sys.argv[2])
+    sys.argv = [''] + sys.argv[3:]
+    opts, args = getopt.getopt(sys.argv[1:], "c:")
+    command = None
     for o, a in opts:
-        if o == "-h":
-            host = a
-        elif o == "-p":
-            port = int(a)
-    client(host, port)
-
+        if o == "-c":
+            command = a
+    interact(host, port, command)
+    
 if __name__ == "__main__":
     main()
