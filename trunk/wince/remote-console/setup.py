@@ -7,13 +7,13 @@ from distutils.core import setup
 import py2exe
 import ctypes
 
-NAME = "RemotePython"
+NAME = "PythonConsole"
 VERSION = "1.0"
 
 # The client.py script is embedded as resource into the exe.
 client_data = open("client.py").read()
 
-server = dict(script = "server.py",
+console = dict(script = "console.py",
               other_resources = [(1000, 1, client_data + "\0")],
               dest_base = "%s-%s" % (NAME, VERSION),
               )
@@ -21,11 +21,16 @@ server = dict(script = "server.py",
 setup(
     name = NAME,
     version = VERSION,
+    description = "blah",
+    long_description = "foo " * 32,
     url = "blahblah",
     author = "theller@ctypes.org",
     author_email = "theller@ctypes.org",
-    
-    scripts = ["server.py", "client.py"],
+    license = "MIT",
+    platforms = ["Windows"],
+
+##    scripts = ["server.py", "client.py", "rapi.py"],
+    py_modules = ["console", "client", "rapi"],
     options = {"py2exe":
                {"excludes":"_ssl inspect calendar datetime".split(),
                 "compressed": 1,
@@ -35,5 +40,5 @@ setup(
                {"force_manifest": 1},
                },
     zipfile=None,
-    console = [server],
+    console = [console],
 )
