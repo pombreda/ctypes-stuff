@@ -1,68 +1,90 @@
-# Thomas Heller 20060109
-# client.py - runs on the Pocket_PC.
-import sys, socket, code, time
+import socket, sys, struct
+import code
 
-PS1 = "PocketPC>>> "
-PS2 = "PocketPC... "
+PS1 = "Remote>>> "
+PS2 = "Remote... "
 
-def client():
-    # An interactive Python interpreter that gets input from a socket,
-    # and sends output to this socket.
+################################################################
+
+def make_packet(data):
+    return struct.pack("<i", len(data)) + data
+
+def read_packets(conn):
+    # Decode packets, and yield them.
+    data = ""
+    while 1:
+        if not data:
+            data += conn.recv(1024)
+            if not data:
+                raise StopIteration
+        size = struct.unpack("<i", data[:4])[0]
+        data = data[4:]
+        while len(data) < size:
+            data += conn.recv(1024)
+        yield data[:size]
+        data = data[size:]
+
+################################################################
+
+def client(host, port):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((host, port))
+
+    reader = read_packets(s)
+
+    def readfunc(prompt=""):
+        sys.stderr.write(prompt)
+        s.sendall(make_packet(""))
+        try:
+            data = reader.next()
+        except StopIteration:
+            raise EOFError
+        sys.stderr._output.write(data)
+        sys.stderr._output.write("\n")
+        return data
+
+    class Output(object):
+        def __init__(self, output):
+            self._output = output
+
+        def write(self, text):
+            self._output.write(text)
+            s.sendall(make_packet(text))
+
+        def flush(self):
+            pass
+
+    banner = "Python %s\n(Remote Console on %s)" % \
+             (sys.version, (host, port))
+
+##    import __builtin__
+##    __builtin__.raw_input = readfunc
+##    __builtin__.input = lambda: eval(readfunc())
+
     try:
-        HOST, PORT = sys.argv[1], int(sys.argv[2])
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((HOST, PORT))
+        sys.ps1, sys.ps2 = PS1, PS2
 
-        def readfunc(prompt=""):
-            if prompt:
-                sys.stderr.write(prompt)
-            try:
-                data = s.recv(1024)
-            except EOFError:
-                s.close()
-            sys.stderr._output.write(data[:-1])
-            sys.stderr._output.write("\n")
-            return data[:-1]
-
-        class Output(object):
-            def __init__(self, output):
-                self._output = output
-
-            def write(self, text):
-                self._output.write(text)
-                s.send(text)
-
-            def flush(self): pass
-
-        sys.stdout = Output(sys.stdout)
         sys.stderr = Output(sys.stderr)
-        sys.ps1 = PS1
-        sys.ps2 = PS2
-
-        banner = "Python %s on %s\n(Remote Console on %s)" % \
-                 (sys.version, sys.platform, (HOST, PORT))
-
-        # Replace the builtin raw_input (which doesn't work on CE
-        # anyway), to make pdb work.
-        import __builtin__
-        __builtin__.raw_input = readfunc
-        __builtin__.input = lambda: eval(readfunc())
+        sys.stdout = Output(sys.stdout)
 
         code.interact(banner=banner, readfunc=readfunc)
+    finally:
+        sys.stderr = sys.__stderr__
+        sys.stdout = sys.__stderr__
 
-        # Clear everything that may contain objects to avoid possible
-        # problems when shutting down
-        sys.last_type = sys.last_value = sys.last_traceback = \
-                        __builtin__._ = None
+################################################################
 
-    except socket.error:
-        raise SystemExit
-    except SystemExit:
-        raise
-    except:
-        import traceback
-        traceback.print_exc()
-        time.sleep(5)
+import getopt
+
+def main(args=sys.argv[1:]):
+    opts, args = getopt.getopt(args, "h:p:")
+    host, port = ("localhost", 10000)
+    for o, a in opts:
+        if o == "-h":
+            host = a
+        elif o == "-p":
+            port = int(a)
+    client(host, port)
 
 if __name__ == "__main__":
-    client()
+    main()
