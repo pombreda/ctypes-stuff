@@ -59,14 +59,22 @@ def main(args=sys.argv[1:]):
     # Parse arguments
     opts, args = getopt.getopt(args, "c:him:v:")
     remote_exe = REMOTE_EXE % (2, 5)
+    command = None
     for o, a in opts:
         if o == "-h":
             usage()
             raise SystemExit
         elif o == "-v":
             remote_exe = REMOTE_EXE % tuple(a.split("."))
+        elif o == "-c":
+            command = a
+        elif o == "-m":
+            command = "import runpy; runpy.run_module('%s', run_name='__main__', alter_sys=True)" % a
         else:
             raise SystemExit("Error: option %s not (yet) implemented" % o)
+
+    if "-m" in sys.argv[1:] and remote_exe < (REMOTE_EXE % (2, 5)):
+        raise SystemExit("Error: '-m' option requires at least Python 2.5")
 
     # Prepare script on the PDA
     own_ip = socket.gethostbyname(socket.gethostname())
@@ -81,9 +89,14 @@ def main(args=sys.argv[1:]):
 
     # Run script on the PDA, and run the console
     try:
-        rapi.CreateProcess(remote_exe,
-                           ur"/new %s -h %s -p %s" % (client_script, own_ip, port))
-        console("localhost", port)
+        if command is None:
+            rapi.CreateProcess(remote_exe,
+                               ur"/new %s %s %s" % (client_script, own_ip, port))
+            console("localhost", port)
+        else:
+            rapi.CreateProcess(remote_exe,
+                               ur"/new %s %s %s -c %r" % (client_script, own_ip, port, command))
+            console("localhost", port)
     # Now cleanup.
     finally:
         # It may not be possible immediately to delete the client
