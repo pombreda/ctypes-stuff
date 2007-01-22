@@ -25,25 +25,36 @@ def console(host, port):
         else:
             sys.stderr.write(packet)
 
-################################################################
+def parse_args(args):
+    from optparse import OptionParser
+
+    def terminate(option, opt_str, value, parser):
+        # optparser callback for an argument that terminates the options
+        # list. Remaining arguments will appear in 'args'.
+        setattr(parser.values, option.dest, value)
+        parser.largs.extend(parser.rargs[:])
+        del parser.rargs[:]
+
+    parser = OptionParser()
+    parser.disable_interspersed_args()
+    parser.add_option("-c", action="callback", callback=terminate, dest="command",
+                      type="string",
+                      help="program passed in as string (terminates option list)")
+    parser.add_option("-i", action="store_true", default=False, dest="interactive",
+                      help="inspect interactively after running script")
+    parser.add_option("-m", action="callback", callback=terminate, dest="module",
+                      type="string",
+                      help="run library module as script (terminates option list)")
+    parser.add_option("-u", action="store_true", default=False, dest="unbuffered",
+                      help="unbuffered binary stdout and stderr (a tad)")
+    parser.add_option("-v", dest = "target_version", default="2.5",
+                      help="specify Python version to use, default is 2.5")
+
+    options, args = parser.parse_args(args)
+    return options, args
 
 REMOTE_EXE = ur'\Program Files\Python%s%s\python.exe'
     
-def usage():
-    print """\
-usage: %s [option] ... [-c cmd | -m mod | file | -] [arg] ..
-Options and arguments (and corresponding environment variables):
--c cmd : program passed in as string (terminates option list)
--h     : print this help message and exit (also --help)
--i     : inspect interactively after running script, (also PYTHONINSPECT=x)
-         and force prompts, even if stdin does not appear to be a terminal
--m mod : run library module as a script (terminates option list)
--v ver : use Python version <ver> on the PDA, default is 2.5
-file   : program read from script file
--      : program read from stdin (default; interactive mode if a tty)
-arg ...: arguments passed to program in sys.argv[1:]
-""" % sys.argv[0]
-
 def get_client_data():
     if hasattr(sys, "frozen"):
         kernel32 = ctypes.windll.kernel32
@@ -57,24 +68,17 @@ def get_client_data():
 
 def main(args=sys.argv[1:]):
     # Parse arguments
-    opts, args = getopt.getopt(args, "c:him:v:")
-    remote_exe = REMOTE_EXE % (2, 5)
-    command = None
-    for o, a in opts:
-        if o == "-h":
-            usage()
-            raise SystemExit
-        elif o == "-v":
-            remote_exe = REMOTE_EXE % tuple(a.split("."))
-        elif o == "-c":
-            command = a
-        elif o == "-m":
-            command = "import runpy; runpy.run_module('%s', run_name='__main__', alter_sys=True)" % a
-        else:
-            raise SystemExit("Error: option %s not (yet) implemented" % o)
+    opts, args = parse_args(args)
 
-    if "-m" in sys.argv[1:] and remote_exe < (REMOTE_EXE % (2, 5)):
-        raise SystemExit("Error: '-m' option requires at least Python 2.5")
+    version = opts.target_version.split(".")
+    remote_exe = REMOTE_EXE % tuple(version)
+
+    if opts.module is None and opts.command is None and args:
+        raise NotImplementedError
+
+    if opts.module is not None:
+        opts.command = "import runpy;" + \
+                       "runpy.run_module('%s', run_name='__main__', alter_sys=True)" % opts.module
 
     # Prepare script on the PDA
     own_ip = socket.gethostbyname(socket.gethostname())
@@ -87,16 +91,14 @@ def main(args=sys.argv[1:]):
         raise SystemExit("Error: %s" % details)
     rapi.WriteFile(client_script, get_client_data())
 
+    cmdline = ur"/new %s %s %s" % (client_script, own_ip, port)
+    if opts.command is not None:
+        cmdline = cmdline + " -c %r" % opts.command
+
     # Run script on the PDA, and run the console
     try:
-        if command is None:
-            rapi.CreateProcess(remote_exe,
-                               ur"/new %s %s %s" % (client_script, own_ip, port))
-            console("localhost", port)
-        else:
-            rapi.CreateProcess(remote_exe,
-                               ur"/new %s %s %s -c %r" % (client_script, own_ip, port, command))
-            console("localhost", port)
+        rapi.CreateProcess(remote_exe, cmdline)
+        console("localhost", port)
     # Now cleanup.
     finally:
         # It may not be possible immediately to delete the client
