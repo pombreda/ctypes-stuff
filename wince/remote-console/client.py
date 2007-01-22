@@ -1,9 +1,6 @@
 import socket, sys, struct
 import code
 
-PS1 = "Remote>>> "
-PS2 = "Remote... "
-
 ################################################################
 
 def make_packet(data):
@@ -64,14 +61,14 @@ def interact(host, port, command):
 ##    __builtin__.input = lambda: eval(readfunc())
 
     try:
-        sys.ps1, sys.ps2 = PS1, PS2
-
         sys.stderr = Output(sys.stderr)
         sys.stdout = Output(sys.stdout)
 
         if command is None:
             code.interact(banner=banner, readfunc=readfunc)
         else:
+            if sys.argv[1] == '-c':
+                sys.argv = ['-c']
             try:
                 exec command in globals()
             except SystemExit:
