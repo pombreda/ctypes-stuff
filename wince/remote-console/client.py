@@ -85,20 +85,34 @@ def interact(host, port, encoding, command):
 
 ################################################################
 
-import getopt
+def parse_args(args):
+    from optparse import OptionParser
+
+    def command(option, opt_str, value, parser):
+        # optparser callback for an argument that terminates the options
+        # list. Remaining arguments will appear in 'args'.
+        setattr(parser.values, option.dest, value)
+        parser.largs.append("-c")
+        parser.largs.extend(parser.rargs[:])
+        del parser.rargs[:]
+
+    parser = OptionParser()
+    parser.disable_interspersed_args()
+    parser.add_option("-c", action="callback", callback=command, dest="command",
+                      type="string",
+                      help="program passed in as string (terminates option list)")
+
+    return parser.parse_args(args)
 
 def main():
     # First two command line args are how to connect to the console:
     host = sys.argv[1]
     port = int(sys.argv[2])
     encoding = sys.argv[3]
-    sys.argv = [''] + sys.argv[4:]
-    opts, args = getopt.getopt(sys.argv[1:], "c:")
-    command = None
-    for o, a in opts:
-        if o == "-c":
-            command = a
-    interact(host, port, encoding, command)
+    opts, args = parse_args(sys.argv[4:])
+    sys.argv = args
+
+    interact(host, port, encoding, opts.command)
     
 if __name__ == "__main__":
     main()
