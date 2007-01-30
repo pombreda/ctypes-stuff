@@ -94,6 +94,8 @@ def main(args=sys.argv[1:]):
     cmdline = ur"/new %s %s %s %s" % (client_script, own_ip, port, sys.stdout.encoding)
     if opts.command is not None:
         cmdline = cmdline + " -c %r" % opts.command
+    for arg in args:
+        cmdline = cmdline + " %r" % arg
 
     # Run script on the PDA, and run the console
     try:
