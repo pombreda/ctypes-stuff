@@ -35,7 +35,8 @@ setup(
                {"excludes":"_ssl inspect calendar datetime".split(),
                 "compressed": 1,
                 "bundle_files": 1,
-                "ascii": 1},
+##                "ascii": 1,
+                },
                "sdist":
                {"force_manifest": 1},
                },
