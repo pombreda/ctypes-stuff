@@ -38,7 +38,8 @@ def interact(host, port, command):
             data = reader.next()
         except StopIteration:
             raise EOFError
-        sys.stderr._output.write(data)
+        data = data.decode("utf-8")
+        sys.stderr._output.write(data.encode("latin-1", "replace"))
         sys.stderr._output.write("\n")
         return data
 
@@ -47,6 +48,8 @@ def interact(host, port, command):
             self._output = output
 
         def write(self, text):
+            if isinstance(text, unicode):
+                text = text.encode("utf-8", "replace")
             self._output.write(text)
             s.sendall(make_packet(text))
 
