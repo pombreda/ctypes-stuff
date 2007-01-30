@@ -91,7 +91,7 @@ def main(args=sys.argv[1:]):
         raise SystemExit("Error: %s" % details)
     rapi.WriteFile(client_script, get_client_data())
 
-    cmdline = ur"/new %s %s %s" % (client_script, own_ip, port)
+    cmdline = ur"/new %s %s %s %s" % (client_script, own_ip, port, sys.stdout.encoding)
     if opts.command is not None:
         cmdline = cmdline + " -c %r" % opts.command
 
