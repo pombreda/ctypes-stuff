@@ -1,2 +1,11 @@
 When ^C is hit in console.py, the server is terminated.  Instead, the
 client should be interrupted (or whatever is possible to implement).
+
+Implement 'console.py file.py <args>'.
+
+Handle the case where sys.stdin is not a terminal (suppress prompt and
+banner).
+
+Can unicode handling be improved?  Maybe we should send and receive
+the data in whatever encoding the console is using, and handling
+decoding/encoding on the PDA?

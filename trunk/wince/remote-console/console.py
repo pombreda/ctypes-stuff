@@ -20,10 +20,14 @@ def console(host, port):
             except EOFError:
                 conn.close()
                 return
+            data = data.decode(sys.stdin.encoding)
+            data = data.encode("utf-8")
             conn.sendall(make_packet(data))
         # nonempty packet: display it
         else:
-            sys.stderr.write(packet)
+            packet = packet.decode("utf-8")
+            packet = packet.encode(sys.stdout.encoding, "replace")
+            sys.stdout.write(packet)
 
 def parse_args(args):
     from optparse import OptionParser
