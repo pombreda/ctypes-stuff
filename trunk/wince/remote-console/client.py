@@ -23,7 +23,7 @@ def read_packets(conn):
 
 ################################################################
 
-def interact(host, port, command):
+def interact(host, port, encoding, command):
     # If command is None, start an interactive interpreter.
     # If command is != None, execute it, then return.
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -43,12 +43,13 @@ def interact(host, port, command):
         return data
 
     class Output(object):
-        def __init__(self, output):
+        def __init__(self, output, encoding):
             self._output = output
+            self.encoding = encoding
 
         def write(self, text):
             if isinstance(text, unicode):
-                text = text.encode("cp850", "replace")
+                text = text.encode(self.encoding, "replace")
             self._output.write(text)
             s.sendall(make_packet(text))
 
@@ -63,8 +64,8 @@ def interact(host, port, command):
 ##    __builtin__.input = lambda: eval(readfunc())
 
     try:
-        sys.stderr = Output(sys.stderr)
-        sys.stdout = Output(sys.stdout)
+        sys.stderr = Output(sys.stderr, encoding)
+        sys.stdout = Output(sys.stdout, encoding)
 
         if command is None:
             code.interact(banner=banner, readfunc=readfunc)
@@ -89,13 +90,14 @@ def main():
     # First two command line args are how to connect to the console:
     host = sys.argv[1]
     port = int(sys.argv[2])
-    sys.argv = [''] + sys.argv[3:]
+    encoding = sys.argv[3]
+    sys.argv = [''] + sys.argv[4:]
     opts, args = getopt.getopt(sys.argv[1:], "c:")
     command = None
     for o, a in opts:
         if o == "-c":
             command = a
-    interact(host, port, command)
+    interact(host, port, encoding, command)
     
 if __name__ == "__main__":
     main()
