@@ -4,6 +4,8 @@ import ctypes
 from client import make_packet, read_packets
 import rapi
 
+OWN_IP = "192.168.131.102" # Default device IP from synce.  Not used on Windows.
+
 def console(host, port):
 
     inp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -82,7 +84,10 @@ def main(args=sys.argv[1:]):
                        "runpy.run_module('%s', run_name='__main__', alter_sys=True)" % opts.module
 
     # Prepare script on the PDA
-    own_ip = socket.gethostbyname(socket.gethostname())
+    if sys.platform == "win32":
+        own_ip = socket.gethostbyname(socket.gethostname())
+    else:
+        own_ip = OWN_IP
     # Select a random port, so we could start several consoles at the same time
     port = random.choice(xrange(20000, 20999))
     client_script = ur"\Temp\_script%s.py" % port
