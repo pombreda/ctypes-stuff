@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import os, sys, socket, struct, getopt, time, random
 import ctypes
 from client import make_packet, read_packets
