@@ -100,7 +100,7 @@ def main(args=sys.argv[1:]):
     # Run script on the PDA, and run the console
     try:
         rapi.CreateProcess(remote_exe, cmdline)
-        console("localhost", port)
+        console(own_ip, port)
     # Now cleanup.
     finally:
         # It may not be possible immediately to delete the client
