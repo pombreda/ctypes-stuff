@@ -86,8 +86,9 @@ def main(args=sys.argv[1:]):
     # Prepare script on the PDA
     if sys.platform == "win32":
         own_ip = socket.gethostbyname(socket.gethostname())
+        server_name = "localhost"
     else:
-        own_ip = OWN_IP
+        server_name = own_ip = OWN_IP
     # Select a random port, so we could start several consoles at the same time
     port = random.choice(xrange(20000, 20999))
     client_script = ur"\Temp\_script%s.py" % port
@@ -106,7 +107,7 @@ def main(args=sys.argv[1:]):
     # Run script on the PDA, and run the console
     try:
         rapi.CreateProcess(remote_exe, cmdline)
-        console(own_ip, port)
+        console(server_name, port)
     # Now cleanup.
     finally:
         # It may not be possible immediately to delete the client
