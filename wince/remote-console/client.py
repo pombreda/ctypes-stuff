@@ -70,9 +70,6 @@ def interact(host, port, encoding, command):
         if command is None:
             code.interact(banner=banner, readfunc=readfunc)
         else:
-            if sys.argv[1] == '-c':
-                del sys.argv[2]
-                del sys.argv[0]
             try:
                 exec command in globals()
             except SystemExit:
