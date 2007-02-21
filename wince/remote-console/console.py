@@ -116,7 +116,7 @@ def main(args=sys.argv[1:]):
         for _ in range(10):
             try:
                 rapi.DeleteFile(client_script)
-            except WindowsError:
+            except OSError:
                 time.sleep(0.2)
                 continue
             else:
