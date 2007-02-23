@@ -56,7 +56,7 @@ def parse_args(args):
     options, args = parser.parse_args(args)
     return options, args
 
-REMOTE_EXE = ur'\Program Files\Python%s%s\python.exe'
+REMOTE_EXE = ur'%s\Python%s%s\python.exe'
     
 def get_client_data():
     if hasattr(sys, "frozen"):
@@ -74,7 +74,6 @@ def main(args=sys.argv[1:]):
     opts, args = parse_args(args)
 
     version = opts.target_version.split(".")
-    remote_exe = REMOTE_EXE % tuple(version)
 
     if opts.module is None and opts.command is None and args:
         raise NotImplementedError
@@ -96,6 +95,7 @@ def main(args=sys.argv[1:]):
         rapi.Init()
     except rapi.ConnectError, details:
         raise SystemExit("Error: %s" % details)
+
     rapi.WriteFile(client_script, get_client_data())
 
     cmdline = ur"/new %s %s %s %s" % (client_script, own_ip, port, sys.stdout.encoding)
@@ -103,6 +103,9 @@ def main(args=sys.argv[1:]):
         cmdline = cmdline + " -c %r" % opts.command
     for arg in args:
         cmdline = cmdline + " %r" % arg
+
+    remote_exe = REMOTE_EXE % (rapi.GetSpecialFolderPath(rapi.CSIDL_PROGRAM_FILES),
+                               version[0], version[1])
 
     # Run script on the PDA, and run the console
     try:
