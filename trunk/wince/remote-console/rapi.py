@@ -84,6 +84,46 @@ CREATE_ALWAYS = 2
 
 ################################################################
 
+#####################################################################
+# getSpecialFolderPath
+
+rapi.CeGetSpecialFolderPath.errcheck = errcheck
+rapi.CeGetSpecialFolderPath.argtypes = (ctypes.c_int, DWORD, ctypes.c_void_p);
+
+def GetSpecialFolderPath(folderid):
+    # We pass a CHAR buffer, but CeGetSpecialFolderPath expects a
+    # WCHAR buffer.
+    buf = ctypes.create_string_buffer(128*2)
+    size = rapi.CeGetSpecialFolderPath(folderid, 128, buf)
+    return buf[:2*size].decode('utf-16')
+
+CSIDL_PROGRAMS=           0x0002
+CSIDL_PERSONAL=           0x0005
+CSIDL_FAVORITES_GRYPHON=  0x0006
+CSIDL_STARTUP=            0x0007
+CSIDL_RECENT=             0x0008
+CSIDL_STARTMENU  =        0x000b
+CSIDL_DESKTOPDIRECTORY=   0x0010
+CSIDL_FONTS=              0x0014
+CSIDL_FAVORITES=          0x0016
+
+CSIDL_PROGRAM_FILES=      0x0026
+
+################################################################
+# Error codes from Synce project (librapi2/src/rapi_types.h)
+
+ERROR_SUCCESS = 0
+ERROR_FILE_NOT_FOUND = 2
+ERROR_NOT_ENOUGH_MEMORY = 8
+ERROR_SEEK = 25
+ERROR_INVALID_PARAMETER = 87
+ERROR_INSUFFICIENT_BUFFER    = 122
+ERROR_NO_DATA = 232
+ERROR_NO_MORE_ITEMS = 259
+ERROR_KEY_DELETED    = 1018
+
+################################################################
+
 def WriteFile(pathname, data):
     # copy a local file to remote system via rapi calls
     handle = rapi.CeCreateFile(pathname,
