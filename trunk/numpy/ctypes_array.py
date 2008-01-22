@@ -1,4 +1,4 @@
-"""This module implements the public functions 'numpy_array' and
+"""This module implements the public functions 'as_array' and
 'as_ctypes', which can construct numpy arrays from ctypes instances,
 and ctypes instances from numpy arrays.
 
@@ -14,7 +14,7 @@ import sys
 from ctypes import *
 import numpy.core.multiarray
 
-__all__ = ["numpy_array"]
+__all__ = ["as_array", "as_ctypes"]
 
 ################################################################
 # simple types
@@ -101,7 +101,7 @@ def prep_array(array_type):
 ################################################################
 # public functions
 
-def numpy_array(obj):
+def as_array(obj):
     """Create a numpy array from a ctypes array.  The numpy array
     shares the memory with the ctypes object."""
     prep_array(type(obj))
