@@ -1,4 +1,4 @@
-"""This module contains the public functions 'numpy_array' and
+"""This module implements the public functions 'numpy_array' and
 'as_ctypes', which can construct numpy arrays from ctypes instances,
 and ctypes instances from numpy arrays.
 
@@ -6,8 +6,8 @@ It uses the __array_interface__ version 3, see
 http://numpy.scipy.org/array_interface.shtml
 
 ctypes does not support the __array_interface__, so this module
-attaches __array_interface__ properties to the ctypes types at
-runtime.  This module could/should also be implemented in C using the
+attaches __array_interface__ properties to the ctypes types when
+needed.  This module could/should also be implemented in C using the
 __array_struct__ description, which would probably be a lot faster.
 """
 import sys
