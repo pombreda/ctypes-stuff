@@ -12,7 +12,7 @@ __array_struct__ description, which would probably be a lot faster.
 """
 import sys
 from ctypes import *
-import numpy.core.multiarray
+from numpy.core.multiarray import array as multi_array
 
 __all__ = ["as_array", "as_ctypes"]
 
@@ -105,7 +105,7 @@ def as_array(obj):
     """Create a numpy array from a ctypes array.  The numpy array
     shares the memory with the ctypes object."""
     prep_array(type(obj))
-    return numpy.core.multiarray.array(obj)
+    return multi_array(obj)
 
 def as_ctypes(obj):
     """Create and return a ctypes object from a numpy array.  Actually
@@ -118,4 +118,3 @@ def as_ctypes(obj):
     result = tp.from_address(addr)
     result.__keep = ai
     return result
-
