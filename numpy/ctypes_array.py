@@ -112,34 +112,10 @@ def as_ctypes(obj):
     anything that exposes the __array_interface__ is accepted."""
     ai = obj.__array_interface__
     tp = _typecodes[ai["typestr"]]
-    for dim in reversed(ai["shape"]):
+    for dim in ai["shape"][::-1]:
         tp = tp * dim
     addr = ai["data"][0]
     result = tp.from_address(addr)
     result.__keep = ai
     return result
 
-################################################################
-
-if __name__ == "__main__":
-
-    a = c_short(3)
-    b = c_float(21.703)
-    c = (c_float * 3 * 2)(*((1, 2, 3), (4, 5, 6)))
-##    print c
-
-    a = numpy_array(a)
-    b = numpy_array(b)
-    nc = numpy_array(c)
-
-##    import gc; gc.collect(); gc.collect()
-
-##    print (a, b, nc)
-##    print typecodes
-
-    c2 = as_ctypes(nc)
-
-    print c, nc, c2
-    print c == c2
-
-    print as_ctypes(a)
