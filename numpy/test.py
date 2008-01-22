@@ -16,7 +16,7 @@ class Test(unittest.TestCase):
 
     def test_ct_to_np(self):
         c = (c_int * 3 * 2)(*((1, 2, 3), (4, 5, 6)))
-        n = ctypes_array.numpy_array(c)
+        n = ctypes_array.as_array(c)
 
         for i in range(2):
             for j in range(3):
