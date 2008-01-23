@@ -105,7 +105,7 @@ def as_array(obj):
     """Create a numpy array from a ctypes array.  The numpy array
     shares the memory with the ctypes object."""
     prep_array(type(obj))
-    return multi_array(obj)
+    return multi_array(obj, copy=False)
 
 def as_ctypes(obj):
     """Create and return a ctypes object from a numpy array.  Actually
