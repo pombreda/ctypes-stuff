@@ -18,8 +18,12 @@ class Test(unittest.TestCase):
         c = (c_int * 3 * 2)(*((1, 2, 3), (4, 5, 6)))
         n = ctypes_array.as_array(c)
 
+        self.failUnless(n.base is c)
+
         for i in range(2):
             for j in range(3):
+                self.failUnlessEqual(c[i][j], n[i,j])
+                c[i][j] = 0
                 self.failUnlessEqual(c[i][j], n[i,j])
 
         
