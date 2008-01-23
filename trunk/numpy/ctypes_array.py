@@ -104,7 +104,9 @@ def prep_array(array_type):
 def as_array(obj):
     """Create a numpy array from a ctypes array.  The numpy array
     shares the memory with the ctypes object."""
-    prep_array(type(obj))
+    tp = type(obj)
+    try: tp.__array_interface__
+    except AttributeError: prep_array(tp)
     return multi_array(obj, copy=False)
 
 def as_ctypes(obj):
