@@ -2,17 +2,18 @@ Roman Yakovenko pointed me by email to an interesting post:
 
 http://blogs.msdn.com/vcblog/archive/2008/12/08/inheriting-from-a-native-c-class-in-c.aspx
 
-This post describes an experiment in which a C++ class is called from
-C# code.  A very similar mechanism could be used in Python via ctypes,
-if only the __thiscall calling convention were implemented (it isn't
+It describes an experiment in which a C++ class is called from C#
+code.  A very similar mechanism could be used in Python via ctypes, if
+only the __thiscall calling convention were implemented (it isn't
 currently).
 
 The files in this directory allow to experiment with this mechanism:
 
 ctypes-thiscall.patch:
-  A preliminary patch against Python trunk, to add the thiscall
-  calling convention to ctypes.  Functions (actually methods) must be
-  created using the CPPDLL library loader.
+  A very preliminary patch against Python trunk, which adds the
+  thiscall calling convention to ctypes.  Functions (actually methods)
+  must be created using the CPPDLL library loader.
+
   The patch must be applied to Python trunk, and Python must be
   recompiled.
 
