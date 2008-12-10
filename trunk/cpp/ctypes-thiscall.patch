@@ -1,0 +1,257 @@
+Index: Lib/ctypes/__init__.py
+===================================================================
+--- Lib/ctypes/__init__.py	(revision 67687)
++++ Lib/ctypes/__init__.py	(working copy)
+@@ -111,6 +111,7 @@
+ if _os.name in ("nt", "ce"):
+     from _ctypes import LoadLibrary as _dlopen
+     from _ctypes import FUNCFLAG_STDCALL as _FUNCFLAG_STDCALL
++    from _ctypes import FUNCFLAG_THISCALL as _FUNCFLAG_THISCALL
+     if _os.name == "ce":
+         # 'ce' doesn't have the stdcall calling convention
+         _FUNCFLAG_STDCALL = _FUNCFLAG_CDECL
+@@ -388,6 +389,12 @@
+         """
+         _func_flags_ = _FUNCFLAG_STDCALL
+ 
++    class CPPDLL(CDLL):
++        """This class represents a dll exporting functions using the
++        Windows thiscall calling convention.
++        """
++        _func_flags_ = _FUNCFLAG_THISCALL
++
+     # XXX Hm, what about HRESULT as normal parameter?
+     # Mustn't it derive from c_long then?
+     from _ctypes import _check_HRESULT, _SimpleCData
+Index: Modules/_ctypes/_ctypes.c
+===================================================================
+--- Modules/_ctypes/_ctypes.c	(revision 67687)
++++ Modules/_ctypes/_ctypes.c	(working copy)
+@@ -5569,6 +5569,7 @@
+ 
+ 	PyModule_AddObject(m, "FUNCFLAG_HRESULT", PyInt_FromLong(FUNCFLAG_HRESULT));
+ 	PyModule_AddObject(m, "FUNCFLAG_STDCALL", PyInt_FromLong(FUNCFLAG_STDCALL));
++	PyModule_AddObject(m, "FUNCFLAG_THISCALL", PyInt_FromLong(FUNCFLAG_THISCALL));
+ #endif
+ 	PyModule_AddObject(m, "FUNCFLAG_CDECL", PyInt_FromLong(FUNCFLAG_CDECL));
+ 	PyModule_AddObject(m, "FUNCFLAG_USE_ERRNO", PyInt_FromLong(FUNCFLAG_USE_ERRNO));
+Index: Modules/_ctypes/callproc.c
+===================================================================
+--- Modules/_ctypes/callproc.c	(revision 67687)
++++ Modules/_ctypes/callproc.c	(working copy)
+@@ -773,8 +773,11 @@
+ 	
+ 	cc = FFI_DEFAULT_ABI;
+ #if defined(MS_WIN32) && !defined(MS_WIN64) && !defined(_WIN32_WCE)
+-	if ((flags & FUNCFLAG_CDECL) == 0)
++	if ((flags & FUNCFLAG_CDECL) == 0) {
+ 		cc = FFI_STDCALL;
++		if ((flags & FUNCFLAG_THISCALL) == FUNCFLAG_THISCALL)
++			cc = FFI_THISCALL;
++	}
+ #endif
+ 	if (FFI_OK != ffi_prep_cif(&cif,
+ 				   cc,
+Index: Modules/_ctypes/ctypes.h
+===================================================================
+--- Modules/_ctypes/ctypes.h	(revision 67687)
++++ Modules/_ctypes/ctypes.h	(working copy)
+@@ -324,6 +324,7 @@
+ #define FUNCFLAG_PYTHONAPI 0x4
+ #define FUNCFLAG_USE_ERRNO 0x8
+ #define FUNCFLAG_USE_LASTERROR 0x10
++#define FUNCFLAG_THISCALL 0x20
+ 
+ #define TYPEFLAG_ISPOINTER 0x100
+ #define TYPEFLAG_HASPOINTER 0x200
+Index: Modules/_ctypes/libffi_msvc/ffi.c
+===================================================================
+--- Modules/_ctypes/libffi_msvc/ffi.c	(revision 67687)
++++ Modules/_ctypes/libffi_msvc/ffi.c	(working copy)
+@@ -169,6 +169,17 @@
+ 		 void (*fn)());
+ /*@=declundef@*/
+ /*@=exportheader@*/
++
++/*@-declundef@*/
++/*@-exportheader@*/
++extern int
++ffi_call_THISCALL(void (*)(char *, extended_cif *),
++		 /*@out@*/ extended_cif *,
++		 unsigned, unsigned,
++		 /*@out@*/ unsigned *,
++		 void (*fn)());
++/*@=declundef@*/
++/*@=exportheader@*/
+ #endif
+ 
+ #ifdef _WIN64
+@@ -221,6 +232,13 @@
+ 			      cif->flags, ecif.rvalue, fn);
+       /*@=usedef@*/
+       break;
++
++    case FFI_THISCALL:
++      /*@-usedef@*/
++      return ffi_call_THISCALL(ffi_prep_args, &ecif, cif->bytes,
++			       cif->flags, ecif.rvalue, fn);
++      /*@=usedef@*/
++      break;
+ #else
+     case FFI_SYSV:
+       /*@-usedef@*/
+Index: Modules/_ctypes/libffi_msvc/ffitarget.h
+===================================================================
+--- Modules/_ctypes/libffi_msvc/ffitarget.h	(revision 67687)
++++ Modules/_ctypes/libffi_msvc/ffitarget.h	(working copy)
+@@ -51,6 +51,7 @@
+ #ifndef _WIN64
+   FFI_STDCALL,
+ #endif
++  FFI_THISCALL,
+   /* TODO: Add fastcall support for the sake of completeness */
+   FFI_DEFAULT_ABI = FFI_SYSV,
+ 
+Index: Modules/_ctypes/libffi_msvc/win32.c
+===================================================================
+--- Modules/_ctypes/libffi_msvc/win32.c	(revision 67687)
++++ Modules/_ctypes/libffi_msvc/win32.c	(working copy)
+@@ -37,6 +37,16 @@
+ #include <ffi.h>
+ #include <ffi_common.h>
+ 
++/* theller: Refactoring needed.  The only difference between ffi_call_SYSV,
++ffi_call_STDCALL, and ffi_call_THISCALL are a few statements around the
++'call [ebp + 28]' command.
++
++ffi_call_SYSV removes the pushed arguments from the stack, ffi_call_STDCALL
++does not have to do this, and ffi_call_THISCALL pops the first arg from the
++stack into the ECX register just before the call and does not have to remove
++anything thereafter.
++*/
++
+ __declspec(naked) int
+ ffi_call_SYSV(void (* prepfunc)(char *, extended_cif *), /* 8 */
+ 		 extended_cif *ecif, /* 12 */
+@@ -265,3 +275,121 @@
+ 		ret
+ 	}
+ }
++
++__declspec(naked) int
++ffi_call_THISCALL(void (* prepfunc)(char *, extended_cif *), /* 8 */
++		  extended_cif *ecif, /* 12 */
++		  unsigned bytes, /* 16 */
++		  unsigned flags, /* 20 */
++		  unsigned *rvalue, /* 24 */
++		  void (*fn)()) /* 28 */
++{
++	_asm {
++		push ebp
++		mov ebp, esp
++
++		push esi // NEW: this register must be preserved across function calls
++
++// XXX SAVE ESP NOW!
++		mov esi, esp
++
++// Make room for all of the new args.
++		mov ecx, [ebp+16]
++		sub esp, ecx
++		
++		mov eax, esp
++
++// Place all of the ffi_prep_args in position
++		push [ebp + 12] // ecif
++		push eax
++		call [ebp + 8] // prepfunc
++
++// Return stack to previous state and call the function
++		add esp, 8
++
++// Get first argument and put it into the ECX register (thiscall convention)
++		pop ecx
++
++// FIXME: Align the stack to a 128-bit boundary to avoid
++// potential performance hits.
++		call [ebp + 28]
++// stdcall functions pop arguments off the stack themselves
++
++// XXX IS ESP NOW THE SAME AS BEFORE?
++		sub esi, esp
++
++// Load %ecx with the return type code
++		mov ecx, [ebp + 20]
++
++// If the return value pointer is NULL, assume no return value.
++/*
++  Intel asm is weird. We have to explicitely specify 'DWORD PTR' in the nexr instruction,
++  otherwise only one BYTE will be compared (instead of a DWORD)!
++ */
++		cmp DWORD PTR [ebp + 24], 0
++		jne sc_retint
++
++// Even if there is no space for the return value, we are
++// obliged to handle floating-point values.
++		cmp ecx, FFI_TYPE_FLOAT
++		jne sc_noretval
++//        fstp  %st(0)
++		fstp st(0)
++
++		jmp sc_epilogue
++
++sc_retint:
++		cmp ecx, FFI_TYPE_INT
++		jne sc_retfloat
++//        # Load %ecx with the pointer to storage for the return value
++		mov ecx, [ebp + 24]
++		mov [ecx + 0], eax
++		jmp sc_epilogue
++
++sc_retfloat:
++		cmp ecx, FFI_TYPE_FLOAT
++		jne sc_retdouble
++// Load %ecx with the pointer to storage for the return value
++		mov ecx, [ebp+24]
++//        fstps (%ecx)
++		fstp DWORD PTR [ecx]
++		jmp sc_epilogue
++
++sc_retdouble:
++		cmp ecx, FFI_TYPE_DOUBLE
++		jne sc_retlongdouble
++//        movl  24(%ebp),%ecx
++		mov ecx, [ebp+24]
++		fstp QWORD PTR [ecx]
++		jmp sc_epilogue
++
++		jmp sc_retlongdouble // avoid warning about unused label
++sc_retlongdouble:
++		cmp ecx, FFI_TYPE_LONGDOUBLE
++		jne sc_retint64
++// Load %ecx with the pointer to storage for the return value
++		mov ecx, [ebp+24]
++//        fstpt (%ecx)
++		fstp QWORD PTR [ecx] /* XXX ??? */
++		jmp sc_epilogue
++
++sc_retint64:
++		cmp ecx, FFI_TYPE_SINT64
++		jne sc_retstruct
++// Load %ecx with the pointer to storage for the return value
++		mov ecx, [ebp+24]
++		mov [ecx+0], eax
++		mov [ecx+4], edx
++
++sc_retstruct:
++// Nothing to do!
++
++sc_noretval:
++sc_epilogue:
++		mov eax, esi
++		pop esi // NEW restore: must be preserved across function calls
++		mov esp, ebp
++		pop ebp
++		ret
++	}
++}
