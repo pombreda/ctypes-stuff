@@ -26,8 +26,6 @@ for name in get_exports.read_export_table("mydll.dll"):
 ##    print name, "=>\n\t", undecorate.symbol_name(name)
     member_names[name_with_args] = name
 
-dll = CPPDLL("mydll.dll")
-
 class bound_method(object):
     def __init__(self, instance, func):
         self.im_func = func
@@ -48,31 +46,10 @@ class method(object):
             return self
         return bound_method(instance, self.func)
 
-class bound_virtual(object):
-    def __init__(self, instance, proto, offset):
-        self.im_proto = proto
-        self.im_self = instance
-        self.offset = offset
-
-    def __call__(self, *args):
-        addr = self.im_self._vtable[self.offset]
-        return self.im_proto(addr)(byref(self.im_self), *args)
-
-class virtual(object):
-    def __init__(self, dll, vtbl_offset, name,
-                 restype, argtypes):
-        self.proto = CPPMETHODTYPE(restype, c_void_p, *argtypes)
-        self.vtbl_offset = vtbl_offset
-
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        return bound_virtual(instance, self.proto, self.vtbl_offset)
+dll = CPPDLL("mydll.dll")
 
 class CSimpleClass(Structure):
-    _fields_ = [("_vtable", POINTER(c_void_p)),
-                ("value", c_int)]
-
+    # non-virtual methods
     __init__ = method(dll, "CSimpleClass::CSimpleClass(int)",
                       None, [c_int])
 
@@ -82,12 +59,23 @@ class CSimpleClass(Structure):
     M1 = method(dll, "void CSimpleClass::M1(void)",
                 None, [])
 
-    V0 = virtual(dll, 0, "virtual void CSimpleClass::V0(void)",
-                 None, [])
-    V1 = virtual(dll, 1, "virtual void CSimpleClass::V1(int)",
-                 None, [c_int])
-    V2 = virtual(dll, 2, "virtual void CSimpleClass::V2(void)",
-                 None, [])
+    # virtual methods
+    def V0(self):
+        return self._vtable[0].V0(self)
+
+    def V1(self, *args):
+        return self._vtable[0].V1(self, *args)
+
+    def V2(self):
+        return self._vtable[0].V2(self)
+
+class vtable(Structure):
+    _fields_ = [("V0", CPPMETHODTYPE(None, POINTER(CSimpleClass))),
+                ("V1", CPPMETHODTYPE(None, POINTER(CSimpleClass), c_int)),
+                ("V2", CPPMETHODTYPE(None, POINTER(CSimpleClass)))]
+
+CSimpleClass. _fields_ = [("_vtable", POINTER(vtable)),
+                          ("value", c_int)]
 
 def main():
     obj = CSimpleClass(42)
