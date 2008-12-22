@@ -6,14 +6,14 @@ from ctypes import *
 # XXX This should be in Lib\ctypes\__init__.py
 _cpp_methodtype_cache = {}
 def CPPMETHODTYPE(restype, *argtypes):
-    from _ctypes import CFuncPtr, FUNCFLAG_THIS
+    from _ctypes import CFuncPtr, FUNCFLAG_THISCALL
     try:
         return _cpp_methodtype_cache[(restype, argtypes)]
     except KeyError:
         class CppMethodType(CFuncPtr):
             _argtypes_ = argtypes
             _restype_ = restype
-            _flags_ = FUNCFLAG_THIS
+            _flags_ = FUNCFLAG_THISCALL
         _cpp_methodtype_cache[(restype, argtypes)] = CppMethodType
         return CppMethodType
 
@@ -69,6 +69,8 @@ class CSimpleClass(Structure):
     def V2(self):
         return self._vtable[0].V2(self)
 
+# To work around circular dependencies, the vtable Structure is
+# defined and assigned AFTER the CSimpleClass statement.
 class vtable(Structure):
     _fields_ = [("V0", CPPMETHODTYPE(None, POINTER(CSimpleClass))),
                 ("V1", CPPMETHODTYPE(None, POINTER(CSimpleClass), c_int)),
