@@ -1,94 +1,145 @@
-import sys
-import get_exports
-import undecorate
 from ctypes import *
 
-# XXX This should be in Lib\ctypes\__init__.py
-_cpp_methodtype_cache = {}
-def CPPMETHODTYPE(restype, *argtypes):
-    from _ctypes import CFuncPtr, FUNCFLAG_THISCALL
+# TODO:
+#
+# CPPDLL should be able to load functions via demangled names?
+#
+# Overloading non-virtual member functions works, overloading virtual
+# member functions does not work because they look up the wrong vtbl
+# entry (by name, not by offset)
+
+def parse_names(dll):
     try:
-        return _cpp_methodtype_cache[(restype, argtypes)]
-    except KeyError:
-        class CppMethodType(CFuncPtr):
-            _argtypes_ = argtypes
-            _restype_ = restype
-            _flags_ = FUNCFLAG_THISCALL
-        _cpp_methodtype_cache[(restype, argtypes)] = CppMethodType
-        return CppMethodType
+        import get_exports
+    except ImportError:
+        from ctypeslib.contrib import get_exports
+    import undecorate
+    dll.member_names = member_names = {}
+    flags = undecorate.UNDNAME_NO_MS_KEYWORDS | undecorate.UNDNAME_NO_ACCESS_SPECIFIERS
 
+    for name in get_exports.read_export_table(dll._name):
+        name_with_args = undecorate.symbol_name(name, flags).strip()
+        # Convert the name to what gccxml creates
+        # Replace the (void) argument list with ()
+        gccxml_name = name_with_args.replace("(void)", "()")
+        # Remove 'virtual void '
+        # XXX We should instead remove everything before '<classname>::'.
+        for prefix in ("virtual ", "void "):
+            # Order of prefixes is important!
+            if gccxml_name.startswith(prefix):
+                gccxml_name = gccxml_name[len(prefix):]
+##        print gccxml_name
+        member_names[gccxml_name] = name
 
-# XXX make a registry of names keyed by the dll...
-member_names = {}
-flags = undecorate.UNDNAME_NO_MS_KEYWORDS | undecorate.UNDNAME_NO_ACCESS_SPECIFIERS
-for name in get_exports.read_export_table("mydll.dll"):
-    name_with_args = undecorate.symbol_name(name, flags).strip()
-##    print name, "=>\n\t", undecorate.symbol_name(name)
-    member_names[name_with_args] = name
+def virtual(name, proto):
+    def func(self, *args):
+        # Use itemgetter and attrgetter, to be faster?
+        return getattr(self._vtable[0], name)(self, *args)
+    func.prototype = proto
+    return func
 
-class bound_method(object):
-    def __init__(self, instance, func):
-        self.im_func = func
-        self.im_self = instance
+def method(dll, name, proto):
+    member = proto((name, dll))
+    def func(self, *args):
+        return member(self, *args)
+    func.prototype = proto
+    return func
 
-    def __call__(self, *args):
-        return self.im_func(byref(self.im_self), *args)
+def multimethod(cls, name, mth):
+    # Dispatches on the number of actual arguments.
+    # XXX Should dispatch on the TYPE of arguments.
+    old_mth = getattr(cls, name)
+    # nargs includes the (implicit) self argument
+    nargs = len(mth.prototype._argtypes_)
+    def call(self, *args):
+        if len(args) == nargs - 1:
+            return mth(self, *args)
+        return old_mth(self, *args)
+    call.__name__ = name
+    call.__doc__ = "%s\n%s" % (mth.__doc__, old_mth.__doc__)
+    return call
 
-class method(object):
-    def __init__(self, dll, name,
-                 restype, argtypes):
-        self.func = getattr(dll, member_names[name])
-        self.func.restype = restype
-        self.func.argtypes = [c_void_p] + list(argtypes)
+class Class(Structure):
+    def __new__(cls, *args):
+        if not hasattr(cls, "_fields_"):
+            if not hasattr(cls.__dll__, "member_names"):
+                parse_names(cls.__dll__)
 
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        return bound_method(instance, self.func)
+            virtual_methods = []
+            for m in cls._methods_:
+                name, is_virt, demangled, restype = m[:4]
+                argtypes = m[4:]
+                proto = CPPMETHODTYPE(restype, POINTER(cls), *argtypes)
+                if is_virt:
+                    # Make sure the method exists
+                    func_name = cls.__dll__.member_names[demangled]
+                    proto((func_name, cls.__dll__))
+                    # Create a virtual method
+                    virtual_methods.append((name, proto))
+                    mth = virtual(name, proto)
+                else:
+                    # Create a 'normal' method
+                    func_name = cls.__dll__.member_names[demangled]
+                    mth = method(cls.__dll__, func_name, proto)
+                mth.__name__ = name
+                mth.__doc__ = demangled
+                if hasattr(cls, name):
+                    # Overloaded function
+                    mm = multimethod(cls, name, mth)
+                    setattr(cls, name, mm)
+                else:
+                    setattr(cls, name, mth)
 
-dll = CPPDLL("mydll.dll")
+            if virtual_methods:
+                class VTBL(Structure):
+                    _fields_ = virtual_methods
+                cppfields = cls._cppfields_
+                assert cppfields[0][0] == "_vtable"
+                cppfields[0] = ("_vtable", POINTER(VTBL))
+                cls._fields_ = cppfields
+        result = super(Class, cls).__new__(cls, *args)
+        result._needs_free = False
+        return result
 
-class CSimpleClass(Structure):
-    # non-virtual methods
-    __init__ = method(dll, "CSimpleClass::CSimpleClass(int)",
-                      None, [c_int])
+    def __init__(self, *args):
+        # __init__ calls the cpp constructor, and also sets the
+        # _needs_free flag so the the cpp desctructor is called when
+        # the Python instance goes away.
+        self.__cpp_constructor__(*args)
+        self._needs_free = True
 
-    __del__ = method(dll, "CSimpleClass::~CSimpleClass(void)",
-                     None, [])
+    def __del__(self):
+        if self._needs_free:
+            self._needs_free = False
+            self.__cpp_destructor__()
 
-    M1 = method(dll, "void CSimpleClass::M1(void)",
-                None, [])
+################################################################
 
-    # virtual methods
-    def V0(self):
-        return self._vtable[0].V0(self)
+class CSimpleClass(Class):
+    __dll__ = CDLL("mydll.dll")
+CSimpleClass._methods_ = [
+    # python-method-name, is_virtual, C++ name, restype, *argtypes
+    ('__cpp_constructor__', False, 'CSimpleClass::CSimpleClass(int)', None, c_int),
+    ('M1', False, 'CSimpleClass::M1()', None, ),
+    ('M1', False, 'CSimpleClass::M1(int)', None, c_int),
+    ('V0', True, 'CSimpleClass::V0()', None, ),
+    ('V1', True, 'CSimpleClass::V1(int)', None, c_int),
+    ('V2', True, 'CSimpleClass::V2()', None, ),
+    ('__cpp_destructor__', False, 'CSimpleClass::~CSimpleClass()', None, ),
+]
+CSimpleClass._cppfields_ = [
+    ('_vtable', c_void_p),
+    ('value', c_int),
+]
 
-    def V1(self, *args):
-        return self._vtable[0].V1(self, *args)
-
-    def V2(self):
-        return self._vtable[0].V2(self)
-
-# To work around circular dependencies, the vtable Structure is
-# defined and assigned AFTER the CSimpleClass statement.
-class vtable(Structure):
-    _fields_ = [("V0", CPPMETHODTYPE(None, POINTER(CSimpleClass))),
-                ("V1", CPPMETHODTYPE(None, POINTER(CSimpleClass), c_int)),
-                ("V2", CPPMETHODTYPE(None, POINTER(CSimpleClass)))]
-
-CSimpleClass. _fields_ = [("_vtable", POINTER(vtable)),
-                          ("value", c_int)]
-
-def main():
-    obj = CSimpleClass(42)
-    print "obj.value:", obj.value
-    print "----- call M1 -----"
-    obj.M1()
-    print "----- call V1(99) -----"
-    obj.V0()
-    obj.V1(99)
-    obj.V2()
-    print "-----  done   -----"
+################################################################
 
 if __name__ == "__main__":
-    main()
+    obj = CSimpleClass(42)
+    print obj.value
+    obj.M1(42)
+    obj.V1(96)
+    obj.M1()
+
+    obj = CSimpleClass(42)
+    help(CSimpleClass)
