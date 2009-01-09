@@ -10,7 +10,7 @@ Index: Lib/ctypes/__init__.py
      if _os.name == "ce":
          # 'ce' doesn't have the stdcall calling convention
          _FUNCFLAG_STDCALL = _FUNCFLAG_CDECL
-@@ -388,6 +389,12 @@
+@@ -388,6 +389,24 @@
          """
          _func_flags_ = _FUNCFLAG_STDCALL
  
@@ -19,6 +19,18 @@ Index: Lib/ctypes/__init__.py
 +        Windows thiscall calling convention.
 +        """
 +        _func_flags_ = _FUNCFLAG_THISCALL
++
++    _cpp_methodtype_cache = {}
++    def CPPMETHODTYPE(restype, *argtypes):
++        try:
++            return _cpp_methodtype_cache[(restype, argtypes)]
++        except KeyError:
++            class CppMethodType(_CFuncPtr):
++                _argtypes_ = argtypes
++                _restype_ = restype
++                _flags_ = _FUNCFLAG_THISCALL
++            _cpp_methodtype_cache[(restype, argtypes)] = CppMethodType
++            return CppMethodType
 +
      # XXX Hm, what about HRESULT as normal parameter?
      # Mustn't it derive from c_long then?
@@ -35,6 +47,23 @@ Index: Modules/_ctypes/_ctypes.c
  #endif
  	PyModule_AddObject(m, "FUNCFLAG_CDECL", PyInt_FromLong(FUNCFLAG_CDECL));
  	PyModule_AddObject(m, "FUNCFLAG_USE_ERRNO", PyInt_FromLong(FUNCFLAG_USE_ERRNO));
+Index: Modules/_ctypes/callbacks.c
+===================================================================
+--- Modules/_ctypes/callbacks.c	(revision 67687)
++++ Modules/_ctypes/callbacks.c	(working copy)
+@@ -436,8 +436,11 @@
+ 
+ 	cc = FFI_DEFAULT_ABI;
+ #if defined(MS_WIN32) && !defined(_WIN32_WCE) && !defined(MS_WIN64)
+-	if ((flags & FUNCFLAG_CDECL) == 0)
++	if ((flags & FUNCFLAG_CDECL) == 0) {
+ 		cc = FFI_STDCALL;
++		if (flags & FUNCFLAG_THISCALL)
++			cc = FFI_THISCALL;
++	}
+ #endif
+ 	result = ffi_prep_cif(&p->cif, cc,
+ 			      Py_SAFE_DOWNCAST(nArgs, Py_ssize_t, int),
 Index: Modules/_ctypes/callproc.c
 ===================================================================
 --- Modules/_ctypes/callproc.c	(revision 67687)
@@ -100,6 +129,42 @@ Index: Modules/_ctypes/libffi_msvc/ffi.c
  #else
      case FFI_SYSV:
        /*@-usedef@*/
+@@ -405,12 +423,14 @@
+   int mask;
+ #endif
+   FFI_ASSERT (cif->abi == FFI_SYSV);
+-  
++
+   if (cif->abi == FFI_SYSV)
+     bytes = 0;
+ #if !defined(_WIN64)
+   else if (cif->abi == FFI_STDCALL)
+     bytes = cif->bytes;
++  else if (cif->abi == FFI_THISCALL)
++    bytes = cif->bytes;
+ #endif
+   else
+     return FFI_BAD_ABI;
+@@ -454,9 +474,18 @@
+ 
+ #else
+ 
++  if (cif->abi == FFI_THISCALL) {
++    /* pop edx */ /* save return address */
++    BYTES("\x5a");
++    /* push ecx */ /* put first parameter on stack */
++    BYTES("\x51");
++    /* push edx */ /* put return address back onto stack */
++    BYTES("\x52");
++  }
++
++  /* Parameters for ffi_closure_SYSV are passed in registers (fastcall) */
+   /* mov ecx, closure */
+   BYTES("\xb9"); POINTER(closure);
+-
+   /* mov edx, esp */
+   BYTES("\x8b\xd4");
+ 
 Index: Modules/_ctypes/libffi_msvc/ffitarget.h
 ===================================================================
 --- Modules/_ctypes/libffi_msvc/ffitarget.h	(revision 67687)
@@ -111,6 +176,15 @@ Index: Modules/_ctypes/libffi_msvc/ffitarget.h
 +  FFI_THISCALL,
    /* TODO: Add fastcall support for the sake of completeness */
    FFI_DEFAULT_ABI = FFI_SYSV,
+ 
+@@ -77,7 +78,7 @@
+ #define FFI_TRAMPOLINE_SIZE 29
+ #define FFI_NATIVE_RAW_API 0
+ #else
+-#define FFI_TRAMPOLINE_SIZE 15
++#define FFI_TRAMPOLINE_SIZE (15 + 8)
+ #define FFI_NATIVE_RAW_API 1	/* x86 has native raw api support */
+ #endif
  
 Index: Modules/_ctypes/libffi_msvc/win32.c
 ===================================================================
