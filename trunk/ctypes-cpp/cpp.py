@@ -56,14 +56,21 @@ def method(dll, name, prototype):
     return func
 
 def multimethod(cls, name, mth):
-    # Dispatches on the number of actual arguments.
-    # XXX Should dispatch on the TYPE of arguments.
     old_mth = getattr(cls, name)
     # nargs includes the (implicit) self argument
     nargs = len(mth.prototype._argtypes_)
     def call(self, *args):
+        # If the number of arguments is what 'mth' expects, try to
+        # call it.  If the actual argument types are not accepted,
+        # ctypes will raise an ArgumentError, and the next method is
+        # tried.
+        #
+        # Probably too expensive, but it works.
         if len(args) == nargs - 1:
-            return mth(self, *args)
+            try:
+                return mth(self, *args)
+            except ArgumentError:
+                pass
         return old_mth(self, *args)
     call.__name__ = name
     call.__doc__ = "%s\n%s" % (mth.__doc__, old_mth.__doc__)
@@ -132,9 +139,7 @@ class CSimpleClass(Class):
 CSimpleClass._methods_ = [
     # python-method-name, is_virtual, C++ name, restype, *argtypes
     ('__cpp_constructor__', False, 'CSimpleClass::CSimpleClass(int)', None, c_int),
-    # The overloaded copy-constructor cannot be used because
-    # dispatching is done via number of arguments, not type of arguments...
-##    ('__cpp_constructor__', False, 'CSimpleClass::CSimpleClass(class CSimpleClass const &)', None, POINTER(CSimpleClass)),
+    ('__cpp_constructor__', False, 'CSimpleClass::CSimpleClass(class CSimpleClass const &)', None, POINTER(CSimpleClass)),
     ('M1', False, 'CSimpleClass::M1()', None, ),
     ('M1', False, 'CSimpleClass::M1(int)', None, c_int),
     ('V0', True, 'CSimpleClass::V0()', None, ),
@@ -150,6 +155,9 @@ CSimpleClass._cppfields_ = [
 
 ################################################################
 
+def make():
+    return CSimpleClass(99)
+
 if __name__ == "__main__":
     obj = CSimpleClass(42)
 ##    print obj.value
@@ -163,5 +171,9 @@ if __name__ == "__main__":
     obj.V2()
     print "V1()"
     obj.V1()
+
+    aCopy = CSimpleClass(obj)
+    del obj
+    print aCopy
 
 ##    help(CSimpleClass)
