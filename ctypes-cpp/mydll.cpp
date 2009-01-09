@@ -20,7 +20,18 @@ void CSimpleClass::V0() {
 void CSimpleClass::V1(int x) {
 	printf("C++/CSimpleClass::V1(%p, %d)\n", this, x);
 }
+/*
+void CSimpleClass::V1() {
+	printf("C++/CSimpleClass::V1(%p)\n", this);
+}
+void CSimpleClass::V1(char *p) {
+	printf("C++/CSimpleClass::V1(%p, '%s')\n", this, p);
+}
+*/
 void CSimpleClass::V2() {
 	printf("C++/CSimpleClass::V2(%p)\n", this);
 }
 
+void CSimpleClass::M1(int x) {
+	printf("C++/CSimpleClass::M1(%p, %d)\n", this, x);
+}
