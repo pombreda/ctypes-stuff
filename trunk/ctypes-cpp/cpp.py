@@ -11,6 +11,8 @@ import sys
 # XXX When an instance is created, we could parse the vtable addresses
 # and assert that they are the same as the adresses of the exported
 # functions we can also load from the dll...
+#
+# See also the undocumented MSVC /d1reportAllClassLayout command line flag
 
 def parse_names(dll):
     try:
