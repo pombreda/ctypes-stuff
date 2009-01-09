@@ -1,4 +1,5 @@
 from ctypes import *
+import sys
 
 # TODO:
 #
@@ -31,8 +32,12 @@ def parse_names(dll):
             # Order of prefixes is important!
             if gccxml_name.startswith(prefix):
                 gccxml_name = gccxml_name[len(prefix):]
-##        print gccxml_name
+        if "-v" in sys.argv:
+            print gccxml_name
         member_names[gccxml_name] = name
+
+if "-v" in sys.argv:
+    print; print
 
 def virtual(name, prototype):
     def func(self, *args):
@@ -125,6 +130,9 @@ class CSimpleClass(Class):
 CSimpleClass._methods_ = [
     # python-method-name, is_virtual, C++ name, restype, *argtypes
     ('__cpp_constructor__', False, 'CSimpleClass::CSimpleClass(int)', None, c_int),
+    # The overloaded copy-constructor cannot be used because
+    # dispatching is done via number of arguments, not type of arguments...
+##    ('__cpp_constructor__', False, 'CSimpleClass::CSimpleClass(class CSimpleClass const &)', None, POINTER(CSimpleClass)),
     ('M1', False, 'CSimpleClass::M1()', None, ),
     ('M1', False, 'CSimpleClass::M1(int)', None, c_int),
     ('V0', True, 'CSimpleClass::V0()', None, ),
