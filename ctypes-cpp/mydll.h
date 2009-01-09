@@ -8,6 +8,5 @@ class __declspec(dllexport) CSimpleClass {
 	virtual void V0();
 	virtual void V1(int x);
 	virtual void V2();
-//	virtual void V1();
-//	virtual void V1(char *p);
+	virtual void V1();
 };

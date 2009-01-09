@@ -4,9 +4,12 @@ from ctypes import *
 #
 # CPPDLL should be able to load functions via demangled names?
 #
-# Overloading non-virtual member functions works, overloading virtual
-# member functions does not work because they look up the wrong vtbl
-# entry (by name, not by offset)
+# How are overloaded virtual functions ordered in the vtable???
+# It seems not in the same order as they appear in the include file???
+#
+# XXX When an instance is created, we could parse the vtable addresses
+# and assert that they are the same as the adresses of the exported
+# functions we can also load from the dll...
 
 def parse_names(dll):
     try:
@@ -31,18 +34,18 @@ def parse_names(dll):
 ##        print gccxml_name
         member_names[gccxml_name] = name
 
-def virtual(name, proto):
+def virtual(name, prototype):
     def func(self, *args):
         # Use itemgetter and attrgetter, to be faster?
         return getattr(self._vtable[0], name)(self, *args)
-    func.prototype = proto
+    func.prototype = prototype
     return func
 
-def method(dll, name, proto):
-    member = proto((name, dll))
+def method(dll, name, prototype):
+    member = prototype((name, dll))
     def func(self, *args):
         return member(self, *args)
-    func.prototype = proto
+    func.prototype = prototype
     return func
 
 def multimethod(cls, name, mth):
@@ -69,18 +72,20 @@ class Class(Structure):
             for m in cls._methods_:
                 name, is_virt, demangled, restype = m[:4]
                 argtypes = m[4:]
-                proto = CPPMETHODTYPE(restype, POINTER(cls), *argtypes)
+                prototype = CPPMETHODTYPE(restype, POINTER(cls), *argtypes)
                 if is_virt:
                     # Make sure the method exists
                     func_name = cls.__dll__.member_names[demangled]
-                    proto((func_name, cls.__dll__))
+                    prototype((func_name, cls.__dll__))
                     # Create a virtual method
-                    virtual_methods.append((name, proto))
-                    mth = virtual(name, proto)
+                    # Names must be unique to allow overloading
+                    v_name = "%s(%s)" % (name, len(virtual_methods))
+                    virtual_methods.append((v_name, prototype))
+                    mth = virtual(v_name, prototype)
                 else:
                     # Create a 'normal' method
                     func_name = cls.__dll__.member_names[demangled]
-                    mth = method(cls.__dll__, func_name, proto)
+                    mth = method(cls.__dll__, func_name, prototype)
                 mth.__name__ = name
                 mth.__doc__ = demangled
                 if hasattr(cls, name):
@@ -123,6 +128,7 @@ CSimpleClass._methods_ = [
     ('M1', False, 'CSimpleClass::M1()', None, ),
     ('M1', False, 'CSimpleClass::M1(int)', None, c_int),
     ('V0', True, 'CSimpleClass::V0()', None, ),
+    ('V1', True, 'CSimpleClass::V1()', None),
     ('V1', True, 'CSimpleClass::V1(int)', None, c_int),
     ('V2', True, 'CSimpleClass::V2()', None, ),
     ('__cpp_destructor__', False, 'CSimpleClass::~CSimpleClass()', None, ),
@@ -136,10 +142,16 @@ CSimpleClass._cppfields_ = [
 
 if __name__ == "__main__":
     obj = CSimpleClass(42)
-    print obj.value
+##    print obj.value
+    print "M1(42)"
     obj.M1(42)
-    obj.V1(96)
+    print "M1()"
     obj.M1()
+    print "V1(96)"
+    obj.V1(96)
+    print "V2()"
+    obj.V2()
+    print "V1()"
+    obj.V1()
 
-    obj = CSimpleClass(42)
-    help(CSimpleClass)
+##    help(CSimpleClass)
