@@ -43,7 +43,6 @@ if "-v" in sys.argv:
 
 def virtual(name, prototype):
     def func(self, *args):
-        # Use itemgetter and attrgetter, to be faster?
         return getattr(self._vtable[0], name)(self, *args)
     func.prototype = prototype
     return func
