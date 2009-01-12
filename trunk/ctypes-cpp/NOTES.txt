@@ -1,0 +1,24 @@
+The vtable
+----------
+
+Order of virtual methods in the vtable:
+
+It seems the methods appear in the order as they are listed in the
+include file.  Overloaded virtual methods appear in the reverse order
+from the include file.  Sample::
+
+	vtable offset	method prototype from include file
+
+	0		virtual void V0();
+	3		virtual void V1(int x);
+	2		virtual void V1();
+	1		virtual void V1(char *ptr) {};
+	4		virtual void V2();
+
+Pure virtual methods 
+
+TODO
+----
+
+Is it possible to get the method addresses from a map file, even when
+the class is NOT declared '__declspec(dllexport)'?
