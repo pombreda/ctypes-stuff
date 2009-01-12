@@ -87,9 +87,6 @@ class Class(Structure):
                 argtypes = m[4:]
                 prototype = CPPMETHODTYPE(restype, POINTER(cls), *argtypes)
                 if is_virt:
-                    # Make sure the method exists
-                    func_name = cls.__dll__.member_names[demangled]
-                    prototype((func_name, cls.__dll__))
                     # Create a virtual method
                     # Names must be unique to allow overloading
                     v_name = "%s(%s)" % (name, len(virtual_methods))
@@ -142,6 +139,7 @@ CSimpleClass._methods_ = [
     ('M1', False, 'CSimpleClass::M1()', None, ),
     ('M1', False, 'CSimpleClass::M1(int)', None, c_int),
     ('V0', True, 'CSimpleClass::V0()', None, ),
+    ('V1', True, 'CSimpleClass::V1(char *)', None, c_char_p),
     ('V1', True, 'CSimpleClass::V1()', None),
     ('V1', True, 'CSimpleClass::V1(int)', None, c_int),
     ('V2', True, 'CSimpleClass::V2()', None, ),
@@ -170,6 +168,8 @@ if __name__ == "__main__":
     obj.V2()
     print "V1()"
     obj.V1()
+##    print "V1('foo')"
+##    obj.V1("foo")
 
     aCopy = CSimpleClass(obj)
     del obj
