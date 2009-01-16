@@ -65,14 +65,18 @@ class Class(Structure):
         """This classmethod scans the _methods_ list, and creates Python methods
         that forward to the C++ methods.
         """
+        if "_class_finished" in cls.__dict__:
+            import warnings
+            warnings.warn("class %s already finished" % cls)
+            return
         for info in cls._methods_:
             mth_name, func_name = info[:2]
-            print mth_name, func_name
             func = getattr(dll, func_name)
             func.restype = info[2]
             func.argtypes = (POINTER(cls),) + info[3:]
             mth = make_method(cls, func, mth_name, func_name)
             setattr(cls, mth_name, mth)
+        cls._class_finished = True
 
 class CPPDLL(CPPDLL):
     """This class represents a dll exporting functions using the

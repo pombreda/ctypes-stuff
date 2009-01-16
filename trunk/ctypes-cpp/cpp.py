@@ -20,6 +20,7 @@ CSimpleClass._methods_ = [
     ('__cpp_destructor__', 'CSimpleClass::~CSimpleClass()', None, ),
 ]
 CSimpleClass._finish(CPPDLL("mydll.dll"))
+CSimpleClass._finish(CPPDLL("mydll.dll"))
 
 ################################################################
 
