@@ -1,5 +1,79 @@
 from ctypes import *
 
+def multimethod(cls, name, mth):
+    old_mth = getattr(cls, name)
+    argtypes = mth.cpp_func.argtypes
+    nargs = len(argtypes)
+
+    def call(self, *args):
+        # If the number of arguments is what 'mth' expects, try to
+        # call it.  If the actual argument types are not accepted,
+        # ctypes will raise an ArgumentError, and the next method is
+        # tried.
+        #
+        # Probably too expensive, but it works.
+        #
+        # nargs includes the (implicit) self argument
+        if len(args) == nargs - 1:
+            try:
+                result = mth(self, *args)
+##                print "\tMATCH   :", argtypes[1:], args
+                return result
+            except ArgumentError, details:
+                pass
+##        print "\tNO MATCH:", argtypes[1:], args
+        try:
+            return old_mth(self, *args)
+        except (ArgumentError, TypeError):
+            raise TypeError("no overloaded function matches")
+    call.__name__ = name
+    call.__doc__ = "%s\n%s" % (mth.__doc__, old_mth.__doc__)
+    return call
+
+
+def make_method(cls, func, mth_name, func_name):
+    # factory for methods
+    def call(self, *args):
+        return func(self, *args)
+    call.__doc__ = func_name
+    call.__name__ = mth_name
+    call.cpp_func = func
+    if hasattr(cls, mth_name):
+        return multimethod(cls, mth_name, call)
+    else:
+        return call
+
+class Class(Structure):
+    """Base class for C++ class proxies."""
+    _needs_free = False
+    def __init__(self, *args):
+        # __init__ calls the cpp constructor, and also sets the
+        # _needs_free flag so the the cpp desctructor is called when
+        # the Python instance goes away.
+        self.__cpp_constructor__(*args)
+        self._needs_free = True
+
+    def __del__(self):
+        # The destructor is only called if this instance has been
+        # created by Python code.
+        if self._needs_free:
+            self._needs_free = False
+            self.__cpp_destructor__()
+
+    @classmethod
+    def _finish(cls, dll):
+        """This classmethod scans the _methods_ list, and creates Python methods
+        that forward to the C++ methods.
+        """
+        for info in cls._methods_:
+            mth_name, func_name = info[:2]
+            print mth_name, func_name
+            func = getattr(dll, func_name)
+            func.restype = info[2]
+            func.argtypes = (POINTER(cls),) + info[3:]
+            mth = make_method(cls, func, mth_name, func_name)
+            setattr(cls, mth_name, mth)
+
 class CPPDLL(CPPDLL):
     """This class represents a dll exporting functions using the
     Windows __thiscall calling convention.
