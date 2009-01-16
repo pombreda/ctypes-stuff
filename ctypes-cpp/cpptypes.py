@@ -1,11 +1,11 @@
 from ctypes import *
 
 try:
-    from itertools import product
+    from itertools import product as _product
 except ImportError:
     # Only Python 2.6 and up have itertools.product. Use the pure
     # Python version from the 2.6 docs when not available:
-    def product(*args, **kwds):
+    def _product(*args, **kwds):
         # product('ABCD', 'xy') --> Ax Ay Bx By Cx Cy Dx Dy
         # product(range(2), repeat=3) --> 000 001 010 011 100 101 110 111
         pools = map(tuple, args) * kwds.get('repeat', 1)
@@ -16,17 +16,17 @@ except ImportError:
             yield tuple(prod)
 
 # XXX add all the primitive ctypes types
-matches = {c_int: [int, long, c_int],
-           c_long: [int, long, c_long],
-           c_char_p: [str, unicode, type(None), c_char_p]
-           }
+_ctypes_matches = {c_int: [int, long, c_int],
+                   c_long: [int, long, c_long],
+                   c_char_p: [str, unicode, type(None), c_char_p]
+                   }
 
-def type_matcher(argtypes):
+def _type_matcher(argtypes):
     """Return a generator producing tuples of types that will match
     the specified argtypes.
     
     >>> import ctypes
-    >>> for item in type_matcher([ctypes.c_long, ctypes.c_char_p]):
+    >>> for item in _type_matcher([ctypes.c_long, ctypes.c_char_p]):
     ...     print item
     (<type 'int'>, <type 'str'>)
     (<type 'int'>, <type 'unicode'>)
@@ -43,38 +43,38 @@ def type_matcher(argtypes):
 
     >>> class X(Structure):
     ...     pass
-    >>> for item in type_matcher([POINTER(X)]):
+    >>> for item in _type_matcher([POINTER(X)]):
     ...     print item
     (<class '__main__.X'>,)
     (<class '__main__.LP_X'>,)
     >>>
 
-    >>> for item in type_matcher([]):
+    >>> for item in _type_matcher([]):
     ...     print item
     ()
     >>>
     """
     result = []
     for tp in argtypes:
-        possible = matches.get(tp, None)
+        possible = _ctypes_matches.get(tp, None)
         if possible is None:
             if hasattr(tp, "_type_"):
                 # a ctypes POINTER type, the type itself is also accepted
-                possible = matches[tp] = [tp._type_, tp]
+                possible = [tp._type_, tp]
         result.append(possible)
-    return product(*result)
+    return _product(*result)
 
 
-def overloaded_method(cls, name, mth):
+def _overloaded_method(cls, name, mth):
     # This overloadedmethod will try to match the arguments passed to the
-    # patterns returned by type_matcher, call the method if a match is
+    # patterns returned by _type_matcher, call the method if a match is
     # found and forward to the next overloaded method when no match is
     # found.
     # XXX Use dictionaty lookup instead of linear searching.
     old_mth = getattr(cls, name)
     argtypes = mth.cpp_func.argtypes
     nargs = len(argtypes)
-    patterns = list(type_matcher(argtypes[1:]))
+    patterns = list(_type_matcher(argtypes[1:]))
 
     def call(self, *args):
         signature = tuple(type(a) for a in args)
@@ -86,7 +86,7 @@ def overloaded_method(cls, name, mth):
     return call
 
 
-def make_method(cls, func, mth_name, func_name):
+def _make_method(cls, func, mth_name, func_name):
     # factory for methods
     def call(self, *args):
         return func(self, *args)
@@ -94,7 +94,7 @@ def make_method(cls, func, mth_name, func_name):
     call.__name__ = mth_name
     call.cpp_func = func
     if hasattr(cls, mth_name):
-        return overloaded_method(cls, mth_name, call)
+        return _overloaded_method(cls, mth_name, call)
     else:
         return call
 
@@ -129,7 +129,7 @@ class Class(Structure):
             func = getattr(dll, func_name)
             func.restype = info[2]
             func.argtypes = (POINTER(cls),) + info[3:]
-            mth = make_method(cls, func, mth_name, func_name)
+            mth = _make_method(cls, func, mth_name, func_name)
             setattr(cls, mth_name, mth)
         cls._class_finished = True
 
