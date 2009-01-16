@@ -34,3 +34,6 @@ cpp.py:
    A simple Python script that defines a CSimpleClass, which is a
    Python proxy for the C++ class implemented in mydll.dll, basically
    code equivalent to the C# code in the blog post, but in Python.
+
+cpptypes.py:
+   Code for accessing C++ objects.
