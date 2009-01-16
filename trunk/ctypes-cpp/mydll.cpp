@@ -38,4 +38,7 @@ void CSimpleClass::V2() {
 
 void CSimpleClass::M1(int x) {
 	printf("C++/CSimpleClass::M1(%p, %d)\n", this, x);
+	V0();
+	V1(x);
+	V2();
 }
