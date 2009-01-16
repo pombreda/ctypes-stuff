@@ -26,6 +26,12 @@ void CSimpleClass::V1() {
 void CSimpleClass::V1(char *p) {
 	printf("C++/CSimpleClass::V1(%p, %s)\n", this, p);
 }
+void CSimpleClass::V1(int x, char *p) {
+	printf("C++/CSimpleClass::V1(%p, %d, %s)\n", this, x, p);
+}
+void CSimpleClass::V1(char *p, int x) {
+	printf("C++/CSimpleClass::V1(%p, %s, %d)\n", this, p, x);
+}
 void CSimpleClass::V2() {
 	printf("C++/CSimpleClass::V2(%p)\n", this);
 }
