@@ -4,10 +4,10 @@ The vtable
 Order of virtual methods in the vtable:
 
 It seems the methods appear in the order as they are listed in the
-include file.  Overloaded virtual methods appear in the reverse order
-from the include file.  Sample::
+include file.  Overloaded virtual methods appear in reverse order from
+the include file.  Sample::
 
-	vtable offset	method prototype from include file
+	vtable offset	function prototype from include file
 
 	0		virtual void V0();
 	3		virtual void V1(int x);
@@ -20,5 +20,9 @@ Pure virtual methods
 TODO
 ----
 
-Is it possible to get the method addresses from a map file, even when
-the class is NOT declared '__declspec(dllexport)'?
+Is is possible to get the function addresses from a map file, even
+when the class is NOT declared '__declspec(dllexport)'.  The code that
+does this should verify the timestamp in the map file against the
+timestamp in the dll's PE header.  The 'preferred load address' value
+must be substracted from the 'Rva+Base' addresses, and ctypes should
+load the functions based on the dll handle.
