@@ -10,6 +10,6 @@ class EXPORT CSimpleClass {
 	virtual void V0();
 	virtual void V1(int x);
 	virtual void V1();
-	virtual void V1(char *ptr) = 0;
+	virtual void V1(char *ptr);
 	virtual void V2();
 };
