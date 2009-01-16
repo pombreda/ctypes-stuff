@@ -70,11 +70,12 @@ def _overloaded_method(cls, name, mth):
     # patterns returned by _type_matcher, call the method if a match is
     # found and forward to the next overloaded method when no match is
     # found.
-    # XXX Use dictionaty lookup instead of linear searching.
+    # XXX should use a single dict lookup instead of chaining to the
+    # next method.
     old_mth = getattr(cls, name)
     argtypes = mth.cpp_func.argtypes
     nargs = len(argtypes)
-    patterns = list(_type_matcher(argtypes[1:]))
+    patterns = set(_type_matcher(argtypes[1:]))
 
     def call(self, *args):
         signature = tuple(type(a) for a in args)
