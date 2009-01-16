@@ -11,5 +11,7 @@ class EXPORT CSimpleClass {
 	virtual void V1(int x);
 	virtual void V1();
 	virtual void V1(char *ptr);
+	virtual void V1(int x, char *ptr);
+	virtual void V1(char *ptr, int x);
 	virtual void V2();
 };
