@@ -1,63 +1,10 @@
-from ctypes import *
-import sys
-
-# TODO:
-#
-# CPPDLL should be able to load functions via demangled names?
-#
-# How are overloaded virtual functions ordered in the vtable???
-# It seems not in the same order as they appear in the include file???
-#
-# XXX When an instance is created, we could parse the vtable addresses
-# and assert that they are the same as the adresses of the exported
-# functions we can also load from the dll...
-#
-# See also the undocumented MSVC /d1reportAllClassLayout command line flag
-
-def parse_names(dll):
-    try:
-        import get_exports
-    except ImportError:
-        from ctypeslib.contrib import get_exports
-    import undecorate
-    dll.member_names = member_names = {}
-    flags = undecorate.UNDNAME_NO_MS_KEYWORDS | undecorate.UNDNAME_NO_ACCESS_SPECIFIERS
-
-    for name in get_exports.read_export_table(dll._name):
-        name_with_args = undecorate.symbol_name(name, flags).strip()
-        # Convert the name to what gccxml creates
-        # Replace the (void) argument list with ()
-        gccxml_name = name_with_args.replace("(void)", "()")
-        # Remove 'virtual void '
-        # XXX We should instead remove everything before '<classname>::'.
-        for prefix in ("virtual ", "void "):
-            # Order of prefixes is important!
-            if gccxml_name.startswith(prefix):
-                gccxml_name = gccxml_name[len(prefix):]
-        if "-v" in sys.argv:
-            print gccxml_name
-        member_names[gccxml_name] = name
-
-if "-v" in sys.argv:
-    print; print
-
-def virtual(name, prototype):
-    def func(self, *args):
-        return getattr(self._vtable[0], name)(self, *args)
-    func.prototype = prototype
-    return func
-
-def method(dll, name, prototype):
-    member = prototype((name, dll))
-    def func(self, *args):
-        return member(self, *args)
-    func.prototype = prototype
-    return func
+from cpptypes import *
 
 def multimethod(cls, name, mth):
     old_mth = getattr(cls, name)
-    # nargs includes the (implicit) self argument
-    nargs = len(mth.prototype._argtypes_)
+    argtypes = mth.cpp_func.argtypes
+    nargs = len(argtypes)
+
     def call(self, *args):
         # If the number of arguments is what 'mth' expects, try to
         # call it.  If the actual argument types are not accepted,
@@ -65,57 +12,39 @@ def multimethod(cls, name, mth):
         # tried.
         #
         # Probably too expensive, but it works.
+        #
+        # nargs includes the (implicit) self argument
         if len(args) == nargs - 1:
             try:
-                return mth(self, *args)
-            except ArgumentError:
+                result = mth(self, *args)
+                print "\tMATCH   :", argtypes[1:], args
+                return result
+            except ArgumentError, details:
                 pass
-        return old_mth(self, *args)
+        print "\tNO MATCH:", argtypes[1:], args
+        try:
+            return old_mth(self, *args)
+        except (ArgumentError, TypeError):
+            raise TypeError("no overloaded function matches")
     call.__name__ = name
     call.__doc__ = "%s\n%s" % (mth.__doc__, old_mth.__doc__)
     return call
 
+
+def make_method(cls, func, mth_name, func_name):
+    # factory for methods
+    def call(self, *args):
+        return func(self, *args)
+    call.__doc__ = func_name
+    call.__name__ = mth_name
+    call.cpp_func = func
+    if hasattr(cls, mth_name):
+        return multimethod(cls, mth_name, call)
+    else:
+        return call
+
 class Class(Structure):
-    def __new__(cls, *args):
-        if not hasattr(cls, "_fields_"):
-            if not hasattr(cls.__dll__, "member_names"):
-                parse_names(cls.__dll__)
-
-            virtual_methods = []
-            for m in cls._methods_:
-                name, is_virt, demangled, restype = m[:4]
-                argtypes = m[4:]
-                prototype = CPPMETHODTYPE(restype, POINTER(cls), *argtypes)
-                if is_virt:
-                    # Create a virtual method
-                    # Names must be unique to allow overloading
-                    v_name = "%s(%s)" % (name, len(virtual_methods))
-                    virtual_methods.append((v_name, prototype))
-                    mth = virtual(v_name, prototype)
-                else:
-                    # Create a 'normal' method
-                    func_name = cls.__dll__.member_names[demangled]
-                    mth = method(cls.__dll__, func_name, prototype)
-                mth.__name__ = name
-                mth.__doc__ = demangled
-                if hasattr(cls, name):
-                    # Overloaded function
-                    mm = multimethod(cls, name, mth)
-                    setattr(cls, name, mm)
-                else:
-                    setattr(cls, name, mth)
-
-            if virtual_methods:
-                class VTBL(Structure):
-                    _fields_ = virtual_methods
-                cppfields = cls._cppfields_
-                assert cppfields[0][0] == "_vtable"
-                cppfields[0] = ("_vtable", POINTER(VTBL))
-                cls._fields_ = cppfields
-        result = super(Class, cls).__new__(cls, *args)
-        result._needs_free = False
-        return result
-
+    _needs_free = False
     def __init__(self, *args):
         # __init__ calls the cpp constructor, and also sets the
         # _needs_free flag so the the cpp desctructor is called when
@@ -124,31 +53,49 @@ class Class(Structure):
         self._needs_free = True
 
     def __del__(self):
+        # The destructor is only called if this instance has been
+        # created by Python code.
         if self._needs_free:
             self._needs_free = False
             self.__cpp_destructor__()
 
+    @classmethod
+    def _finish(cls, dll):
+        """This class method scans the _methods_ list, and creates Python methods
+        that forward to the C++ methods.
+        """
+        for info in cls._methods_:
+            mth_name, func_name = info[:2]
+            print mth_name, func_name
+            func = getattr(dll, func_name)
+            func.restype = info[2]
+            func.argtypes = (POINTER(cls),) + info[3:]
+            mth = make_method(cls, func, mth_name, func_name)
+            setattr(cls, mth_name, mth)
+
+
 ################################################################
 
 class CSimpleClass(Class):
-    __dll__ = CDLL("mydll.dll")
+    pass
 CSimpleClass._methods_ = [
-    # python-method-name, is_virtual, C++ name, restype, *argtypes
-    ('__cpp_constructor__', False, 'CSimpleClass::CSimpleClass(int)', None, c_int),
-    ('__cpp_constructor__', False, 'CSimpleClass::CSimpleClass(class CSimpleClass const &)', None, POINTER(CSimpleClass)),
-    ('M1', False, 'CSimpleClass::M1()', None, ),
-    ('M1', False, 'CSimpleClass::M1(int)', None, c_int),
-    ('V0', True, 'CSimpleClass::V0()', None, ),
-    ('V1', True, 'CSimpleClass::V1(char *)', None, c_char_p),
-    ('V1', True, 'CSimpleClass::V1()', None),
-    ('V1', True, 'CSimpleClass::V1(int)', None, c_int),
-    ('V2', True, 'CSimpleClass::V2()', None, ),
-    ('__cpp_destructor__', False, 'CSimpleClass::~CSimpleClass()', None, ),
+    # python-method-name, C++ name, restype, *argtypes
+    ('__cpp_constructor__', 'CSimpleClass::CSimpleClass(int)', None, c_int),
+    ('__cpp_constructor__', 'CSimpleClass::CSimpleClass(CSimpleClass const&)', None, POINTER(CSimpleClass)),
+    ('M1', 'CSimpleClass::M1()', None, ),
+    ('M1', 'CSimpleClass::M1(int)', None, c_int),
+    ('V0', 'CSimpleClass::V0()', None, ),
+    ('V1', 'CSimpleClass::V1()', None),
+    ('V1', 'CSimpleClass::V1(int)', None, c_int),
+    ('V1', 'CSimpleClass::V1(char*)', None, c_char_p),
+    ('V2', 'CSimpleClass::V2()', None, ),
+    ('__cpp_destructor__', 'CSimpleClass::~CSimpleClass()', None, ),
 ]
-CSimpleClass._cppfields_ = [
+CSimpleClass._fields_ = [
     ('_vtable', c_void_p),
     ('value', c_int),
 ]
+CSimpleClass._finish(CPPDLL("mydll.dll"))
 
 ################################################################
 
@@ -156,8 +103,10 @@ def make():
     return CSimpleClass(99)
 
 if __name__ == "__main__":
+    help(CSimpleClass)
+
     obj = CSimpleClass(42)
-##    print obj.value
+    print obj.value
     print "M1(42)"
     obj.M1(42)
     print "M1()"
@@ -168,8 +117,8 @@ if __name__ == "__main__":
     obj.V2()
     print "V1()"
     obj.V1()
-##    print "V1('foo')"
-##    obj.V1("foo")
+    print "V1('foo')"
+    obj.V1("foo")
 
     aCopy = CSimpleClass(obj)
     del obj
