@@ -1,31 +1,86 @@
 from ctypes import *
 
-def multimethod(cls, name, mth):
+try:
+    from itertools import product
+except ImportError:
+    # Only Python 2.6 and up have itertools.product. Use the pure
+    # Python version from the 2.6 docs when not available:
+    def product(*args, **kwds):
+        # product('ABCD', 'xy') --> Ax Ay Bx By Cx Cy Dx Dy
+        # product(range(2), repeat=3) --> 000 001 010 011 100 101 110 111
+        pools = map(tuple, args) * kwds.get('repeat', 1)
+        result = [[]]
+        for pool in pools:
+            result = [x+[y] for x in result for y in pool]
+        for prod in result:
+            yield tuple(prod)
+
+# XXX add all the primitive ctypes types
+matches = {c_int: [int, long, c_int],
+           c_long: [int, long, c_long],
+           c_char_p: [str, unicode, type(None), c_char_p]
+           }
+
+def type_matcher(argtypes):
+    """Return a generator producing tuples of types that will match
+    the specified argtypes.
+    
+    >>> import ctypes
+    >>> for item in type_matcher([ctypes.c_long, ctypes.c_char_p]):
+    ...     print item
+    (<type 'int'>, <type 'str'>)
+    (<type 'int'>, <type 'unicode'>)
+    (<type 'int'>, <type 'NoneType'>)
+    (<type 'int'>, <class 'ctypes.c_char_p'>)
+    (<type 'long'>, <type 'str'>)
+    (<type 'long'>, <type 'unicode'>)
+    (<type 'long'>, <type 'NoneType'>)
+    (<type 'long'>, <class 'ctypes.c_char_p'>)
+    (<class 'ctypes.c_long'>, <type 'str'>)
+    (<class 'ctypes.c_long'>, <type 'unicode'>)
+    (<class 'ctypes.c_long'>, <type 'NoneType'>)
+    (<class 'ctypes.c_long'>, <class 'ctypes.c_char_p'>)
+
+    >>> class X(Structure):
+    ...     pass
+    >>> for item in type_matcher([POINTER(X)]):
+    ...     print item
+    (<class '__main__.X'>,)
+    (<class '__main__.LP_X'>,)
+    >>>
+
+    >>> for item in type_matcher([]):
+    ...     print item
+    ()
+    >>>
+    """
+    result = []
+    for tp in argtypes:
+        possible = matches.get(tp, None)
+        if possible is None:
+            if hasattr(tp, "_type_"):
+                # a ctypes POINTER type, the type itself is also accepted
+                possible = matches[tp] = [tp._type_, tp]
+        result.append(possible)
+    return product(*result)
+
+
+def overloaded_method(cls, name, mth):
+    # This overloadedmethod will try to match the arguments passed to the
+    # patterns returned by type_matcher, call the method if a match is
+    # found and forward to the next overloaded method when no match is
+    # found.
+    # XXX Use dictionaty lookup instead of linear searching.
     old_mth = getattr(cls, name)
     argtypes = mth.cpp_func.argtypes
     nargs = len(argtypes)
+    patterns = list(type_matcher(argtypes[1:]))
 
     def call(self, *args):
-        # If the number of arguments is what 'mth' expects, try to
-        # call it.  If the actual argument types are not accepted,
-        # ctypes will raise an ArgumentError, and the next method is
-        # tried.
-        #
-        # Probably too expensive, but it works.
-        #
-        # nargs includes the (implicit) self argument
-        if len(args) == nargs - 1:
-            try:
-                result = mth(self, *args)
-##                print "\tMATCH   :", argtypes[1:], args
-                return result
-            except ArgumentError, details:
-                pass
-##        print "\tNO MATCH:", argtypes[1:], args
-        try:
-            return old_mth(self, *args)
-        except (ArgumentError, TypeError):
-            raise TypeError("no overloaded function matches")
+        signature = tuple(type(a) for a in args)
+        if signature in patterns:
+            return mth(self, *args)
+        return old_mth(self, *args)
     call.__name__ = name
     call.__doc__ = "%s\n%s" % (mth.__doc__, old_mth.__doc__)
     return call
@@ -39,7 +94,7 @@ def make_method(cls, func, mth_name, func_name):
     call.__name__ = mth_name
     call.cpp_func = func
     if hasattr(cls, mth_name):
-        return multimethod(cls, mth_name, call)
+        return overloaded_method(cls, mth_name, call)
     else:
         return call
 
@@ -147,23 +202,29 @@ class CPPDLL(CPPDLL):
         return result
 
 if __name__ == "__main__":
-    dll = CPPDLL("mydll.dll")
-    print dll
-    print getattr(dll, "??0CSimpleClass@@QAE@ABV0@@Z")
-    print getattr(dll, "??0CSimpleClass@@QAE@H@Z")
-    print getattr(dll, "CSimpleClass::CSimpleClass(int)")
-    print getattr(dll, "CSimpleClass::CSimpleClass(int)")
-    print getattr(dll, "CSimpleClass::~CSimpleClass()")
+    if 1:
+        import doctest
+        doctest.testmod()
 
-    class X(Structure):
-        _fields_ = [("allocate some space", c_int * 32)]
-        def __init__(self, value):
-            func = getattr(dll, "CSimpleClass::CSimpleClass(int)")
-            func(byref(self), value)
+    if 1:
+        dll = CPPDLL("mydll.dll")
+        print dll
+##        print getattr(dll, "??0CSimpleClass@@QAE@ABV0@@Z")
+##        print getattr(dll, "??0CSimpleClass@@QAE@H@Z")
+##        print getattr(dll, "CSimpleClass::CSimpleClass(int)")
+##        print getattr(dll, "CSimpleClass::CSimpleClass(int)")
+##        print getattr(dll, "CSimpleClass::~CSimpleClass()")
 
-        def __del__(self):
-            func = getattr(dll, "CSimpleClass::~CSimpleClass()")
-            func(byref(self))
-            
-    x = X(42)
-    del x
+        class X(Structure):
+            _fields_ = [("allocate some space", c_int * 32)]
+            def __init__(self, value):
+                func = getattr(dll, "CSimpleClass::CSimpleClass(int)")
+                func(byref(self), value)
+
+            def __del__(self):
+                func = getattr(dll, "CSimpleClass::~CSimpleClass()")
+                func(byref(self))
+
+        x = X(42)
+        del x
+
