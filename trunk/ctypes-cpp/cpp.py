@@ -2,7 +2,7 @@ from cpptypes import *
 
 class CSimpleClass(Class):
     pass
-CSimpleClass._fields_ = [
+CSimpleClass._cpp_fields_ = [
     ('_vtable', c_void_p),
     ('value', c_int),
 ]
@@ -11,7 +11,7 @@ CSimpleClass._methods_ = [
     constructor('CSimpleClass::CSimpleClass(int)', argtypes=[c_int]),
 ##    ('__cpp_constructor__', 'CSimpleClass::CSimpleClass(CSimpleClass const&)', argtypes=[POINTER(CSimpleClass)]),
     copy_constructor(),
-    method('__cpp_constructor__', 'CSimpleClass::CSimpleClass(CSimpleClass const&)', argtypes=[POINTER(CSimpleClass)]),
+##    method('__cpp_constructor__', 'CSimpleClass::CSimpleClass(CSimpleClass const&)', argtypes=[POINTER(CSimpleClass)]),
     method('M1', 'CSimpleClass::M1()'),
     method('M1', 'CSimpleClass::M1(int)', argtypes=[c_int]),
     method('V0', 'CSimpleClass::V0()'),
