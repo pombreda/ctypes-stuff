@@ -1,4 +1,5 @@
 from ctypes import *
+import warnings
 
 try:
     from itertools import product as _product
@@ -15,84 +16,69 @@ except ImportError:
         for prod in result:
             yield tuple(prod)
 
-# XXX add all the primitive ctypes types
-_ctypes_matches = {c_int: [int, long, c_int],
-                   c_long: [int, long, c_long],
-                   c_char_p: [str, unicode, type(None), c_char_p]
-                   }
+# XXX add all the primitive ctypes types: c_char, c_byte, ...
+_argtypes_matches = {c_int: [int, long, c_int],
+                     c_long: [int, long, c_long],
+                     # XXX c_char_p would also accept (c_char * n) arrays
+                     c_char_p: [str, unicode, type(None), c_char_p, POINTER(c_char)]
+                     }
 
 def _type_matcher(argtypes):
-    """Return a generator producing tuples of types that will match
-    the specified argtypes.
+    """Return a generator producing all possible tuples of types that
+    will match the specified argtypes.  Here are examples::
     
     >>> import ctypes
-    >>> for item in _type_matcher([ctypes.c_long, ctypes.c_char_p]):
+    >>> for item in _type_matcher([ctypes.c_char_p]):
     ...     print item
-    (<type 'int'>, <type 'str'>)
-    (<type 'int'>, <type 'unicode'>)
-    (<type 'int'>, <type 'NoneType'>)
-    (<type 'int'>, <class 'ctypes.c_char_p'>)
-    (<type 'long'>, <type 'str'>)
-    (<type 'long'>, <type 'unicode'>)
-    (<type 'long'>, <type 'NoneType'>)
-    (<type 'long'>, <class 'ctypes.c_char_p'>)
-    (<class 'ctypes.c_long'>, <type 'str'>)
-    (<class 'ctypes.c_long'>, <type 'unicode'>)
-    (<class 'ctypes.c_long'>, <type 'NoneType'>)
-    (<class 'ctypes.c_long'>, <class 'ctypes.c_char_p'>)
-
-    >>> class X(Structure):
-    ...     pass
-    >>> for item in _type_matcher([POINTER(X)]):
+    (<type 'str'>,)
+    (<type 'unicode'>,)
+    (<type 'NoneType'>,)
+    (<class 'ctypes.c_char_p'>,)
+    (<class 'ctypes.LP_c_char'>,)
+    
+    >>> for item in _type_matcher([POINTER(c_long)]):
     ...     print item
-    (<class '__main__.X'>,)
-    (<class '__main__.LP_X'>,)
+    (<class 'ctypes.c_long'>,)
+    (<class '__main__.LP_c_long'>,)
     >>>
 
     >>> for item in _type_matcher([]):
     ...     print item
     ()
     >>>
+
+    >>> for item in _type_matcher([c_long, c_long]):
+    ...     print item
+    (<type 'int'>, <type 'int'>)
+    (<type 'int'>, <type 'long'>)
+    (<type 'int'>, <class 'ctypes.c_long'>)
+    (<type 'long'>, <type 'int'>)
+    (<type 'long'>, <type 'long'>)
+    (<type 'long'>, <class 'ctypes.c_long'>)
+    (<class 'ctypes.c_long'>, <type 'int'>)
+    (<class 'ctypes.c_long'>, <type 'long'>)
+    (<class 'ctypes.c_long'>, <class 'ctypes.c_long'>)
+    >>>
     """
     result = []
     for tp in argtypes:
-        possible = _ctypes_matches.get(tp, None)
+        possible = _argtypes_matches.get(tp, None)
         if possible is None:
             if hasattr(tp, "_type_"):
-                # a ctypes POINTER type, the type itself is also accepted
+                # ctypes POINTER(tp) does also accept tp instances
                 possible = [tp._type_, tp]
         result.append(possible)
     return _product(*result)
 
-def _overloaded_method(cls, name, mth):
-    # This overloadedmethod will try to match the arguments passed to the
-    # patterns returned by _type_matcher, call the method if a match is
-    # found and forward to the next overloaded method when no match is
-    # found.
-    # XXX should use a single dict lookup instead of chaining to the
-    # next method.
-    old_mth = getattr(cls, name)
-    argtypes = mth.cpp_func.argtypes
-    nargs = len(argtypes)
-    patterns = set(_type_matcher(argtypes[1:]))
-
-    def call(self, *args):
-        signature = tuple(type(a) for a in args)
-        if signature in patterns:
-            return mth(self, *args)
-        return old_mth(self, *args)
-    call.__name__ = name
-    call.__doc__ = "%s\n%s" % (mth.__doc__, old_mth.__doc__)
-    return call
-
 class method(object):
-    def __init__(self, mth_name, func_name, restype=None, argtypes=()):
+    """Helper to create a C++ method."""
+    def __init__(self, mth_name, func_name, restype=None, argtypes=(), virtual=False):
         self.mth_name = mth_name
         self.func_name = func_name
         self.restype = restype
         self.argtypes = argtypes
 
-    def create(self, dll, cls):
+    def _create(self, dll, cls):
         func = getattr(dll, self.func_name)
         func.restype = self.restype
         func.argtypes = (POINTER(cls),) + tuple(self.argtypes)
@@ -102,14 +88,10 @@ class method(object):
 
         call.__doc__ = self.func_name
         call.__name__ = self.mth_name
-        call.cpp_func = func
-        if hasattr(cls, self.mth_name):
-            mth = _overloaded_method(cls, self.mth_name, call)
-        else:
-            mth = call
-        setattr(cls, self.mth_name, mth)
+        return self.argtypes, call
 
 class constructor(method):
+    """Helper to create a C++ constructor."""
     def __init__(self, func_name, argtypes=()):
         super(constructor, self).__init__("__cpp_constructor__",
                                           func_name,
@@ -117,43 +99,80 @@ class constructor(method):
                                           argtypes=argtypes)
 
 class copy_constructor(method):
+    """Helper to create a C++ copy constructor."""
     def __init__(self):
         super(copy_constructor, self).__init__("__cpp_constructor__",
                                                None,
                                                restype=None,
                                                argtypes=())
-    def create(self, dll, cls):
+    def _create(self, dll, cls):
         name = cls.__name__
         self.func_name = '%s::%s(%s const&)' % (name, name, name)
         self.argtypes = (POINTER(cls),)
-        super(copy_constructor, self).create(dll, cls)
+        return super(copy_constructor, self)._create(dll, cls)
 
 class destructor(method):
-    def __init__(self):
+    """Helper to create a C++ destructor."""
+    def __init__(self, virtual=False):
         super(destructor, self).__init__("__cpp_destructor__",
                                          None,
                                          restype=None,
-                                         argtypes=())
+                                         argtypes=(),
+                                         virtual=virtual)
 
-    def create(self, dll, cls):
+    def _create(self, dll, cls):
         name = cls.__name__
         self.func_name = '%s::~%s()' % (name, name)
-        super(destructor, self).create(dll, cls)
-    
+        return super(destructor, self)._create(dll, cls)
+
+class OverloadingError(TypeError):
+    """This exception is raised if an overloaded method could not be
+    matched to the types of the actual arguments"""
+
+class OverloadingConflict(UserWarning):
+    """This warning is emitted when there are conflicting argspec entries
+    in an overloaded method."""
+
+def _multimethod(name, info):
+    # info is a sequence containing (mth, argtypes) tuples
+    methodmap = {}
+    docs = ["Overloaded method:"]
+    for mth, argtypes in info:
+        docs.append(mth.__doc__)
+        for argspec in _type_matcher(argtypes):
+            if argspec in methodmap:
+                warnings.warn("Conflicting entries for '%s'" % mth.__name__,
+                              OverloadingConflict, stacklevel=3)
+            methodmap[argspec] = mth
+
+    def call(self, *args):
+        types = tuple([type(a) for a in args])
+        try:
+            mth = methodmap[types]
+        except KeyError:
+            # XXX Use custom exception, derived from TypeError?
+            raise OverloadingError("No matching signature found for overloaded function")
+        return mth(self, *args)
+
+    call.__doc__ = "\n".join(docs)
+    call.__name__ = name
+    return call
 
 class Class(Structure):
     """Base class for C++ class proxies."""
     _needs_free = False
     def __init__(self, *args):
-        # __init__ calls the cpp constructor, and also sets the
-        # _needs_free flag so the the cpp desctructor is called when
-        # the Python instance goes away.
+        """__init__ calls the cpp constructor, and also sets the
+        _needs_free flag so the the cpp destructor is called when
+        the Python instance goes away.
+        """
         self.__cpp_constructor__(*args)
         self._needs_free = True
 
     def __del__(self):
-        # The destructor is only called if this instance has been
-        # created by Python code.
+        """The destructor is only called when the _needs_free flag is
+        set because this instance has been created by Python code.
+        """
         if self._needs_free:
             self._needs_free = False
             self.__cpp_destructor__()
@@ -164,11 +183,21 @@ class Class(Structure):
         creates Python methods that forward to the C++ methods.
         """
         if "_class_finished" in cls.__dict__:
-            import warnings
-            warnings.warn("class %s already finished" % cls)
+            warnings.warn("class %s already finished" % cls,
+                          stacklevel=2)
             return
+        methods = {}
         for item in cls._methods_:
-            item.create(dll, cls)
+            argtypes, mth = item._create(dll, cls)
+            methods.setdefault(mth.__name__, []).append((mth, argtypes))
+        for name, info in methods.iteritems():
+            if len(info) == 1:
+                mth, argspec = info[0]
+                setattr(cls, name, mth)
+            else:
+                mth = _multimethod(name, info)
+                setattr(cls, name, mth)
+        cls._fields_ = cls._cpp_fields_
         cls._class_finished = True
 
 class CPPDLL(CPPDLL):
@@ -200,11 +229,13 @@ class CPPDLL(CPPDLL):
         # Remove the return type from function prototypes.  Types from
         # variable declaration are not removed.
         #
-        # Does not work for templates, the regexp would be much more
-        # complicated.
+        # XXX Does not work for templates, the regexp would be much
+        # more complicated.
         name = name.strip()
         if name.endswith("const"):
             name = name[:-len("const")]
+        # Some of these replacements should probably be done with re,
+        # to be more immune to whitespace.
         name = name.replace(", ", ",")
         name = name.replace("(void)", "()")
         name = name.replace(" &", "&")
@@ -220,13 +251,14 @@ class CPPDLL(CPPDLL):
         return name
 
     def __getattr__(self, name):
-        """This method allows to access functions by mangled name
-        and by unmangled normalized name."""
+        """This method allows to access functions by mangled name and
+        by demangled name.  The demangled name does not need to be
+        normalized.
+        """
         try:
             # try mangled name
             result = super(CPPDLL, self).__getattr__(name)
-            # XXX Should also try to find and cache with the demangled
-            # name, but this is only for performance...
+            # XXX better caching?
         except AttributeError:
             # try demangled name
             try:
@@ -240,29 +272,5 @@ class CPPDLL(CPPDLL):
         return result
 
 if __name__ == "__main__":
-    if 1:
-        import doctest
-        doctest.testmod()
-
-    if 1:
-        dll = CPPDLL("mydll.dll")
-        print dll
-##        print getattr(dll, "??0CSimpleClass@@QAE@ABV0@@Z")
-##        print getattr(dll, "??0CSimpleClass@@QAE@H@Z")
-##        print getattr(dll, "CSimpleClass::CSimpleClass(int)")
-##        print getattr(dll, "CSimpleClass::CSimpleClass(int)")
-##        print getattr(dll, "CSimpleClass::~CSimpleClass()")
-
-        class X(Structure):
-            _fields_ = [("allocate some space", c_int * 32)]
-            def __init__(self, value):
-                func = getattr(dll, "CSimpleClass::CSimpleClass(int)")
-                func(byref(self), value)
-
-            def __del__(self):
-                func = getattr(dll, "CSimpleClass::~CSimpleClass()")
-                func(byref(self))
-
-        x = X(42)
-        del x
-
+    import doctest
+    doctest.testmod()
