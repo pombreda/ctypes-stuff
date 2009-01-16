@@ -134,9 +134,12 @@ class OverloadingConflict(UserWarning):
     in an overloaded method."""
 
 def _multimethod(name, info):
+    """Return a method that dispatches to one of the C++ overloaded
+    methods depending on the actual argument types passed in the call.
+    """
     # info is a sequence containing (mth, argtypes) tuples
     methodmap = {}
-    docs = ["Overloaded method:"]
+    docs = ["--overloaded method--"]
     for mth, argtypes in info:
         docs.append(mth.__doc__)
         for argspec in _type_matcher(argtypes):
