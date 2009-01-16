@@ -7,19 +7,22 @@ CSimpleClass._fields_ = [
     ('value', c_int),
 ]
 CSimpleClass._methods_ = [
-    # python-method-name, C++ name, restype, *argtypes
-    ('__cpp_constructor__', 'CSimpleClass::CSimpleClass(int)', None, c_int),
-    ('__cpp_constructor__', 'CSimpleClass::CSimpleClass(CSimpleClass const&)', None, POINTER(CSimpleClass)),
-    ('M1', 'CSimpleClass::M1()', None, ),
-    ('M1', 'CSimpleClass::M1(int)', None, c_int),
-    ('V0', 'CSimpleClass::V0()', None, ),
-    ('V1', 'CSimpleClass::V1()', None),
-    ('V1', 'CSimpleClass::V1(int)', None, c_int),
-    ('V1', 'CSimpleClass::V1(char*)', None, c_char_p),
-    ('V1', 'CSimpleClass::V1(int,char*)', None, c_int, c_char_p),
-    ('V1', 'CSimpleClass::V1(char*,int)', None, c_char_p, c_int),
-    ('V2', 'CSimpleClass::V2()', None, ),
-    ('__cpp_destructor__', 'CSimpleClass::~CSimpleClass()', None, ),
+##    method('__cpp_constructor__', 'CSimpleClass::CSimpleClass(int)', argtypes=[c_int]),
+    constructor('CSimpleClass::CSimpleClass(int)', argtypes=[c_int]),
+##    ('__cpp_constructor__', 'CSimpleClass::CSimpleClass(CSimpleClass const&)', argtypes=[POINTER(CSimpleClass)]),
+    copy_constructor(),
+    method('__cpp_constructor__', 'CSimpleClass::CSimpleClass(CSimpleClass const&)', argtypes=[POINTER(CSimpleClass)]),
+    method('M1', 'CSimpleClass::M1()'),
+    method('M1', 'CSimpleClass::M1(int)', argtypes=[c_int]),
+    method('V0', 'CSimpleClass::V0()'),
+    method('V1', 'CSimpleClass::V1()'),
+    method('V1', 'CSimpleClass::V1(int)', argtypes=[c_int]),
+    method('V1', 'CSimpleClass::V1(char*)', argtypes=[c_char_p]),
+    method('V1', 'CSimpleClass::V1(int,char*)', argtypes=[c_int, c_char_p]),
+    method('V1', 'CSimpleClass::V1(char*,int)', argtypes=[c_char_p, c_int]),
+    method('V2', 'CSimpleClass::V2()'),
+##    method('__cpp_destructor__', 'CSimpleClass::~CSimpleClass()'),
+    destructor(),
 ]
 CSimpleClass._finish(CPPDLL("mydll.dll"))
 CSimpleClass._finish(CPPDLL("mydll.dll"))

@@ -64,7 +64,6 @@ def _type_matcher(argtypes):
         result.append(possible)
     return _product(*result)
 
-
 def _overloaded_method(cls, name, mth):
     # This overloadedmethod will try to match the arguments passed to the
     # patterns returned by _type_matcher, call the method if a match is
@@ -86,18 +85,61 @@ def _overloaded_method(cls, name, mth):
     call.__doc__ = "%s\n%s" % (mth.__doc__, old_mth.__doc__)
     return call
 
+class method(object):
+    def __init__(self, mth_name, func_name, restype=None, argtypes=()):
+        self.mth_name = mth_name
+        self.func_name = func_name
+        self.restype = restype
+        self.argtypes = argtypes
 
-def _make_method(cls, func, mth_name, func_name):
-    # factory for methods
-    def call(self, *args):
-        return func(self, *args)
-    call.__doc__ = func_name
-    call.__name__ = mth_name
-    call.cpp_func = func
-    if hasattr(cls, mth_name):
-        return _overloaded_method(cls, mth_name, call)
-    else:
-        return call
+    def create(self, dll, cls):
+        func = getattr(dll, self.func_name)
+        func.restype = self.restype
+        func.argtypes = (POINTER(cls),) + tuple(self.argtypes)
+
+        def call(self, *args):
+            return func(self, *args)
+
+        call.__doc__ = self.func_name
+        call.__name__ = self.mth_name
+        call.cpp_func = func
+        if hasattr(cls, self.mth_name):
+            mth = _overloaded_method(cls, self.mth_name, call)
+        else:
+            mth = call
+        setattr(cls, self.mth_name, mth)
+
+class constructor(method):
+    def __init__(self, func_name, argtypes=()):
+        super(constructor, self).__init__("__cpp_constructor__",
+                                          func_name,
+                                          restype=None,
+                                          argtypes=argtypes)
+
+class copy_constructor(method):
+    def __init__(self):
+        super(copy_constructor, self).__init__("__cpp_constructor__",
+                                               None,
+                                               restype=None,
+                                               argtypes=())
+    def create(self, dll, cls):
+        name = cls.__name__
+        self.func_name = '%s::%s(%s const&)' % (name, name, name)
+        self.argtypes = (POINTER(cls),)
+        super(copy_constructor, self).create(dll, cls)
+
+class destructor(method):
+    def __init__(self):
+        super(destructor, self).__init__("__cpp_destructor__",
+                                         None,
+                                         restype=None,
+                                         argtypes=())
+
+    def create(self, dll, cls):
+        name = cls.__name__
+        self.func_name = '%s::~%s()' % (name, name)
+        super(destructor, self).create(dll, cls)
+    
 
 class Class(Structure):
     """Base class for C++ class proxies."""
@@ -118,20 +160,15 @@ class Class(Structure):
 
     @classmethod
     def _finish(cls, dll):
-        """This classmethod scans the _methods_ list, and creates Python methods
-        that forward to the C++ methods.
+        """This classmethod iterates over the _methods_ list, and
+        creates Python methods that forward to the C++ methods.
         """
         if "_class_finished" in cls.__dict__:
             import warnings
             warnings.warn("class %s already finished" % cls)
             return
-        for info in cls._methods_:
-            mth_name, func_name = info[:2]
-            func = getattr(dll, func_name)
-            func.restype = info[2]
-            func.argtypes = (POINTER(cls),) + info[3:]
-            mth = _make_method(cls, func, mth_name, func_name)
-            setattr(cls, mth_name, mth)
+        for item in cls._methods_:
+            item.create(dll, cls)
         cls._class_finished = True
 
 class CPPDLL(CPPDLL):
