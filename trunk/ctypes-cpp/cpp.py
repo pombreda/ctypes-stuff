@@ -16,6 +16,8 @@ CSimpleClass._methods_ = [
     ('V1', 'CSimpleClass::V1()', None),
     ('V1', 'CSimpleClass::V1(int)', None, c_int),
     ('V1', 'CSimpleClass::V1(char*)', None, c_char_p),
+    ('V1', 'CSimpleClass::V1(int,char*)', None, c_int, c_char_p),
+    ('V1', 'CSimpleClass::V1(char*,int)', None, c_char_p, c_int),
     ('V2', 'CSimpleClass::V2()', None, ),
     ('__cpp_destructor__', 'CSimpleClass::~CSimpleClass()', None, ),
 ]
