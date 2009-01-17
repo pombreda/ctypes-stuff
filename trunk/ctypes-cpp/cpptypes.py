@@ -1,6 +1,11 @@
 from ctypes import *
 import warnings
 
+# I'm not sure the vtable layout is correct.  So, this variable
+# determines if virtual functions are called through the vtable (True)
+# or by name (False).
+USE_VIRTUAL = True
+
 try:
     from itertools import product as _product
 except ImportError:
@@ -24,6 +29,10 @@ _argtypes_matches = {c_int: [int, long, c_int],
                      }
 
 def _type_matcher(argtypes):
+    # XXX For long argument lists, the result can get pretty large.
+    # It will ensure a very fast lookup at the expense of the
+    # dictionary size that is built from the result.  Not sure it
+    # matters, though, since it is only uses for overloaded functions.
     """Return a generator producing all possible tuples of types that
     will match the specified argtypes.  Here are examples::
     
@@ -77,21 +86,35 @@ class method(object):
         self.func_name = func_name
         self.restype = restype
         self.argtypes = argtypes
+        self.virtual = virtual
 
     def _create(self, dll, cls):
         func = getattr(dll, self.func_name)
         func.restype = self.restype
         func.argtypes = (POINTER(cls),) + tuple(self.argtypes)
+        if self.virtual:
+            self.virtual_prototype = CPPMETHODTYPE(func.restype, *func.argtypes)
 
-        def call(self, *args):
-            return func(self, *args)
+        if USE_VIRTUAL and self.virtual:
+            from operator import attrgetter
+            getter = attrgetter(self.func_name)
+            def call(self, *args):
+                return getter(self.pvtable[0])(self, *args)
+        else:
+            def call(self, *args):
+                return func(self, *args)
 
         call.__doc__ = self.func_name
         call.__name__ = self.mth_name
-        return self.argtypes, call
+        return call, self.argtypes
+
+    def __repr__(self):
+        return "<method(%r, %r, virtual=%s at %x>" % \
+               (self.mth_name, self.func_name, self.virtual, id(self))
 
 class constructor(method):
     """Helper to create a C++ constructor."""
+    # XXX can constructors be virtual? Guess no.
     def __init__(self, func_name, argtypes=()):
         super(constructor, self).__init__("__cpp_constructor__",
                                           func_name,
@@ -100,11 +123,13 @@ class constructor(method):
 
 class copy_constructor(method):
     """Helper to create a C++ copy constructor."""
+    # XXX can constructors be virtual? Guess no.
     def __init__(self):
         super(copy_constructor, self).__init__("__cpp_constructor__",
                                                None,
                                                restype=None,
                                                argtypes=())
+
     def _create(self, dll, cls):
         name = cls.__name__
         self.func_name = '%s::%s(%s const&)' % (name, name, name)
@@ -185,22 +210,65 @@ class Class(Structure):
         """This classmethod iterates over the _methods_ list, and
         creates Python methods that forward to the C++ methods.
         """
+        # XXX TODO: This code is complicated enough so that it should
+        # be moved into a ClassBuilder class.
         if "_class_finished" in cls.__dict__:
             warnings.warn("class %s already finished" % cls,
                           stacklevel=2)
             return
+
+        # Determine the order of virtual methods in the vtable.
+        virtual_methods = []
+        seen = set()
+        for item in cls._methods_:
+            if not item.virtual:
+                continue
+            name = item.mth_name
+            if name in seen:
+                virtual_methods[-1].insert(0, item)
+            else:
+                virtual_methods.append([item])
+            seen.add(name)
+
+        # Assign the vtable_index to virtual methods
+        index = 0
+        for methods in virtual_methods:
+            for m in methods:
+                m.vtable_index = index
+                index += 1
+
+        # Build all the methods, and collect them into a dictionary.
+        # Key is the method name, value is a list containing one (or
+        # more, in case of overloading) methods.
         methods = {}
         for item in cls._methods_:
-            argtypes, mth = item._create(dll, cls)
+            mth, argtypes = item._create(dll, cls)
             methods.setdefault(mth.__name__, []).append((mth, argtypes))
+
+        # Attach the methods to the class.  Overloaded functions are
+        # stuffed into a _multimethod dispatcher.
         for name, info in methods.iteritems():
             if len(info) == 1:
-                mth, argspec = info[0]
+                mth, argtypes = info[0]
                 setattr(cls, name, mth)
             else:
                 mth = _multimethod(name, info)
                 setattr(cls, name, mth)
-        cls._fields_ = cls._cpp_fields_
+
+        # Now, build the vtable structure
+        vtable_fields = []
+        for methods in virtual_methods:
+            for m in methods:
+                vtable_fields.append((m.func_name, m.virtual_prototype))
+        class VTABLE(Structure):
+            _fields_ = vtable_fields
+
+        # Determine _fields_ from _cpp_fields_, and assign to the class
+        fields = list(cls._cpp_fields_)[:]
+        fields[0] = ("pvtable", POINTER(VTABLE))
+        cls._fields_ = fields
+
+        # Done.
         cls._class_finished = True
 
 class CPPDLL(CPPDLL):

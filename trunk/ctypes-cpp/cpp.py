@@ -9,21 +9,21 @@ CSimpleClass._cpp_fields_ = [
 CSimpleClass._methods_ = [
 ##    method('__cpp_constructor__', 'CSimpleClass::CSimpleClass(int)', argtypes=[c_int]),
     constructor('CSimpleClass::CSimpleClass(int)', argtypes=[c_int]),
-##    ('__cpp_constructor__', 'CSimpleClass::CSimpleClass(CSimpleClass const&)', argtypes=[POINTER(CSimpleClass)]),
-    copy_constructor(),
 ##    method('__cpp_constructor__', 'CSimpleClass::CSimpleClass(CSimpleClass const&)', argtypes=[POINTER(CSimpleClass)]),
+    copy_constructor(),
     method('M1', 'CSimpleClass::M1()'),
     method('M1', 'CSimpleClass::M1(int)', argtypes=[c_int]),
-    method('V0', 'CSimpleClass::V0()'),
-    method('V1', 'CSimpleClass::V1()'),
-    method('V1', 'CSimpleClass::V1(int)', argtypes=[c_int]),
-    method('V1', 'CSimpleClass::V1(char*)', argtypes=[c_char_p]),
-    method('V1', 'CSimpleClass::V1(int,char*)', argtypes=[c_int, c_char_p]),
-    method('V1', 'CSimpleClass::V1(char*,int)', argtypes=[c_char_p, c_int]),
-    method('V2', 'CSimpleClass::V2()'),
+    method('V0', 'CSimpleClass::V0()', virtual=True),
+    method('V1', 'CSimpleClass::V1(int)', argtypes=[c_int], virtual=True),
+    method('V1', 'CSimpleClass::V1()', virtual=True),
+    method('V1', 'CSimpleClass::V1(char*)', argtypes=[c_char_p], virtual=True),
+    method('V1', 'CSimpleClass::V1(int,char*)', argtypes=[c_int, c_char_p], virtual=True),
+    method('V1', 'CSimpleClass::V1(char*,int)', argtypes=[c_char_p, c_int], virtual=True),
+    method('V2', 'CSimpleClass::V2()', virtual=True),
 ##    method('__cpp_destructor__', 'CSimpleClass::~CSimpleClass()'),
     destructor(),
 ]
+
 CSimpleClass._finish(CPPDLL("mydll.dll"))
 CSimpleClass._finish(CPPDLL("mydll.dll"))
 
