@@ -1,31 +1,36 @@
-from cpptypes import *
+import cpptypes
 
-class CSimpleClass(Class):
+class CSimpleClass(cpptypes.Class):
     pass
 CSimpleClass._cpp_fields_ = [
-    ('_vtable', c_void_p),
-    ('value', c_int),
+    ('_vtable', cpptypes.c_void_p),
+    ('value', cpptypes.c_int),
 ]
 CSimpleClass._methods_ = [
+    # The following two lines are equivalent...
 ##    method('__cpp_constructor__', 'CSimpleClass::CSimpleClass(int)', argtypes=[c_int]),
-    constructor('CSimpleClass::CSimpleClass(int)', argtypes=[c_int]),
+    cpptypes.constructor('CSimpleClass::CSimpleClass(int)', argtypes=[cpptypes.c_int]),
+
+    # The following two lines are equivalent...
 ##    method('__cpp_constructor__', 'CSimpleClass::CSimpleClass(CSimpleClass const&)', argtypes=[POINTER(CSimpleClass)]),
-    copy_constructor(),
-    method('M1', 'CSimpleClass::M1()'),
-    method('M1', 'CSimpleClass::M1(int)', argtypes=[c_int]),
-    method('V0', 'CSimpleClass::V0()', virtual=True),
-    method('V1', 'CSimpleClass::V1(int)', argtypes=[c_int], virtual=True),
-    method('V1', 'CSimpleClass::V1()', virtual=True),
-    method('V1', 'CSimpleClass::V1(char*)', argtypes=[c_char_p], virtual=True),
-    method('V1', 'CSimpleClass::V1(int,char*)', argtypes=[c_int, c_char_p], virtual=True),
-    method('V1', 'CSimpleClass::V1(char*,int)', argtypes=[c_char_p, c_int], virtual=True),
-    method('V2', 'CSimpleClass::V2()', virtual=True),
+    cpptypes.copy_constructor(),
+
+    cpptypes.method('M1', 'CSimpleClass::M1()'),
+    cpptypes.method('M1', 'CSimpleClass::M1(int)', argtypes=[cpptypes.c_int]),
+    cpptypes.method('V0', 'CSimpleClass::V0()', virtual=True),
+    cpptypes.method('V1', 'CSimpleClass::V1(int)', argtypes=[cpptypes.c_int], virtual=True),
+    cpptypes.method('V1', 'CSimpleClass::V1()', virtual=True),
+    cpptypes.method('V1', 'CSimpleClass::V1(char*)', argtypes=[cpptypes.c_char_p], virtual=True),
+    cpptypes.method('V1', 'CSimpleClass::V1(int,char*)', argtypes=[cpptypes.c_int, cpptypes.c_char_p], virtual=True),
+    cpptypes.method('V1', 'CSimpleClass::V1(char*,int)', argtypes=[cpptypes.c_char_p, cpptypes.c_int], virtual=True),
+    cpptypes.method('V2', 'CSimpleClass::V2()', virtual=True),
+
+    # The following two lines are equivalent...
 ##    method('__cpp_destructor__', 'CSimpleClass::~CSimpleClass()'),
-    destructor(),
+    cpptypes.destructor(),
 ]
 
-CSimpleClass._finish(CPPDLL("mydll.dll"))
-CSimpleClass._finish(CPPDLL("mydll.dll"))
+CSimpleClass._finish(cpptypes.CPPDLL("mydll.dll"))
 
 ################################################################
 
