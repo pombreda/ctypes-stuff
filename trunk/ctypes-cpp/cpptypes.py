@@ -274,6 +274,8 @@ class Class(Structure):
 # XXX The following code should be in Lib/ctypes/__init__.py:
 
 from _ctypes import FUNCFLAG_THISCALL as _FUNCFLAG_THISCALL
+from _ctypes import CFuncPtr as _CFuncPtr
+
 class CPPDLL(CDLL):
     """This class represents a dll exporting functions using the
     Windows __thiscall calling convention.
@@ -281,7 +283,17 @@ class CPPDLL(CDLL):
     Functions can be accessed as attributes, using the mangled or the
     demangled name.
     """
-    _func_flags_ = _FUNCFLAG_THISCALL
+
+    from ctypes import __version__
+    if __version__ < "1":
+        # This is for my private, very old ctypes version...
+        # XXX Remove later
+        class _FuncPtr(_CFuncPtr):
+            _flags_ = _FUNCFLAG_THISCALL
+            _restype_ = c_int # default, can be overridden in instances
+    else:
+        _func_flags_ = _FUNCFLAG_THISCALL
+
     # XXX Should we allow unnormalized, demangled name?  Should we try
     # to read function addresses from a map file?
 
@@ -347,7 +359,6 @@ class CPPDLL(CDLL):
         return result
 
 _cpp_methodtype_cache = {}
-from _ctypes import CFuncPtr as _CFuncPtr
 def CPPMETHODTYPE(restype, *argtypes):
     try:
         return _cpp_methodtype_cache[(restype, argtypes)]
