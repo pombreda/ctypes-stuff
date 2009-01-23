@@ -80,6 +80,9 @@ def _type_matcher(argtypes):
         result.append(possible)
     return _product(*result)
 
+class UncatchedCppException(Exception):
+    pass
+
 class method(object):
     """Helper to create a C++ method."""
     def __init__(self, mth_name, func_name, restype=None, argtypes=(), virtual=False):
@@ -100,10 +103,22 @@ class method(object):
             from operator import attrgetter
             getter = attrgetter(self.func_name)
             def call(self, *args):
-                return getter(self.pvtable[0])(self, *args)
+##                return getter(self.pvtable[0])(self, *args)
+                try:
+                    return getter(self.pvtable[0])(self, *args)
+                except WindowsError, details:
+                    if details.args == ("exception code 0xe06d7363",):
+                        raise UncatchedCppException("uncatched C++ exception")
+                    raise
         else:
             def call(self, *args):
-                return func(self, *args)
+##                return func(self, *args)
+                try:
+                    return func(self, *args)
+                except WindowsError, details:
+                    if details.args == ("exception code 0xe06d7363",):
+                        raise UncatchedCppException("uncatched C++ exception")
+                    raise
 
         call.__doc__ = self.func_name
         call.__name__ = self.mth_name
@@ -115,7 +130,7 @@ class method(object):
 
 class constructor(method):
     """Helper to create a C++ constructor."""
-    # XXX can constructors be virtual? Guess no.
+    # Constructors cannot be virtual.
     def __init__(self, func_name, argtypes=()):
         super(constructor, self).__init__("__cpp_constructor__",
                                           func_name,
@@ -124,7 +139,7 @@ class constructor(method):
 
 class copy_constructor(method):
     """Helper to create a C++ copy constructor."""
-    # XXX can constructors be virtual? Guess no.
+    # Constructors cannot be virtual.
     def __init__(self):
         super(copy_constructor, self).__init__("__cpp_constructor__",
                                                None,
@@ -132,7 +147,7 @@ class copy_constructor(method):
                                                argtypes=())
 
     def _create(self, dll, cls):
-        name = cls.__name__
+        name = getattr(cls, "_realname_", cls.__name__)
         self.func_name = '%s::%s(%s const&)' % (name, name, name)
         self.argtypes = (POINTER(cls),)
         return super(copy_constructor, self)._create(dll, cls)
@@ -147,7 +162,7 @@ class destructor(method):
                                          virtual=virtual)
 
     def _create(self, dll, cls):
-        name = cls.__name__
+        name = getattr(cls, "_realname_", cls.__name__)
         self.func_name = '%s::~%s()' % (name, name)
         return super(destructor, self)._create(dll, cls)
 
