@@ -1,12 +1,12 @@
 import cpptypes
 
-class CSimpleClass(cpptypes.Class):
-    pass
-CSimpleClass._cpp_fields_ = [
+class MySimpleClass(cpptypes.Class):
+    _realname_ = "CSimpleClass"
+MySimpleClass._cpp_fields_ = [
     ('_vtable', cpptypes.c_void_p),
     ('value', cpptypes.c_int),
 ]
-CSimpleClass._methods_ = [
+MySimpleClass._methods_ = [
     # The following two lines are equivalent...
 ##    method('__cpp_constructor__', 'CSimpleClass::CSimpleClass(int)', argtypes=[c_int]),
     cpptypes.constructor('CSimpleClass::CSimpleClass(int)', argtypes=[cpptypes.c_int]),
@@ -30,17 +30,17 @@ CSimpleClass._methods_ = [
     cpptypes.destructor(),
 ]
 
-CSimpleClass._finish(cpptypes.CPPDLL("mydll.dll"))
+MySimpleClass._finish(cpptypes.CPPDLL("mydll.dll"))
 
 ################################################################
 
 if __name__ == "__main__":
-##    help(CSimpleClass)
+##    help(MySimpleClass)
 
-    obj = CSimpleClass(42)
+    obj = MySimpleClass(42)
     print obj.value
-    print "M1(42)"
-    obj.M1(42)
+    print "M1(4200)"
+    obj.M1(42000)
     print "M1()"
     obj.M1()
     print "V1(96)"
@@ -59,8 +59,15 @@ if __name__ == "__main__":
     else:
         raise RuntimeError("expected TypeError not raised")
 
-    aCopy = CSimpleClass(obj)
+    try:
+        obj.M1(-1)
+    except cpptypes.UncatchedCppException:
+        pass
+    else:
+        raise RuntimeError("expected UnCatchedCppException not raised")
+
+    aCopy = MySimpleClass(obj)
     del obj
     print aCopy
 
-##    help(CSimpleClass)
+    help(MySimpleClass)
