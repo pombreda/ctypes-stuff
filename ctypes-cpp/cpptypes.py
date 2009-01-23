@@ -1,3 +1,4 @@
+# -*- coding: latin-1 -*-
 from ctypes import *
 import warnings
 
@@ -174,12 +175,25 @@ def _multimethod(name, info):
             methodmap[argspec] = mth
 
     def call(self, *args):
-        types = tuple([type(a) for a in args])
+        argtypes = tuple([type(a) for a in args])
         try:
-            mth = methodmap[types]
+            mth = methodmap[argtypes]
         except KeyError:
-            # XXX Use custom exception, derived from TypeError?
-            raise OverloadingError("No matching signature found for overloaded function")
+            # No exact match found.  It may be possible that one or
+            # more arguments are instances of subclasses of argtypes,
+            # which would be accepted as well.
+            for types in methodmap.iterkeys():
+                if len(types) != len(argtypes):
+                    continue
+                if all(isinstance(a, t) for a, t in zip(args, types)):
+                    mth = methodmap[types]
+                    # Extend the dispatcher so that we can match
+                    # faster next time the methd is called with the
+                    # same argument types.
+                    methodmap[argtypes] = mth
+                    break
+            else:
+                raise OverloadingError("No matching signature found for overloaded function")
         return mth(self, *args)
 
     call.__doc__ = "\n".join(docs)
