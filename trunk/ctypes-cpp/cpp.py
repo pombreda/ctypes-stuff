@@ -30,7 +30,7 @@ MySimpleClass._methods_ = [
     cpptypes.destructor(),
 ]
 
-MySimpleClass._finish(cpptypes.CPPDLL("mydll.dll"))
+MySimpleClass._finish(cpptypes.AnyDLL("mydll.dll"))
 
 ################################################################
 
@@ -69,5 +69,3 @@ if __name__ == "__main__":
     aCopy = MySimpleClass(obj)
     del obj
     print aCopy
-
-    help(MySimpleClass)

@@ -22,6 +22,16 @@ except ImportError:
         for prod in result:
             yield tuple(prod)
 
+try:
+    all
+except NameError:
+    # all is only in Python 2.5 and above.
+    def all(iterable):
+         for element in iterable:
+             if not element:
+                 return False
+         return True
+
 # XXX add all the primitive ctypes types: c_char, c_byte, ...
 _argtypes_matches = {c_int: [int, long, c_int],
                      c_long: [int, long, c_long],
@@ -81,7 +91,10 @@ def _type_matcher(argtypes):
     return _product(*result)
 
 class UncatchedCppException(Exception):
-    pass
+    """Raised when Windows SEH catches a C++ exception.
+
+    XXX It seems that SEH also prints 'error -529697949' to stdout?
+    """
 
 class method(object):
     """Helper to create a C++ method."""
@@ -93,11 +106,8 @@ class method(object):
         self.virtual = virtual
 
     def _create(self, dll, cls):
-        func = getattr(dll, self.func_name)
-        func.restype = self.restype
-        func.argtypes = (POINTER(cls),) + tuple(self.argtypes)
-        if self.virtual:
-            self.virtual_prototype = CPPMETHODTYPE(func.restype, *func.argtypes)
+        argtypes = (POINTER(cls),) + tuple(self.argtypes)
+        proto = self.virtual_prototype = CPPMETHODTYPE(self.restype, *argtypes)
 
         if USE_VIRTUAL and self.virtual:
             from operator import attrgetter
@@ -111,6 +121,8 @@ class method(object):
                         raise UncatchedCppException("uncatched C++ exception")
                     raise
         else:
+            mangled = dll._names_map[self.func_name]
+            func = proto((mangled, dll))
             def call(self, *args):
 ##                return func(self, *args)
                 try:
@@ -302,26 +314,13 @@ class Class(Structure):
 
 # XXX The following code should be in Lib/ctypes/__init__.py:
 
-from _ctypes import FUNCFLAG_THISCALL as _FUNCFLAG_THISCALL
-from _ctypes import CFuncPtr as _CFuncPtr
-
-class CPPDLL(CDLL):
-    """This class represents a dll exporting functions using the
-    Windows __thiscall calling convention.
+class AnyDLL(CDLL):
+    """This class does NOT allow to access functions by attribute access.
+    XXX Need to invent an api.
 
     Functions can be accessed as attributes, using the mangled or the
     demangled name.
     """
-
-    from ctypes import __version__
-    if __version__ < "1":
-        # This is for my private, very old ctypes version...
-        # XXX Remove later
-        class _FuncPtr(_CFuncPtr):
-            _flags_ = _FUNCFLAG_THISCALL
-            _restype_ = c_int # default, can be overridden in instances
-    else:
-        _func_flags_ = _FUNCFLAG_THISCALL
 
     # XXX Should we allow unnormalized, demangled name?  Should we try
     # to read function addresses from a map file?
@@ -333,7 +332,7 @@ class CPPDLL(CDLL):
         for mangled in function_names:
             demangled = self.normalize(self.undecorate(mangled))
             self._names_map[demangled] = mangled
-        super(CPPDLL, self).__init__(path, *args, **kw)
+        super(AnyDLL, self).__init__(path, *args, **kw)
 
     def undecorate(self, name):
         import undecorate
@@ -367,25 +366,32 @@ class CPPDLL(CDLL):
         return name
 
     def __getattr__(self, name):
-        """This method allows to access functions by mangled name and
-        by demangled name.  The demangled name does not need to be
-        normalized.
-        """
-        try:
-            # try mangled name
-            result = super(CPPDLL, self).__getattr__(name)
-            # XXX better caching?
-        except AttributeError:
-            # try demangled name
-            try:
-                demangled = self._names_map[name]
-            except KeyError:
-                name = self.normalize(name)
-                demangled = self._names_map[name]
-            result = super(CPPDLL, self).__getattr__(demangled)
-            setattr(self, demangled, result)
-        setattr(self, name, result)
-        return result
+        # We override __getattr__ so that accessing functions as
+        # attributes does no longer work.
+        raise AttributeError(name)
+
+##        """This method allows to access functions by mangled name and
+##        by demangled name.  The demangled name does not need to be
+##        normalized.
+##        """
+##        try:
+##            # try mangled name
+##            result = super(CPPDLL, self).__getattr__(name)
+##            # XXX better caching?
+##        except AttributeError:
+##            # try demangled name
+##            try:
+##                demangled = self._names_map[name]
+##            except KeyError:
+##                name = self.normalize(name)
+##                demangled = self._names_map[name]
+##            result = super(CPPDLL, self).__getattr__(demangled)
+##            setattr(self, demangled, result)
+##        setattr(self, name, result)
+##        return result
+
+from _ctypes import FUNCFLAG_THISCALL as _FUNCFLAG_THISCALL
+from _ctypes import CFuncPtr as _CFuncPtr
 
 _cpp_methodtype_cache = {}
 def CPPMETHODTYPE(restype, *argtypes):
