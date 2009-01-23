@@ -38,6 +38,10 @@ void CSimpleClass::V2() {
 
 void CSimpleClass::M1(int x) {
 	printf("C++/CSimpleClass::M1(%p, %d)\n", this, x);
+	if (x == -1)
+		throw(x);
+	if (x == -2)
+		throw("foo bar");
 	V0();
 	V1(x);
 	V2();
