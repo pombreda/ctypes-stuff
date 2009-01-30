@@ -87,5 +87,3 @@ if __name__ == "__main__":
     aCopy = MySimpleClass(obj)
     del obj
     print aCopy
-
-    aCopy.Foo()
