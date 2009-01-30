@@ -98,7 +98,11 @@ class UncatchedCppException(Exception):
 
 class method(object):
     """Helper to create a C++ method."""
-    def __init__(self, mth_name, func_name, restype=None, argtypes=(), virtual=False):
+    def __init__(self, mth_name, func_name,
+                 restype=None,
+                 argtypes=(),
+                 virtual=False,
+                 pure_virtual=False):
         self.mth_name = mth_name
         self.func_name = func_name
         self.restype = restype
@@ -109,9 +113,11 @@ class method(object):
         argtypes = (POINTER(cls),) + tuple(self.argtypes)
         proto = self.virtual_prototype = CPPMETHODTYPE(self.restype, *argtypes)
 
+        func_name = dll.normalize(self.func_name)
+
         if USE_VIRTUAL and self.virtual:
             from operator import attrgetter
-            getter = attrgetter(self.func_name)
+            getter = attrgetter(func_name)
             def call(self, *args):
 ##                return getter(self.pvtable[0])(self, *args)
                 try:
@@ -121,7 +127,7 @@ class method(object):
                         raise UncatchedCppException("uncatched C++ exception")
                     raise
         else:
-            mangled = dll._names_map[self.func_name]
+            mangled = dll._names_map[func_name]
             func = proto((mangled, dll))
             def call(self, *args):
 ##                return func(self, *args)
@@ -366,29 +372,25 @@ class AnyDLL(CDLL):
         return name
 
     def __getattr__(self, name):
-        # We override __getattr__ so that accessing functions as
-        # attributes does no longer work.
-        raise AttributeError(name)
-
-##        """This method allows to access functions by mangled name and
-##        by demangled name.  The demangled name does not need to be
-##        normalized.
-##        """
-##        try:
-##            # try mangled name
-##            result = super(CPPDLL, self).__getattr__(name)
-##            # XXX better caching?
-##        except AttributeError:
-##            # try demangled name
-##            try:
-##                demangled = self._names_map[name]
-##            except KeyError:
-##                name = self.normalize(name)
-##                demangled = self._names_map[name]
-##            result = super(CPPDLL, self).__getattr__(demangled)
-##            setattr(self, demangled, result)
-##        setattr(self, name, result)
-##        return result
+        """This method allows to access functions by mangled name and
+        by demangled name.  The demangled name does not need to be
+        normalized.
+        """
+        try:
+            # try mangled name
+            result = super(AnyDLL, self).__getattr__(name)
+            # XXX better caching?
+        except AttributeError:
+            # try demangled name
+            try:
+                demangled = self._names_map[name]
+            except KeyError:
+                name = self.normalize(name)
+                demangled = self._names_map[name]
+            result = super(AnyDLL, self).__getattr__(demangled)
+            setattr(self, demangled, result)
+        setattr(self, name, result)
+        return result
 
 from _ctypes import FUNCFLAG_THISCALL as _FUNCFLAG_THISCALL
 from _ctypes import CFuncPtr as _CFuncPtr
