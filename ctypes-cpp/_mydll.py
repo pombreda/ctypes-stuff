@@ -1,6 +1,6 @@
 from cpptypes import *
 
-mydll = CPPDLL("mydll.dll")
+mydll = AnyDLL("mydll.dll")
 
 ################################################################
 if __debug__:
@@ -17,7 +17,23 @@ if __debug__:
 # that):
 STRING = c_char_p
 class CSimpleClass(Class):
+    _realname_ = 'CSimpleClass'
+class COLOR(Structure):
     pass
+COLOR._fields_ = [
+    ('red', c_int),
+    ('green', c_int),
+    ('blue', c_int),
+    ('alpha', c_int),
+]
+class color(Structure):
+    pass
+color._fields_ = [
+    ('red', c_ubyte),
+    ('green', c_ubyte),
+    ('blue', c_ubyte),
+    ('alpha', c_ubyte),
+]
 CSimpleClass._methods_ = [
     method('__cpp_constructor__', 'CSimpleClass::CSimpleClass(CSimpleClass const&)', argtypes=[POINTER(CSimpleClass)]),
     method('__cpp_constructor__', 'CSimpleClass::CSimpleClass(int)', argtypes=[c_int]),
@@ -31,6 +47,9 @@ CSimpleClass._methods_ = [
     method('V1', 'CSimpleClass::V1(int, char*)', argtypes=[c_int, STRING], virtual=True),
     method('V1', 'CSimpleClass::V1(char*, int)', argtypes=[STRING, c_int], virtual=True),
     method('V2', 'CSimpleClass::V2()', virtual=True),
+    method('RGB', 'CSimpleClass::RGB(int, int, int, int)', restype=COLOR, argtypes=[c_int, c_int, c_int, c_int]),
+    method('rgb', 'CSimpleClass::rgb(unsigned char, unsigned char, unsigned char, unsigned char)', restype=color, argtypes=[c_ubyte, c_ubyte, c_ubyte, c_ubyte]),
+    method('Foo', 'CSimpleClass::Foo()', virtual=True, pure_virtual=True),
 ]
 CSimpleClass._cpp_fields_ = [
     ('vtable', c_void_p),

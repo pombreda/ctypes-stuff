@@ -1,5 +1,21 @@
 import cpptypes
 
+class COLOR(cpptypes.Structure):
+    _fields_ = [("red", cpptypes.c_int),
+                ("green", cpptypes.c_int),
+                ("blue", cpptypes.c_int),
+                ("alpha", cpptypes.c_int)]
+    def __repr__(self):
+        return "<COLOR %d, %d, %d, %d>" % (self.red, self.green, self.blue, self.alpha)
+
+class color(cpptypes.Structure):
+    _fields_ = [("red", cpptypes.c_ubyte),
+                ("green", cpptypes.c_ubyte),
+                ("blue", cpptypes.c_ubyte),
+                ("alpha", cpptypes.c_ubyte)]
+    def __repr__(self):
+        return "<color %d, %d, %d, %d>" % (self.red, self.green, self.blue, self.alpha)
+
 class MySimpleClass(cpptypes.Class):
     _realname_ = "CSimpleClass"
 MySimpleClass._cpp_fields_ = [
@@ -7,13 +23,9 @@ MySimpleClass._cpp_fields_ = [
     ('value', cpptypes.c_int),
 ]
 MySimpleClass._methods_ = [
-    # The following two lines are equivalent...
-##    method('__cpp_constructor__', 'CSimpleClass::CSimpleClass(int)', argtypes=[c_int]),
-    cpptypes.constructor('CSimpleClass::CSimpleClass(int)', argtypes=[cpptypes.c_int]),
-
-    # The following two lines are equivalent...
-##    method('__cpp_constructor__', 'CSimpleClass::CSimpleClass(CSimpleClass const&)', argtypes=[POINTER(CSimpleClass)]),
     cpptypes.copy_constructor(),
+    cpptypes.constructor('CSimpleClass::CSimpleClass(int)', argtypes=[cpptypes.c_int]),
+    cpptypes.destructor(),
 
     cpptypes.method('M1', 'CSimpleClass::M1()'),
     cpptypes.method('M1', 'CSimpleClass::M1(int)', argtypes=[cpptypes.c_int]),
@@ -23,11 +35,14 @@ MySimpleClass._methods_ = [
     cpptypes.method('V1', 'CSimpleClass::V1(char*)', argtypes=[cpptypes.c_char_p], virtual=True),
     cpptypes.method('V1', 'CSimpleClass::V1(int,char*)', argtypes=[cpptypes.c_int, cpptypes.c_char_p], virtual=True),
     cpptypes.method('V1', 'CSimpleClass::V1(char*,int)', argtypes=[cpptypes.c_char_p, cpptypes.c_int], virtual=True),
+    cpptypes.method('RGB', 'CSimpleClass::RGB(int, int, int, int)',
+                    argtypes=[cpptypes.c_int, cpptypes.c_int, cpptypes.c_int, cpptypes.c_int],
+                    restype = COLOR),
+    cpptypes.method('rgb', 'CSimpleClass::rgb(unsigned char,unsigned char,unsigned char,unsigned char)',
+                    argtypes=[cpptypes.c_ubyte, cpptypes.c_ubyte, cpptypes.c_ubyte, cpptypes.c_ubyte],
+                    restype = color),
     cpptypes.method('V2', 'CSimpleClass::V2()', virtual=True),
-
-    # The following two lines are equivalent...
-##    method('__cpp_destructor__', 'CSimpleClass::~CSimpleClass()'),
-    cpptypes.destructor(),
+    cpptypes.method('Foo', 'CSimpleClass::Foo()', virtual=True, pure_virtual=True),
 ]
 
 MySimpleClass._finish(cpptypes.AnyDLL("mydll.dll"))
@@ -39,8 +54,8 @@ if __name__ == "__main__":
 
     obj = MySimpleClass(42)
     print obj.value
-    print "M1(4200)"
-    obj.M1(42000)
+    print "M1(4)"
+    obj.M1(4)
     print "M1()"
     obj.M1()
     print "V1(96)"
@@ -51,6 +66,9 @@ if __name__ == "__main__":
     obj.V1()
     print "V1('foo')"
     obj.V1("foo")
+
+    print obj.RGB(1, 2, 3, 4)
+    print obj.rgb(1, 2, 3, 4)
 
     try:
         obj.V1(3.12)
@@ -69,3 +87,5 @@ if __name__ == "__main__":
     aCopy = MySimpleClass(obj)
     del obj
     print aCopy
+
+    aCopy.Foo()
