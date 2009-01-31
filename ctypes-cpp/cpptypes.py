@@ -252,6 +252,9 @@ class Class(Structure):
             self._needs_free = False
             self.__cpp_destructor__()
 
+    def __cpp_destructor__(self):
+        """Will be overridden if the subclass has a destructor."""
+
     @classmethod
     def _finish(cls, dll):
         """This classmethod iterates over the _methods_ list, and
@@ -312,7 +315,8 @@ class Class(Structure):
 
         # Determine _fields_ from _cpp_fields_, and assign to the class
         fields = list(cls._cpp_fields_)[:]
-        fields[0] = ("pvtable", POINTER(VTABLE))
+        if vtable_fields:
+            fields[0] = ("pvtable", POINTER(VTABLE))
         cls._fields_ = fields
 
         # Done.
