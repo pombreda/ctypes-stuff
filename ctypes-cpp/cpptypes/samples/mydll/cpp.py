@@ -1,4 +1,4 @@
-import cpptypes
+import cpptypes, os
 
 class COLOR(cpptypes.Structure):
     _fields_ = [("red", cpptypes.c_int),
@@ -45,7 +45,8 @@ MySimpleClass._methods_ = [
     cpptypes.method('Foo', 'CSimpleClass::Foo()', virtual=True, pure_virtual=True),
 ]
 
-MySimpleClass._finish(cpptypes.AnyDLL("mydll.dll"))
+dll = cpptypes.AnyDLL(os.path.join(os.path.dirname(__file__), "mydll.dll"))
+MySimpleClass._finish(dll)
 
 ################################################################
 
