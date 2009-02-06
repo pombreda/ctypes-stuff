@@ -1,5 +1,44 @@
 from cpptypes import _imagehlp
 
+from _imagehlp import (UNDNAME_COMPLETE,
+                       UNDNAME_NO_LEADING_UNDERSCORES,
+                       UNDNAME_NO_MS_KEYWORDS,
+                       UNDNAME_NO_FUNCTION_RETURNS,
+                       UNDNAME_NO_ALLOCATION_MODEL,
+                       UNDNAME_NO_ALLOCATION_LANGUAGE,
+                       UNDNAME_NO_MS_THISTYPE,
+                       UNDNAME_NO_CV_THISTYPE,
+                       UNDNAME_NO_THISTYPE,
+                       UNDNAME_NO_ACCESS_SPECIFIERS,
+                       UNDNAME_NO_THROW_SIGNATURES,
+                       UNDNAME_NO_MEMBER_TYPE,
+                       UNDNAME_NO_RETURN_UDT_MODEL,
+                       UNDNAME_32_BIT_DECODE,
+                       UNDNAME_NAME_ONLY,
+                       UNDNAME_NO_ARGUMENTS,
+                       UNDNAME_NO_SPECIAL_SYMS)
+
+
+def symbol_name(name, flags=UNDNAME_COMPLETE):
+    """
+    Undecorates a decorated C++ symbol name.
+    
+    >>> symbol_name('?AfxGetResourceHandle@@YGPAUHINSTANCE__@@XZ')
+    'struct HINSTANCE__ * __stdcall AfxGetResourceHandle(void)'
+    >>>
+    >>> symbol_name('?DEREncode@AsymmetricAlgorithm@CryptoPP@@QBEXAAVBufferedTransformation@2@@Z')
+    'public: void __thiscall CryptoPP::AsymmetricAlgorithm::DEREncode(class CryptoPP::BufferedTransformation &)const '
+    >>>
+    """
+    buf = _imagehlp.create_string_buffer(1000)
+    res = _imagehlp.UnDecorateSymbolName(name,
+                                         buf,
+                                         _imagehlp.sizeof(buf),
+                                         flags)
+    if res:
+        return buf[:res]
+    raise _imagehlp.WinError()
+
 def read_export_table(base):
     """An image file is mapped into memory at address 'base'.
     Read the export table and return a list of exported symbols.
@@ -17,7 +56,6 @@ def read_export_table(base):
                                               _imagehlp.IMAGE_DIRECTORY_ENTRY_EXPORT, # Index into Directory Entry
                                               size
                                               )
-    print hex(ptr), size
     export_dir = _imagehlp.IMAGE_EXPORT_DIRECTORY.from_address(ptr)
     pnt_headers = _imagehlp.ImageNtHeader(base)
 
@@ -67,14 +105,6 @@ def get_exports(path):
         _imagehlp.UnMapAndLoad(loaded)
 
 if __name__ == "__main__":
-##    import doctest
-##    doctest.testmod()
-    import sys, pprint
-    import undecorate
-    for mangled in get_exports(sys.argv[1]):
-        print mangled
-        print "\t", undecorate.symbol_name(mangled)
-##    for mangled in read_export_table(sys.dllhandle):
-##        print mangled
-##        print "\t", undecorate.symbol_name(mangled)
+    import doctest
+    doctest.testmod()
 
