@@ -112,6 +112,7 @@ class method(object):
         self.virtual = virtual
 
     def _create(self, dll, cls):
+        self.class_name = getattr(cls, "_realname_", cls.__name__)
         argtypes = (POINTER(cls),) + tuple(self.argtypes)
         proto = self.virtual_prototype = CPPMETHODTYPE(self.restype, *argtypes)
 
@@ -147,6 +148,31 @@ class method(object):
     def __repr__(self):
         return "<method(%r, %r, virtual=%s at %x>" % \
                (self.mth_name, self.func_name, self.virtual, id(self))
+
+    def parse_names(self):
+        """Split self.func_name, with help from self.class_name, into useful parts."""
+        # classname must be know because C++ class names/type names
+        # are not simply identifiers that can be parsed by a regular
+        # expression ;-(
+        fullname = self.func_name
+        classname = self.class_name
+        restype, rest = fullname.split("%s::" % classname)
+        restype = restype.strip()
+        member_name, argtypes = rest.split("(")
+        argtypes = "(" + argtypes
+
+        import re
+        def replacement(matchobj, index=[0]):
+            match = matchobj.group(0)
+            index[0] += 1
+            return r" __%d%s" % (index[0], match)
+        if argtypes in ("()", "(void)"):
+            arglist = argtypes
+        else:
+            arglist = re.sub("([,)])", replacement, argtypes)
+        print fullname
+        print "\t", (restype, classname, member_name, arglist)
+        
 
 class constructor(method):
     """Helper to create a C++ constructor."""
