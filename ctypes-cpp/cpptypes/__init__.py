@@ -101,12 +101,14 @@ class method(object):
     def __init__(self, mth_name, func_name,
                  restype=None,
                  argtypes=(),
+                 errcheck=None,
                  virtual=False,
                  pure_virtual=False):
         self.mth_name = mth_name
         self.func_name = func_name
         self.restype = restype
         self.argtypes = argtypes
+        self.errcheck = errcheck
         self.virtual = virtual
 
     def _create(self, dll, cls):
@@ -119,7 +121,6 @@ class method(object):
             from operator import attrgetter
             getter = attrgetter(func_name)
             def call(self, *args):
-##                return getter(self.pvtable[0])(self, *args)
                 try:
                     return getter(self.pvtable[0])(self, *args)
                 except WindowsError, details:
@@ -129,8 +130,9 @@ class method(object):
         else:
             mangled = dll._names_map[func_name]
             func = proto((mangled, dll))
+            if self.errcheck:
+                func.errcheck = self.errcheck
             def call(self, *args):
-##                return func(self, *args)
                 try:
                     return func(self, *args)
                 except WindowsError, details:
@@ -233,6 +235,32 @@ def _multimethod(name, info):
     call.__name__ = name
     return call
 
+def implement(signature):
+    """This doecorator allows to override a C++ method.  The signature
+    of the C++ method is passed as argument.
+
+    Example:
+    class CSimpleClass(Class):
+        ...
+        @implement('CSimpleClass::V1(int)')
+        def V1(self, value):
+            ...
+    """
+    def decorator(func):
+        def wrapper(self, this, *args):
+            # The wrapper function is called when an overridden method
+            # is called.  It receives the C++ 'this' parameter as
+            # first argument, just after the automatic 'self'.
+            #
+            # Forwards the call to the real method with all the
+            # arguments, except 'this'.
+            return func(self, *args)
+        wrapper._cpp_override = signature
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        return wrapper
+    return decorator
+
 class Class(Structure):
     """Base class for C++ class proxies."""
     _needs_free = False
@@ -243,6 +271,33 @@ class Class(Structure):
         """
         self.__cpp_constructor__(*args)
         self._needs_free = True
+
+        # This code is run each time a Class instance is created.  Can
+        # we create the patched vtable instance once for each class?
+        overridden = {}
+        # Is there a better way to find override functions???
+        for name in dir(self):
+            item = getattr(self, name)
+            if hasattr(item, "_cpp_override"):
+                signature = item._cpp_override
+                overridden[signature] = item
+
+        if overridden:
+            # Create new VTable instance
+            vtable = self._fields_[0][1]._type_()
+            # copy from the old vtable
+            memmove(byref(vtable), self.pvtable, sizeof(vtable))
+            
+            for signature, func in overridden.iteritems():
+                try:
+                    proto = type(getattr(vtable, signature))
+                except AttributeError:
+                    # attempt to override non-virtual function.
+                    raise TypeError("Cannot implement non-virtual function %r" % signature)
+                else:
+                    setattr(vtable, signature, proto(func))
+            # Install new vtable
+            self.pvtable = pointer(vtable)
 
     def __del__(self):
         """The destructor is only called when the _needs_free flag is
@@ -300,10 +355,14 @@ class Class(Structure):
         for name, info in methods.iteritems():
             if len(info) == 1:
                 mth, argtypes = info[0]
-                setattr(cls, name, mth)
             else:
                 mth = _multimethod(name, info)
-                setattr(cls, name, mth)
+            if not name.startswith("__") and not name.endswith("__") and hasattr(cls, name):
+                # Questionable.  When a member function is already
+                # present as method in the class, we set the member
+                # function with "_" prepended to the name.
+                name = "_" + name
+            setattr(cls, name, mth)
 
         # Now, build the vtable structure
         vtable_fields = []
@@ -316,13 +375,13 @@ class Class(Structure):
         # Determine _fields_ from _cpp_fields_, and assign to the class
         fields = list(cls._cpp_fields_)[:]
         if vtable_fields:
+            if fields[0] != ("pvtable", c_void_p):
+                raise TypeError("missing or incorrect pvtable entry in _cpp_fields_")
             fields[0] = ("pvtable", POINTER(VTABLE))
         cls._fields_ = fields
 
         # Done.
         cls._class_finished = True
-
-# XXX The following code should be in Lib/ctypes/__init__.py:
 
 class AnyDLL(CDLL):
     """This class does NOT allow to access functions by attribute access.
@@ -336,19 +395,19 @@ class AnyDLL(CDLL):
     # to read function addresses from a map file?
 
     def __init__(self, path, *args, **kw):
-        import get_exports
-        function_names = get_exports.read_export_table(path)
+        super(AnyDLL, self).__init__(path, *args, **kw)
+        import get_exports_2
+        function_names = get_exports_2.read_export_table(self._handle)
         self._names_map = {}
         for mangled in function_names:
             demangled = self.normalize(self.undecorate(mangled))
             self._names_map[demangled] = mangled
-        super(AnyDLL, self).__init__(path, *args, **kw)
 
     def undecorate(self, name):
-        import undecorate
-        flags = undecorate.UNDNAME_NO_MS_KEYWORDS \
-                | undecorate.UNDNAME_NO_ACCESS_SPECIFIERS
-        return undecorate.symbol_name(name, flags)
+        import get_exports_2
+        flags = get_exports_2.UNDNAME_NO_MS_KEYWORDS \
+                | get_exports_2.UNDNAME_NO_ACCESS_SPECIFIERS
+        return get_exports_2.symbol_name(name, flags)
 
     def normalize(self, name):
         # Remove the return type from function prototypes.  Types from
