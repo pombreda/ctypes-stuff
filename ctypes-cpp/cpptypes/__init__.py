@@ -475,7 +475,10 @@ class AnyDLL(CDLL):
                 demangled = self._names_map[name]
             except KeyError:
                 name = self.normalize(name)
-                demangled = self._names_map[name]
+                try:
+                    demangled = self._names_map[name]
+                except KeyError:
+                    raise AttributeError(name)
             result = super(AnyDLL, self).__getattr__(demangled)
             setattr(self, demangled, result)
         setattr(self, name, result)
