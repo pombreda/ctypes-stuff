@@ -9,4 +9,5 @@ activating a WinSxS context and loading the second interpreter.  It
 displays the sys.path, sys.dllhandle; also loads the _socket extension
 from the assembly.
 
-The scripts are currently hardcoded to embed Python 2.6.
+This code was tested with Python 2.6 32 bit and Python 2.7 64 bit on
+Windows 7.
