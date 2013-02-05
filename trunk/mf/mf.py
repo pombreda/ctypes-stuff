@@ -42,9 +42,10 @@ class ModuleFinder:
     # Most methods literally copied from python3.3's
     # importlib._bootstrap module, with only very few changes.
 
-    def __init__(self):
+    def __init__(self, excludes=[]):
         self.modules = {} # simulates sys.modules
         self.badmodules = defaultdict(set) # modules that have not been found
+        self.excludes = excludes
 
 
     # /python33/lib/importlib/_bootstrap.py 1455
@@ -107,25 +108,10 @@ class ModuleFinder:
         # Backwards-compatibility; be nicer to skip the dict lookup.
         module = self.modules[name]
 
-        # TODO(theller): Move all this into _load_module!
         if parent:
             # Set the module as an attribute on its parent.
             parent_module = self.modules[parent]
             setattr(parent_module, name.rpartition('.')[2], module)
-        # Set __package__ if the loader did not.
-        if getattr(module, '__package__', None) is None:
-            try:
-                module.__package__ = module.__name__
-                if not hasattr(module, '__path__'):
-                    module.__package__ = module.__package__.rpartition('.')[0]
-            except AttributeError:
-                pass
-        # Set loader if need be.
-        if not hasattr(module, '__loader__'):
-            try:
-                module.__loader__ = loader
-            except AttributeError:
-                pass
 
         # It is important that all the required __...__ attributes at
         # the module are set before the code is scanned.
@@ -148,7 +134,7 @@ class ModuleFinder:
         self._sanity_check(name, package, level)
         if level > 0:
             name = self._resolve_name(name, package, level)
-        if name in self.badmodules:
+        if name in self.badmodules or name in self.excludes:
             raise ImportError(_ERR_MSG.format(name), name=name)
         if name not in self.modules:
             return self._find_and_load(name)
@@ -220,6 +206,7 @@ class ModuleFinder:
         ..pkg import mod`` would have a 'level' of 2).
 
         """
+
         if level == 0:
             module = self._gcd_import(name)
         else:
@@ -245,7 +232,8 @@ class ModuleFinder:
         except ImportError as exc:
             if level:
                 name = self._resolve_name(name, caller.__name__, level)
-            self.badmodules[name].add(caller.__name__)
+            if name not in self.excludes:
+                self.badmodules[name].add(caller.__name__)
 
     ## indent = ""
     ## def pr(self, name, caller, fromlist, level):
@@ -361,21 +349,11 @@ class ModuleFinder:
             parent, _, symbol = name.rpartition(".")
             if parent and parent in self.modules:
                 if symbol in self.modules[parent].__globalnames__:
-##                    print(name, "->", parent)
                     continue
             else:
                 mods = sorted(self.badmodules[name])
                 print("? %-35s imported by %s" % (name, ', '.join(mods)))
                 
-
-##         print(self.badmodules)
-##         missing = self.badmodules
-##         if missing:
-##             print()
-##             print("Missing modules:")
-##             for name in missing:
-## ##                mods = sorted(self.badmodules[name].keys())
-##                 print("?", name)#, "imported from", ', '.join(mods))
 
     def report_modules(self):
         """Print a report about found modules to stdout, with their
@@ -414,12 +392,15 @@ class Module:
 
     __loader__: The loader for this module.
 
+    __code__: the code object provided by the loader; can be None.
+
     """
     
     def __init__(self, loader, name):
         self.__globalnames__ = set()
 
         self.__name__ = name
+        self.__loader__ = loader
 
         if hasattr(loader, "get_filename"):
             # python modules
@@ -438,8 +419,15 @@ class Module:
             if loader.is_package(name):
                 self.__path__ = [name]
 
-        # self.__package__ is set elsewhere
-        self.__loader__ = loader
+        if getattr(self, '__package__', None) is None:
+            try:
+                self.__package__ = self.__name__
+                if not hasattr(self, '__path__'):
+                    self.__package__ = self.__package__.rpartition('.')[0]
+            except AttributeError:
+                pass
+
+
         self.__code__ = loader.get_code(name)
 
     def __repr__(self):
@@ -452,10 +440,27 @@ class Module:
 
 ################################################################
 
+WIN32_EXCLUDES = """\
+_dummy_threading
+_emx_link
+_gestalt
+_posixsubprocess
+ce
+fcntl
+grp
+java.lang
+org.python.core
+os2
+posix
+pwd
+termios
+vms_lib
+""".split()
+
 if __name__ == "__main__":
 
     sys.path.insert(0, ".")
-    mf = ModuleFinder()
+    mf = ModuleFinder(excludes=WIN32_EXCLUDES)
     for name in sys.argv[1:]:
         mf.import_hook(name)
 ##    mf.import_hook("pep328.subpackage1")
