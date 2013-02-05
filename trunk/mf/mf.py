@@ -240,46 +240,25 @@ class ModuleFinder:
 
     ################################################################
     def safe_import_hook(self, name, caller=None, fromlist=(), level=0):
-
-        ## if level == 0:
-        ##     if fromlist:
-        ##         print("%sfrom %s import %s" % (self.indent, name, ", ".join(fromlist)))
-        ##     else:
-        ##         print("%simport %s" % (self.indent, name))
-        ## elif name:
-        ##     print("%sfrom %s import %s" % (self.indent, "."*level + name, ", ".join(fromlist)))
-        ## else:
-        ##     print("%sfrom %s import %s" % (self.indent, "."*level, ", ".join(fromlist)))
-
-##        self.pr(name, caller, fromlist, level)
-##        self.indent += " "
         try:
-            res = self.import_hook(name, caller, fromlist, level)
+            return self.import_hook(name, caller, fromlist, level)
         except ImportError as exc:
-            ## print("%s=>" % self.indent, None)
-            self.pr(name, caller, fromlist, level)
             if level:
                 name = self._resolve_name(name, caller.__name__, level)
-            print("BAD", exc)
-            print()
             self.badmodules[name].add(caller.__name__)
-            res = None
 
-##        self.indent = self.indent[:-1]
-        ## print("%s=>" % self.indent, res)
-
-    indent = ""
-    def pr(self, name, caller, fromlist, level):
-        print("caller", caller.__name__)
-        if level == 0:
-            if fromlist:
-                print("%sfrom %s import %s" % (self.indent, name, ", ".join(fromlist)))
-            else:
-                print("%simport %s" % (self.indent, name))
-        elif name:
-            print("%sfrom %s import %s" % (self.indent, "."*level + name, ", ".join(fromlist)))
-        else:
-            print("%sfrom %s import %s" % (self.indent, "."*level, ", ".join(fromlist)))
+    ## indent = ""
+    ## def pr(self, name, caller, fromlist, level):
+    ##     print("caller", caller.__name__)
+    ##     if level == 0:
+    ##         if fromlist:
+    ##             print("%sfrom %s import %s" % (self.indent, name, ", ".join(fromlist)))
+    ##         else:
+    ##             print("%simport %s" % (self.indent, name))
+    ##     elif name:
+    ##         print("%sfrom %s import %s" % (self.indent, "."*level + name, ", ".join(fromlist)))
+    ##     else:
+    ##         print("%sfrom %s import %s" % (self.indent, "."*level, ", ".join(fromlist)))
 
     def _load_module(self, loader, name):
         """Simulate loader.load_module(name).
@@ -382,7 +361,7 @@ class ModuleFinder:
             parent, _, symbol = name.rpartition(".")
             if parent and parent in self.modules:
                 if symbol in self.modules[parent].__globalnames__:
-                    print(name, "->", parent)
+##                    print(name, "->", parent)
                     continue
             else:
                 mods = sorted(self.badmodules[name])
@@ -413,22 +392,43 @@ class ModuleFinder:
                 print("P", end=" ")
             else:
                 print("m", end=" ")
-            print("%-35s" % key, getattr(m, "__file__", ""))
+            print("%-35s" % key, getattr(m, "__file__", " --builtin--"))
 
 ################################################################
 
 class Module:
+    """Represents a Python module.
+
+    These attributes are set, depending on the loader:
+    
+    __name__: The name of the module.
+
+    __file__: The path to where the module data is stored (not set for
+    built-in modules).
+
+    __path__: A list of strings specifying the search path within a
+    package. This attribute is not set on modules.
+
+    __package__: The parent package for the module/package. If the
+    module is top-level then it has a value of the empty string.
+
+    __loader__: The loader for this module.
+
+    """
+    
     def __init__(self, loader, name):
         self.__globalnames__ = set()
 
         self.__name__ = name
 
         if hasattr(loader, "get_filename"):
+            # python modules
             fnm = loader.get_filename(name)
             self.__file__ = fnm
             if loader.is_package(name):
                 self.__path__ = [os.path.dirname(fnm)]
         elif hasattr(loader, "path"):
+            # extension modules
             fnm = loader.path
             self.__file__ = fnm
             if loader.is_package(name):
