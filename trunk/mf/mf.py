@@ -265,6 +265,10 @@ class ModuleFinder:
 
     indent = ""
     def _info(self, name, caller, fromlist, level):
+        """Print the call as a Python import statement, indented.
+        
+        """
+        
         if level == 0:
             if fromlist:
                 print("%sfrom %s import %s" % (self.indent, name, ", ".join(fromlist)))
@@ -274,6 +278,7 @@ class ModuleFinder:
             print("%sfrom %s import %s" % (self.indent, "."*level + name, ", ".join(fromlist)))
         else:
             print("%sfrom %s import %s" % (self.indent, "."*level, ", ".join(fromlist)))
+
 
     def _load_module(self, loader, name):
         """Simulate loader.load_module(name).
@@ -312,9 +317,25 @@ class ModuleFinder:
             return self.modules[name]
 
         # See importlib.abc.Loader
-        self.modules[name] = Module(loader, name)
+        try:
+            self.modules[name] = Module(loader, name)
+        except Exception as details:
+            # loader.get_code() can raise a SyntaxError, for example,
+            # when compiling code.  How to inform the user?
+            raise ImportError(name) from details
+
 
     def _scan_code(self, code, mod):
+        """
+        Scan the module bytecode.
+
+        When we encounter in import statement, we simulate the import
+        by calling safe_import_hook() to find the imported modules.
+
+        We also take note of 'static' global symbols in the module and
+        add them to __globalnames__.
+        """
+        
         for what, args in self._scan_opcodes(code):
             if what == "store":
                 name, = args
@@ -329,6 +350,7 @@ class ModuleFinder:
         for c in code.co_consts:
             if isinstance(c, type(code)):
                 self._scan_code(c, mod)
+
 
     def _scan_opcodes(self, co, unpack=struct.unpack):
         """
@@ -504,12 +526,25 @@ vms_lib
 """.split()
 
 if __name__ == "__main__":
+    import getopt
+    opts, args = getopt.getopt(sys.argv[1:], "dm:x:", ["module=", "exclude=", "debug"])
 
-    sys.path.insert(0, ".")
-    mf = ModuleFinder(excludes=WIN32_EXCLUDES,
-##                      debug=1,
+    debug = 0
+    excludes = WIN32_EXCLUDES
+    modules = []
+    for o, a in opts:
+        if o in ("-x", "--excludes"):
+            excludes.append(a)
+        elif o in ("-m", "--module"):
+            modules.append(a)
+        elif o in ("-d", "--debug"):
+            debug = 1
+
+    mf = ModuleFinder(excludes=excludes,
+                      debug=debug,
                       )
-    for name in sys.argv[1:]:
+    sys.path.insert(0, ".")
+    for name in modules:
         mf.import_hook(name)
     mf.report_modules()
     mf.report_missing()
