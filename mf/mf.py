@@ -42,7 +42,8 @@ class ModuleFinder:
     # Most methods literally copied from python3.3's
     # importlib._bootstrap module, with only very few changes.
 
-    def __init__(self, excludes=[]):
+    def __init__(self, excludes=[], debug=0):
+        self._debug = debug
         self.modules = {} # simulates sys.modules
         self.badmodules = defaultdict(set) # modules that have not been found
         self.excludes = excludes
@@ -227,15 +228,32 @@ class ModuleFinder:
 
     ################################################################
     def safe_import_hook(self, name, caller=None, fromlist=(), level=0):
-        self._info(name, caller, fromlist, level)
-        self.indent += "  "
+        """Wrapper for import_hook() that catches ImportError.
+
+        """
+        if level:
+            fqname = self._resolve_name(name, caller.__name__, level)
+        else:
+            fqname = name
+
+        if fqname in self.modules:
+            return self.modules[fqname]
+        if fqname in self.badmodules or name in self.excludes:
+            return
+
+        if self._debug:
+            self.indent += "| "
+            self._info(name, caller, fromlist, level)
+
         try:
             mod = self.import_hook(name, caller, fromlist, level)
-            print("%s=> %s" % (self.indent, mod.__name__))
+            if self._debug:
+                print("%s=> %s" % (self.indent, mod.__name__))
         except ImportError as exc:
             if level:
                 name = self._resolve_name(name, caller.__name__, level)
-            print("%sImportError: %s" % (self.indent, exc))
+            if self._debug:
+                print("%sImportError: %s" % (self.indent, exc))
             if name not in self.excludes:
                 if caller:
                     self.badmodules[name].add(caller.__name__)
@@ -345,6 +363,8 @@ class ModuleFinder:
         be missing.
 
         """
+        self.report()
+        self.report_missing()
 
     def report_missing(self):
         """Print a report to stdout, listing those modules that are
@@ -352,6 +372,8 @@ class ModuleFinder:
 
         """
         print()
+        print("  %-35s" % "Missing Modules")
+        print("  %-35s" % "---------------")
         for name in sorted(self.badmodules):
             parent, _, symbol = name.rpartition(".")
             if parent and parent in self.modules:
@@ -447,14 +469,31 @@ class Module:
 
 ################################################################
 
+# /python33/lib/curses
+# /python33/lib/site-packages/numpy
+
+# What about __main__?  bdb imports __main__...
+# we don't want __this__ module to be pulled in...
+
+# What about IronPath..., clr, ...?
+
+# What about old, deprecated modules (compiler, for example): compiler, new, sets, ...
+
 WIN32_EXCLUDES = """\
+__main__
 _dummy_threading
 _emx_link
 _gestalt
 _posixsubprocess
+_scproxy
+_sysconfigdata
 ce
+curses
 fcntl
 grp
+importlib
+importlib._bootstrap
+importlib.machinery
 java.lang
 org.python.core
 os2
@@ -462,18 +501,15 @@ posix
 pwd
 termios
 vms_lib
-importlib
-importlib._bootstrap
-importlib.machinery
 """.split()
 
 if __name__ == "__main__":
 
     sys.path.insert(0, ".")
-    mf = ModuleFinder(excludes=WIN32_EXCLUDES)
+    mf = ModuleFinder(excludes=WIN32_EXCLUDES,
+##                      debug=1,
+                      )
     for name in sys.argv[1:]:
         mf.import_hook(name)
-##    mf.import_hook("pep328.subpackage1")
-##    mf.import_hook("collections.abc")
     mf.report_modules()
     mf.report_missing()
