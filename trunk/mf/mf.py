@@ -227,26 +227,35 @@ class ModuleFinder:
 
     ################################################################
     def safe_import_hook(self, name, caller=None, fromlist=(), level=0):
+        self._info(name, caller, fromlist, level)
+        self.indent += "  "
         try:
-            return self.import_hook(name, caller, fromlist, level)
+            mod = self.import_hook(name, caller, fromlist, level)
+            print("%s=> %s" % (self.indent, mod.__name__))
         except ImportError as exc:
             if level:
                 name = self._resolve_name(name, caller.__name__, level)
+            print("%sImportError: %s" % (self.indent, exc))
             if name not in self.excludes:
-                self.badmodules[name].add(caller.__name__)
+                if caller:
+                    self.badmodules[name].add(caller.__name__)
+                else:
+                    self.badmodules[name].add("-")
+        finally:
+            self.indent = self.indent[:-2]
 
-    ## indent = ""
-    ## def pr(self, name, caller, fromlist, level):
-    ##     print("caller", caller.__name__)
-    ##     if level == 0:
-    ##         if fromlist:
-    ##             print("%sfrom %s import %s" % (self.indent, name, ", ".join(fromlist)))
-    ##         else:
-    ##             print("%simport %s" % (self.indent, name))
-    ##     elif name:
-    ##         print("%sfrom %s import %s" % (self.indent, "."*level + name, ", ".join(fromlist)))
-    ##     else:
-    ##         print("%sfrom %s import %s" % (self.indent, "."*level, ", ".join(fromlist)))
+
+    indent = ""
+    def _info(self, name, caller, fromlist, level):
+        if level == 0:
+            if fromlist:
+                print("%sfrom %s import %s" % (self.indent, name, ", ".join(fromlist)))
+            else:
+                print("%simport %s" % (self.indent, name))
+        elif name:
+            print("%sfrom %s import %s" % (self.indent, "."*level + name, ", ".join(fromlist)))
+        else:
+            print("%sfrom %s import %s" % (self.indent, "."*level, ", ".join(fromlist)))
 
     def _load_module(self, loader, name):
         """Simulate loader.load_module(name).
@@ -283,8 +292,6 @@ class ModuleFinder:
         """
         if name in self.modules:
             return self.modules[name]
-
-        # __package__ is set elsewhere!
 
         # See importlib.abc.Loader
         self.modules[name] = Module(loader, name)
@@ -455,6 +462,9 @@ posix
 pwd
 termios
 vms_lib
+importlib
+importlib._bootstrap
+importlib.machinery
 """.split()
 
 if __name__ == "__main__":
