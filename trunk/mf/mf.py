@@ -46,6 +46,8 @@ class ModuleFinder:
         self._debug = debug
         self.modules = {} # simulates sys.modules
         self.excludes = excludes
+        self.__last_caller = None
+        self.depgraph = defaultdict(set)
 
 
     # /python33/lib/importlib/_bootstrap.py 1455
@@ -139,6 +141,9 @@ class ModuleFinder:
             name = self._resolve_name(name, package, level)
 
         # 'name' is now the fully qualified, absolute name of the module we want to import.
+        if self.__last_caller:
+            self.depgraph[name].add(self.__last_caller.__name__)
+
         if name in self.excludes:
             raise ImportError(_ERR_MSG.format(name), name=name)
         if name in self.modules:
@@ -161,9 +166,14 @@ class ModuleFinder:
             if '*' in fromlist:
                 fromlist = list(fromlist)
                 fromlist.remove('*')
-                if hasattr(module, '__all__'):
-                    fromlist.extend(module.__all__)
+                ## # This does certainly not work in ModuleFinder:
+                ## if hasattr(module, '__all__'):
+                ##     fromlist.extend(module.__all__)
             for x in fromlist:
+                if x in module.__globalnames__:
+                    if self._debug:
+                        print("%s  # found global %s in %s" % (self.indent, x, module.__name__))
+                    continue
                 if not hasattr(module, x):
                     try:
                         self._gcd_import('{}.{}'.format(module.__name__, x))
@@ -177,7 +187,15 @@ class ModuleFinder:
                             pass
                         else:
                             raise
-        # XXX Should be extended to import names???  globalnames???
+        elif module is not None:
+            for x in fromlist:
+                if x == "*":
+                    continue
+                if x in module.__globalnames__:
+                    if self._debug:
+                        print("%s  # found global %s in %s" % (self.indent, x, module.__name__))
+                    continue
+                raise ImportError("%s.%s" % (module.__name__, x))
         return module
 
 
@@ -199,6 +217,16 @@ class ModuleFinder:
 
     # /python33/lib/importlib/_bootstrap.py 1647
     def import_hook(self, name, caller=None, fromlist=(), level=0):
+        self.__old_last_caller = self.__last_caller
+        self.__last_caller = caller
+        try:
+            return self._import_hook(name, caller, fromlist, level)
+        except:
+            raise
+        finally:
+            self.__last_caller = self.__old_last_caller
+
+    def _import_hook(self, name, caller=None, fromlist=(), level=0):
         """Import a module.
 
         The 'caller' argument is used to infer where the import is
@@ -210,7 +238,7 @@ class ModuleFinder:
         ..pkg import mod`` would have a 'level' of 2).
 
         """
-
+        
         if level == 0:
             module = self._gcd_import(name)
         else:
@@ -227,7 +255,12 @@ class ModuleFinder:
                 cut_off = len(name) - len(name.partition('.')[0])
                 return self.modules[module.__name__[:len(module.__name__)-cut_off]]
         else:
-            return self._handle_fromlist(module, fromlist)
+            try:
+                return self._handle_fromlist(module, fromlist)
+            except ImportError:
+                raise
+            except Exception:
+                import traceback; traceback.print_exc()
 
     ################################################################
     def safe_import_hook(self, name, caller=None, fromlist=(), level=0):
@@ -326,6 +359,9 @@ class ModuleFinder:
         except Exception as details:
             # loader.get_code() can raise a SyntaxError, for example,
             # when compiling code.  How to inform the user?
+            #
+            # In Python 3.3.0 (but not in 3.4), _frozen_importlib's
+            # loader raises an exception when is_package() is called.
             raise ImportError(name) from details
 
 
@@ -402,17 +438,8 @@ class ModuleFinder:
         print("  %-35s" % "---------------")
         for name in sorted(self.modules):
             if self.modules[name] is None:
-                print("? %-35s" % name)
-        return
-
-        for name in sorted(self.badmodules):
-            parent, _, symbol = name.rpartition(".")
-            if parent and parent in self.modules:
-                if symbol in self.modules[parent].__globalnames__:
-                    continue
-            else:
-                mods = sorted(self.badmodules[name])
-                print("? %-35s imported by %s" % (name, ', '.join(mods)))
+                mods = sorted(self.depgraph[name])
+                print("? %-35s imported from %s" % (name, ", ".join(mods)))
 
 
     def report_modules(self):
@@ -433,8 +460,7 @@ class ModuleFinder:
                 print("P", end=" ")
             else:
                 print("m", end=" ")
-            print("%-35s" % key, getattr(m, "__file__",
-                                         "    --builtin or frozen--"))
+            print("%-35s" % key, getattr(m, "__file__", ""))
 
 ################################################################
 
@@ -568,10 +594,11 @@ if __name__ == "__main__":
                       )
     sys.path.insert(0, ".")
     for name in modules:
+        # Hm, call import_hook() or safe_import_hook() here?
         if name.endswith(".*"):
-            mf.import_hook(name[:-2], None, ["*"])
+            mf.safe_import_hook(name[:-2], None, ["*"])
         else:
-            mf.import_hook(name)
+            mf.safe_import_hook(name)
     if report:
         mf.report_modules()
         mf.report_missing()
