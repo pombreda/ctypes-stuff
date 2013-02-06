@@ -242,7 +242,7 @@ class ModuleFinder:
             return
 
         if self._debug:
-            self.indent += "| "
+            self.indent += self.INDENT
             self._info(name, caller, fromlist, level)
 
         try:
@@ -254,14 +254,11 @@ class ModuleFinder:
                 name = self._resolve_name(name, caller.__name__, level)
             if self._debug:
                 print("%sImportError: %s" % (self.indent, exc))
-            if name not in self.excludes:
-                self.badmodules[name].add(caller.__name__
-                                          if caller
-                                          else "-")
         finally:
-            self.indent = self.indent[:-2]
+            self.indent = self.indent[:-len(self.INDENT)]
 
 
+    INDENT = "    "
     indent = ""
     def _info(self, name, caller, fromlist, level):
         """Print the call as a Python import statement, indented.
@@ -270,13 +267,13 @@ class ModuleFinder:
         
         if level == 0:
             if fromlist:
-                print("%sfrom %s import %s" % (self.indent, name, ", ".join(fromlist)))
+                print("%sfrom %s import %s # in %s" % (self.indent, name, ", ".join(fromlist), caller.__name__))
             else:
-                print("%simport %s" % (self.indent, name))
+                print("%simport %s # in %s" % (self.indent, name, caller.__name__))
         elif name:
-            print("%sfrom %s import %s" % (self.indent, "."*level + name, ", ".join(fromlist)))
+            print("%sfrom %s import %s # in %s" % (self.indent, "."*level + name, ", ".join(fromlist), caller.__name__))
         else:
-            print("%sfrom %s import %s" % (self.indent, "."*level, ", ".join(fromlist)))
+            print("%sfrom %s import %s # in %s" % (self.indent, "."*level, ", ".join(fromlist), caller.__name__))
 
 
     def _load_module(self, loader, name):
@@ -530,10 +527,11 @@ vms_lib
 
 if __name__ == "__main__":
     import getopt
-    opts, args = getopt.getopt(sys.argv[1:], "dm:x:", ["module=", "exclude=", "debug"])
+    opts, args = getopt.getopt(sys.argv[1:], "dm:x:r", ["module=", "exclude=", "debug", "report"])
 
     debug = 0
     excludes = WIN32_EXCLUDES
+    report = 0
     modules = []
     for o, a in opts:
         if o in ("-x", "--excludes"):
@@ -542,6 +540,8 @@ if __name__ == "__main__":
             modules.append(a)
         elif o in ("-d", "--debug"):
             debug = 1
+        elif o in ("-r", "--report"):
+            report += 1
 
     mf = ModuleFinder(excludes=excludes,
                       debug=debug,
@@ -549,5 +549,6 @@ if __name__ == "__main__":
     sys.path.insert(0, ".")
     for name in modules:
         mf.import_hook(name)
-    mf.report_modules()
-    mf.report_missing()
+    if report:
+        mf.report_modules()
+        mf.report_missing()
