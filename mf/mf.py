@@ -255,10 +255,9 @@ class ModuleFinder:
             if self._debug:
                 print("%sImportError: %s" % (self.indent, exc))
             if name not in self.excludes:
-                if caller:
-                    self.badmodules[name].add(caller.__name__)
-                else:
-                    self.badmodules[name].add("-")
+                self.badmodules[name].add(caller.__name__
+                                          if caller
+                                          else "-")
         finally:
             self.indent = self.indent[:-2]
 
