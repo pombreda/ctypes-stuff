@@ -32,7 +32,7 @@ if sys.version_info[:3] == (3, 3, 0):
     patch()
     del patch
 ################################################################
-            
+
 # /python33/lib/importlib/_bootstrap.py
 
 _ERR_MSG = 'No module named {!r}'
@@ -45,7 +45,6 @@ class ModuleFinder:
     def __init__(self, excludes=[], debug=0):
         self._debug = debug
         self.modules = {} # simulates sys.modules
-        self.badmodules = defaultdict(set) # modules that have not been found
         self.excludes = excludes
 
 
@@ -109,7 +108,6 @@ class ModuleFinder:
         elif name not in self.modules:
             # The parent import may have already imported this module.
             self._load_module(loader, name)
-##            _verbose_message('import {!r} # {!r}', name, loader)
         # Backwards-compatibility; be nicer to skip the dict lookup.
         module = self.modules[name]
 
@@ -141,16 +139,15 @@ class ModuleFinder:
             name = self._resolve_name(name, package, level)
 
         # 'name' is now the fully qualified, absolute name of the module we want to import.
-        if name in self.badmodules or name in self.excludes:
+        if name in self.excludes:
             raise ImportError(_ERR_MSG.format(name), name=name)
-        if name not in self.modules:
+        if name in self.modules:
+            return self.modules[name]
+        try:
             return self._find_and_load(name)
-        module = self.modules[name]
-        if module is None:
-            message = ("import of {} halted; "
-                        "None in sys.modules".format(name))
-            raise ImportError(message, name=name)
-        return module
+        except Exception as exc:
+            self.modules[name] = None
+            raise ImportError(name)
 
 
     # /python33/lib/importlib/_bootstrap.py 1587
@@ -241,10 +238,10 @@ class ModuleFinder:
             fqname = self._resolve_name(name, caller.__name__, level)
         else:
             fqname = name
-
         if fqname in self.modules:
             return self.modules[fqname]
-        if fqname in self.badmodules or name in self.excludes:
+
+        if fqname in self.excludes:
             return
 
         if self._debug:
@@ -268,14 +265,14 @@ class ModuleFinder:
     indent = ""
     def _info(self, name, caller, fromlist, level):
         """Print the call as a Python import statement, indented.
-        
+
         """
 
         if caller:
             caller_info = "# in %s" % caller.__name__
         else:
             caller_info = ""
-        
+
         if level == 0:
             if fromlist:
                 print("%sfrom %s import %s" % (self.indent, name, ", ".join(fromlist)), caller_info)
@@ -342,7 +339,7 @@ class ModuleFinder:
         We also take note of 'static' global symbols in the module and
         add them to __globalnames__.
         """
-        
+
         for what, args in self._scan_opcodes(code):
             if what == "store":
                 name, = args
@@ -392,7 +389,7 @@ class ModuleFinder:
         be missing.
 
         """
-        self.report()
+        self.report_modules()
         self.report_missing()
 
     def report_missing(self):
@@ -403,6 +400,11 @@ class ModuleFinder:
         print()
         print("  %-35s" % "Missing Modules")
         print("  %-35s" % "---------------")
+        for name in sorted(self.modules):
+            if self.modules[name] is None:
+                print("? %-35s" % name)
+        return
+
         for name in sorted(self.badmodules):
             parent, _, symbol = name.rpartition(".")
             if parent and parent in self.modules:
@@ -411,7 +413,7 @@ class ModuleFinder:
             else:
                 mods = sorted(self.badmodules[name])
                 print("? %-35s imported by %s" % (name, ', '.join(mods)))
-                
+
 
     def report_modules(self):
         """Print a report about found modules to stdout, with their
@@ -424,11 +426,15 @@ class ModuleFinder:
         keys = sorted(self.modules.keys())
         for key in keys:
             m = self.modules[key]
-            if getattr(m, "__path__", None):
+            if m is None:
+                ## print("?", end=" ")
+                continue
+            elif getattr(m, "__path__", None):
                 print("P", end=" ")
             else:
                 print("m", end=" ")
-            print("%-35s" % key, getattr(m, "__file__", ""))
+            print("%-35s" % key, getattr(m, "__file__",
+                                         "    --builtin or frozen--"))
 
 ################################################################
 
@@ -436,7 +442,7 @@ class Module:
     """Represents a Python module.
 
     These attributes are set, depending on the loader:
-    
+
     __name__: The name of the module.
 
     __file__: The path to where the module data is stored (not set for
@@ -453,7 +459,7 @@ class Module:
     __code__: the code object provided by the loader; can be None.
 
     """
-    
+
     def __init__(self, loader, name):
         self.__globalnames__ = set()
 
@@ -538,10 +544,13 @@ vms_lib
 
 if __name__ == "__main__":
     import getopt
-    opts, args = getopt.getopt(sys.argv[1:], "dm:x:r", ["module=", "exclude=", "debug", "report"])
+    opts, args = getopt.getopt(sys.argv[1:],
+                               "dm:x:r",
+                               ["module=", "exclude=", "debug", "report"])
 
     debug = 0
     excludes = WIN32_EXCLUDES
+    excludes = []
     report = 0
     modules = []
     for o, a in opts:
