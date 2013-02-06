@@ -52,6 +52,10 @@ class ModuleFinder:
     # /python33/lib/importlib/_bootstrap.py 1455
     def _resolve_name(self, name, package, level):
         """Resolve a relative module name to an absolute one."""
+        assert level > 0
+        # This method must only be called for relative imports.
+        # Probably it could return <name> when level == 0;
+        # and we can save the 'if level > 0:' test in the calling code.
         bits = package.rsplit('.', level - 1)
         if len(bits) < level:
             raise ValueError('attempted relative import beyond top-level package')
@@ -135,6 +139,8 @@ class ModuleFinder:
         self._sanity_check(name, package, level)
         if level > 0:
             name = self._resolve_name(name, package, level)
+
+        # 'name' is now the fully qualified, absolute name of the module we want to import.
         if name in self.badmodules or name in self.excludes:
             raise ImportError(_ERR_MSG.format(name), name=name)
         if name not in self.modules:
@@ -264,16 +270,21 @@ class ModuleFinder:
         """Print the call as a Python import statement, indented.
         
         """
+
+        if caller:
+            caller_info = "# in %s" % caller.__name__
+        else:
+            caller_info = ""
         
         if level == 0:
             if fromlist:
-                print("%sfrom %s import %s # in %s" % (self.indent, name, ", ".join(fromlist), caller.__name__))
+                print("%sfrom %s import %s" % (self.indent, name, ", ".join(fromlist)), caller_info)
             else:
-                print("%simport %s # in %s" % (self.indent, name, caller.__name__))
+                print("%simport %s" % (self.indent, name), caller_info)
         elif name:
-            print("%sfrom %s import %s # in %s" % (self.indent, "."*level + name, ", ".join(fromlist), caller.__name__))
+            print("%sfrom %s import %s" % (self.indent, "."*level + name, ", ".join(fromlist)), caller_info)
         else:
-            print("%sfrom %s import %s # in %s" % (self.indent, "."*level, ", ".join(fromlist), caller.__name__))
+            print("%sfrom %s import %s" % (self.indent, "."*level, ", ".join(fromlist)), caller_info)
 
 
     def _load_module(self, loader, name):
@@ -548,7 +559,10 @@ if __name__ == "__main__":
                       )
     sys.path.insert(0, ".")
     for name in modules:
-        mf.import_hook(name)
+        if name.endswith(".*"):
+            mf.import_hook(name[:-2], None, ["*"])
+        else:
+            mf.import_hook(name)
     if report:
         mf.report_modules()
         mf.report_missing()
