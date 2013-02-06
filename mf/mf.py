@@ -421,7 +421,7 @@ class ModuleFinder:
                 print("P", end=" ")
             else:
                 print("m", end=" ")
-            print("%-35s" % key, getattr(m, "__file__", " --builtin--"))
+            print("%-35s" % key, getattr(m, "__file__", ""))
 
 ################################################################
 
@@ -499,7 +499,11 @@ class Module:
 
 # What about IronPath..., clr, ...?
 
-# What about old, deprecated modules (compiler, for example): compiler, new, sets, ...
+# What about old, deprecated modules (compiler, for example):
+# compiler, new, sets, ...
+
+# There is something strange with the importlib package, so we exclude
+# it automatically.
 
 WIN32_EXCLUDES = """\
 __main__
