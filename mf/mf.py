@@ -136,13 +136,13 @@ class ModuleFinder:
         the loader did not.
 
         """
+
         self._sanity_check(name, package, level)
         if level > 0:
             name = self._resolve_name(name, package, level)
 
         # 'name' is now the fully qualified, absolute name of the module we want to import.
-        if self.__last_caller:
-            self.depgraph[name].add(self.__last_caller.__name__)
+        self.depgraph[name].add(self.__last_caller.__name__ if self.__last_caller else "-")
 
         if name in self.excludes:
             raise ImportError(_ERR_MSG.format(name), name=name)
@@ -438,8 +438,8 @@ class ModuleFinder:
         print("  %-35s" % "---------------")
         for name in sorted(self.modules):
             if self.modules[name] is None:
-                mods = sorted(self.depgraph[name])
-                print("? %-35s imported from %s" % (name, ", ".join(mods)))
+                deps = sorted(self.depgraph[name])
+                print("? %-35s imported from %s" % (name, ", ".join(deps)))
 
 
     def report_modules(self):
@@ -450,9 +450,8 @@ class ModuleFinder:
         print("  %-35s %s" % ("Name", "File"))
         print("  %-35s %s" % ("----", "----"))
         # Print modules found
-        keys = sorted(self.modules.keys())
-        for key in keys:
-            m = self.modules[key]
+        for name in sorted(self.modules):
+            m = self.modules[name]
             if m is None:
                 ## print("?", end=" ")
                 continue
@@ -460,7 +459,10 @@ class ModuleFinder:
                 print("P", end=" ")
             else:
                 print("m", end=" ")
-            print("%-35s" % key, getattr(m, "__file__", ""))
+            print("%-35s" % name, getattr(m, "__file__", ""))
+            deps = sorted(self.depgraph[name])
+            print("   imported from %s" % ", ".join(deps))
+            print()
 
 ################################################################
 
