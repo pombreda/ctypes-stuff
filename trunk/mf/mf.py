@@ -72,7 +72,12 @@ class ModuleFinder:
     def __init__(self, excludes=[], debug=0):
         self._debug = debug
         self.modules = {} # simulates sys.modules
-        self.excludes = excludes
+
+        self.excludes = set(excludes)
+        # bdb, for example, imports __main__, and this would
+        # find the real __main__!
+        self.excludes.add("__main__")
+
         self.__last_caller = None
         self.depgraph = defaultdict(set)
 
@@ -482,9 +487,9 @@ class ModuleFinder:
             else:
                 print("m", end=" ")
             print("%-35s" % name, getattr(m, "__file__", ""))
-            ## deps = sorted(self.depgraph[name])
-            ## print("   imported from %s" % ", ".join(deps))
-            ## print()
+            deps = sorted(self.depgraph[name])
+            print("   imported from %s" % ", ".join(deps))
+            print()
 
 ################################################################
 
@@ -567,9 +572,6 @@ class Module:
 # /python33/lib/curses
 # /python33/lib/site-packages/numpy
 
-# What about __main__?  bdb imports __main__...
-# we don't want __this__ module to be pulled in...
-
 # What about IronPath..., clr, ...?
 
 # What about old, deprecated modules (compiler, for example):
@@ -579,7 +581,6 @@ class Module:
 # it automatically.
 
 WIN32_EXCLUDES = """\
-__main__
 _dummy_threading
 _emx_link
 _gestalt
