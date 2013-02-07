@@ -3,6 +3,33 @@
 """Modulefinder based on importlib
 """
 
+# BUGS: Doesn't find all the modules that the old modulefinder finds?
+# But it seems this is a bug of the old modulefinder.  Example: the
+# old one finds 'multiprocessing.Pool' which is not a module but a
+# class.  A module exists with different casing 'multiprocessing.pool'
+#
+
+# Differences for Python's standard modulefinder:
+#
+# Old behaviour:
+#
+# import_hook("package", None, ["*"]) did find all submodules in a
+# package; this does no longer work.
+#
+# New behaviour:
+#
+# import_hook("package", None, ["*"]) behaves like Python's
+# 'from package import *' (which does not pull in submodules).
+#
+# It is not clear how importlib could list all the submodules
+# in a package
+#
+# New behaviour: a lot faster
+#
+#  import_hook("os") => 45% runtime
+#  import_hook("numpy") => 46% runtime
+
+
 from collections import defaultdict
 import dis
 import importlib
@@ -125,6 +152,10 @@ class ModuleFinder:
 
         return module
 
+    # XXX TODO:  Should _gcd_import be the only place in the code where
+    # self.modules[...] is checked?  this would allow to do the whole dependency
+    # tracking in one place, and would maybe also help the debug logs...
+        
 
     # /python33/lib/importlib/_bootstrap.py 1563
     def _gcd_import(self, name, package=None, level=0):
@@ -150,7 +181,7 @@ class ModuleFinder:
             return self.modules[name]
         try:
             return self._find_and_load(name)
-        except Exception as exc:
+        except ImportError:
             self.modules[name] = None
             raise ImportError(name)
 
@@ -267,16 +298,6 @@ class ModuleFinder:
         """Wrapper for import_hook() that catches ImportError.
 
         """
-        if level:
-            fqname = self._resolve_name(name, caller.__name__, level)
-        else:
-            fqname = name
-        if fqname in self.modules:
-            return self.modules[fqname]
-
-        if fqname in self.excludes:
-            return
-
         if self._debug:
             self.indent += self.INDENT
             self._info(name, caller, fromlist, level)
@@ -356,13 +377,14 @@ class ModuleFinder:
         # See importlib.abc.Loader
         try:
             self.modules[name] = Module(loader, name)
-        except Exception as details:
-            # loader.get_code() can raise a SyntaxError, for example,
-            # when compiling code.  How to inform the user?
-            #
-            # In Python 3.3.0 (but not in 3.4), _frozen_importlib's
-            # loader raises an exception when is_package() is called.
-            raise ImportError(name) from details
+        except ImportError:
+            raise
+        # Don't catch other exceptions: let them propagates
+        # loader.get_code() can raise a SyntaxError, for example, when
+        # compiling code.
+        #
+        # In Python 3.3.0 (but not in 3.4), _frozen_importlib's loader
+        # raises an exception when is_package() is called.
 
 
     def _scan_code(self, code, mod):
@@ -460,9 +482,9 @@ class ModuleFinder:
             else:
                 print("m", end=" ")
             print("%-35s" % name, getattr(m, "__file__", ""))
-            deps = sorted(self.depgraph[name])
-            print("   imported from %s" % ", ".join(deps))
-            print()
+            ## deps = sorted(self.depgraph[name])
+            ## print("   imported from %s" % ", ".join(deps))
+            ## print()
 
 ################################################################
 
@@ -521,6 +543,16 @@ class Module:
 
 
         self.__code__ = loader.get_code(name)
+
+        # This would allow to find submodules (but it fails in ziparchives):
+        ## if hasattr(self, "__path__"):
+        ##     print(self)
+        ##     for pathname in os.listdir(self.__path__[0]):
+        ##         dir, fname = os.path.split(pathname)
+        ##         modname, ext = os.path.splitext(fname)
+        ##         if modname != "__init__" and ext in (".py", ".pyc", ".pyo", ".pyd"):
+        ##             print("   ", modname)
+        ##     print()
 
     def __repr__(self):
         s = "Module(%s" % self.__name__
@@ -590,6 +622,9 @@ if __name__ == "__main__":
             debug = 1
         elif o in ("-r", "--report"):
             report += 1
+
+    if args:
+        raise getopt.error("No arguments expected, got '%s'" % ", ".join(args))
 
     mf = ModuleFinder(excludes=excludes,
                       debug=debug,
