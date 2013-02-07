@@ -71,7 +71,7 @@ class ModuleFinder:
 
     def __init__(self, excludes=[], debug=0):
         self._debug = debug
-        self.modules = {} # simulates sys.modules
+        self._modules = {} # simulates sys.modules
 
         self.excludes = set(excludes)
         # bdb, for example, imports __main__, and this would
@@ -106,7 +106,7 @@ class ModuleFinder:
         if package:
             if not isinstance(package, str):
                 raise TypeError("__package__ not set to a string")
-            elif package not in self.modules:
+            elif package not in self._modules:
                 msg = ("Parent module {!r} not loaded, cannot perform relative "
                        "import")
                 raise SystemError(msg.format(package))
@@ -120,13 +120,13 @@ class ModuleFinder:
         path = None
         parent = name.rpartition('.')[0]
         if parent:
-            if parent not in self.modules:
+            if parent not in self._modules:
                 self._gcd_import(parent)
             # Crazy side-effects!
-            if name in self.modules:
-                return self.modules[name]
+            if name in self._modules:
+                return self._modules[name]
             # Backwards-compatibility; be nicer to skip the dict lookup.
-            parent_module = self.modules[parent]
+            parent_module = self._modules[parent]
             try:
                 path = parent_module.__path__
             except AttributeError:
@@ -139,15 +139,15 @@ class ModuleFinder:
             # 3.4.
             exc._not_found = True
             raise exc
-        elif name not in self.modules:
+        elif name not in self._modules:
             # The parent import may have already imported this module.
             self._load_module(loader, name)
         # Backwards-compatibility; be nicer to skip the dict lookup.
-        module = self.modules[name]
+        module = self._modules[name]
 
         if parent:
             # Set the module as an attribute on its parent.
-            parent_module = self.modules[parent]
+            parent_module = self._modules[parent]
             setattr(parent_module, name.rpartition('.')[2], module)
 
         # It is important that all the required __...__ attributes at
@@ -158,7 +158,7 @@ class ModuleFinder:
         return module
 
     # XXX TODO:  Should _gcd_import be the only place in the code where
-    # self.modules[...] is checked?  this would allow to do the whole dependency
+    # self._modules[...] is checked?  this would allow to do the whole dependency
     # tracking in one place, and would maybe also help the debug logs...
         
 
@@ -182,12 +182,12 @@ class ModuleFinder:
 
         if name in self.excludes:
             raise ImportError(_ERR_MSG.format(name), name=name)
-        if name in self.modules:
-            return self.modules[name]
+        if name in self._modules:
+            return self._modules[name]
         try:
             return self._find_and_load(name)
         except ImportError:
-            self.modules[name] = None
+            self._modules[name] = None
             raise ImportError(name)
 
 
@@ -253,16 +253,6 @@ class ModuleFinder:
 
     # /python33/lib/importlib/_bootstrap.py 1647
     def import_hook(self, name, caller=None, fromlist=(), level=0):
-        self.__old_last_caller = self.__last_caller
-        self.__last_caller = caller
-        try:
-            return self._import_hook(name, caller, fromlist, level)
-        except:
-            raise
-        finally:
-            self.__last_caller = self.__old_last_caller
-
-    def _import_hook(self, name, caller=None, fromlist=(), level=0):
         """Import a module.
 
         The 'caller' argument is used to infer where the import is
@@ -275,6 +265,16 @@ class ModuleFinder:
 
         """
         
+        self.__old_last_caller = self.__last_caller
+        self.__last_caller = caller
+        try:
+            return self._import_hook(name, caller, fromlist, level)
+        except:
+            raise
+        finally:
+            self.__last_caller = self.__old_last_caller
+
+    def _import_hook(self, name, caller=None, fromlist=(), level=0):
         if level == 0:
             module = self._gcd_import(name)
         else:
@@ -289,7 +289,7 @@ class ModuleFinder:
                 return module
             else:
                 cut_off = len(name) - len(name.partition('.')[0])
-                return self.modules[module.__name__[:len(module.__name__)-cut_off]]
+                return self._modules[module.__name__[:len(module.__name__)-cut_off]]
         else:
             try:
                 return self._handle_fromlist(module, fromlist)
@@ -376,12 +376,12 @@ class ModuleFinder:
         whenever a loader is used.)
 
         """
-        if name in self.modules:
-            return self.modules[name]
+        if name in self._modules:
+            return self._modules[name]
 
         # See importlib.abc.Loader
         try:
-            self.modules[name] = Module(loader, name)
+            self._modules[name] = Module(loader, name)
         except ImportError:
             raise
         # Don't catch other exceptions: let them propagates
@@ -445,6 +445,34 @@ class ModuleFinder:
             else:
                 code = code[1:]
 
+    @property
+    def modules(self):
+        """
+        A dictionary containing the found modules.
+        """
+        return dict((n, v) for (n, v) in self._modules.items()
+                    if v)
+
+
+    def missing(self):
+        """Return a list of modules that appear to be missing. Use
+        any_missing_maybe() if you want to know which modules are
+        certain to be missing, and which *may* be missing.
+
+        """
+        return [n for n in self._modules
+                if self._modules[n] is None]
+
+    def any_missing_maybe(self):
+        """Return two lists, one with modules that are certainly missing
+        and one with modules that *may* be missing. The latter names could
+        either be submodules *or* just global names in the package.
+
+        The reason it can't always be determined is that it's impossible to
+        tell which names are imported when "from module import *" is done
+        with an extension module, short of actually importing it.
+        """
+        raise NotImplementedError
 
     def report(self):
         """Print a report to stdout, listing the found modules with
@@ -463,10 +491,9 @@ class ModuleFinder:
         print()
         print("  %-35s" % "Missing Modules")
         print("  %-35s" % "---------------")
-        for name in sorted(self.modules):
-            if self.modules[name] is None:
-                deps = sorted(self.depgraph[name])
-                print("? %-35s imported from %s" % (name, ", ".join(deps)))
+        for name in sorted(self.missing()):
+            deps = sorted(self.depgraph[name])
+            print("? %-35s imported from %s" % (name, ", ".join(deps)))
 
 
     def report_modules(self):
@@ -487,9 +514,9 @@ class ModuleFinder:
             else:
                 print("m", end=" ")
             print("%-35s" % name, getattr(m, "__file__", ""))
-            deps = sorted(self.depgraph[name])
-            print("   imported from %s" % ", ".join(deps))
-            print()
+            ## deps = sorted(self.depgraph[name])
+            ## print("   imported from %s" % ", ".join(deps))
+            ## print()
 
 ################################################################
 
@@ -513,6 +540,8 @@ class Module:
 
     __code__: the code object provided by the loader; can be None.
 
+    __globalnames__: a set containing the global names that are defined.
+    
     """
 
     def __init__(self, loader, name):
