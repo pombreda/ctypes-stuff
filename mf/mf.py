@@ -264,7 +264,7 @@ class ModuleFinder:
         ..pkg import mod`` would have a 'level' of 2).
 
         """
-        
+
         self.__old_last_caller = self.__last_caller
         self.__last_caller = caller
         try:
@@ -460,8 +460,15 @@ class ModuleFinder:
         certain to be missing, and which *may* be missing.
 
         """
-        return [n for n in self._modules
-                if self._modules[n] is None]
+        missing = [n for n in self._modules
+                   if self._modules[n] is None]
+        for name in missing[:]:
+            package, _, symbol = name.rpartition(".")
+            if not package or package in missing:
+                continue
+            if symbol in self._modules[package].__globalnames__:
+                missing.remove(name)
+        return missing
 
     def any_missing_maybe(self):
         """Return two lists, one with modules that are certainly missing
