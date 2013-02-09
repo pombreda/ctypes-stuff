@@ -5,11 +5,13 @@
 
 # /python33-64/lib/modulefinder.py
 
+from collections import defaultdict
 import dis
 import importlib
 import os
 import struct
 import sys
+import textwrap
 
 # XXX Clean up once str8's cstor matches bytes.
 LOAD_CONST = bytes([dis.opname.index('LOAD_CONST')])
@@ -39,6 +41,8 @@ class ModuleFinder:
         self.path = path
         self.modules = {}
         self.badmodules = set()
+        self.__last_caller = None
+        self.depgraph = defaultdict(set)
 
     # /python33/lib/importlib/_bootstrap.py 1647
     def import_hook(self, name, caller=None, fromlist=(), level=0):
@@ -53,14 +57,19 @@ class ModuleFinder:
         ..pkg import mod`` would have a 'level' of 2).
 
         """
-        if level == 0:
-            module = self._gcd_import(name)
-        else:
-            package = self._calc___package__(caller)
-            module = self._gcd_import(name, package, level)
-        if fromlist:
-            symbols = self._handle_fromlist(module, fromlist, caller)
+        self.__old_last_caller = self.__last_caller
+        self.__last_caller = caller
 
+        try:
+            if level == 0:
+                module = self._gcd_import(name)
+            else:
+                package = self._calc___package__(caller)
+                module = self._gcd_import(name, package, level)
+            if fromlist:
+                symbols = self._handle_fromlist(module, fromlist, caller)
+        finally:
+            self.__last_caller = self.__old_last_caller
 
     # for now:
     def safe_import_hook(self, name, caller=None, fromlist=(), level=0):
@@ -70,7 +79,6 @@ class ModuleFinder:
         try:
             self.import_hook(name, caller, fromlist, level)
         except ImportError as exc:
-##            import traceback; traceback.print_exc(0)
             pass
 
     # /python33-64/lib/collections
@@ -153,12 +161,15 @@ class ModuleFinder:
         if name == "__main__":
             raise ImportError()
 
+        if name.endswith("array"):
+            print("GCD_IMPORT", name, package)
+
         self._sanity_check(name, package, level)
         if level > 0:
             name = self._resolve_name(name, package, level)
         # 'name' is now the fully qualified, absolute name of the module we want to import.
 
-        ## self.depgraph[name].add(self.__last_caller.__name__ if self.__last_caller else "-")
+        self.depgraph[name].add(self.__last_caller.__name__ if self.__last_caller else "-")
 
         ## if name in self.excludes:
         ##     raise ImportError(_ERR_MSG.format(name), name=name)
@@ -323,9 +334,10 @@ class ModuleFinder:
             else:
                 print("m", end=" ")
             print("%-35s" % name, getattr(m, "__file__", ""))
-            ## deps = sorted(self.depgraph[name])
-            ## print("   imported from %s" % ", ".join(deps))
-            ## print()
+            deps = sorted(self.depgraph[name])
+            text = "\n".join(textwrap.wrap(", ".join(deps)))
+            print("   imported from:\n%s" % textwrap.indent(text, "      "))
+##            print()
 
 
     def report_missing(self):
@@ -337,8 +349,7 @@ class ModuleFinder:
         print("  %-35s" % "Missing Modules")
         print("  %-35s" % "---------------")
         for name in sorted(self.missing()):
-##            deps = sorted(self.depgraph[name])
-            deps = {"?"}
+            deps = sorted(self.depgraph[name])
             print("? %-35s imported from %s" % (name, ", ".join(deps)))
 
 ################################################################
@@ -400,7 +411,7 @@ class Module:
 
         self.__code__ = loader.get_code(name)
 
-        # This would allow to find submodules (but it fails in ziparchives):
+        # This would allow to find submodules (but it has to be extended for ziparchives):
         ## if hasattr(self, "__path__"):
         ##     print(self)
         ##     for pathname in os.listdir(self.__path__[0]):

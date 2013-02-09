@@ -202,5 +202,7 @@ class SimpleTests(unittest.TestCase):
         self.assertIn("encodings.big5", mf.modules)
         self.assertEqual({"encodings.foo"}, mf.missing())
 
+# /python33/lib/site-packages/numpy
+
 if __name__ == "__main__":
     unittest.main()
