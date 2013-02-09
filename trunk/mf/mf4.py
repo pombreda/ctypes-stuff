@@ -83,9 +83,9 @@ class ModuleFinder:
                 continue
             if name in mod.__globalnames__:
                 continue
-            if mod.__name__ == "collections":
-                print("FROMLIST", mod.__name__, name, caller)
-                print("   ", sorted(mod.__globalnames__))
+            ## if mod.__name__ == "collections":
+            ##     print("FROMLIST", mod.__name__, name, caller)
+            ##     print("   ", sorted(mod.__globalnames__))
         ## if mod.__name__.startswith("collections"):
         ##     print("HANDLE_FROMLIST", mod.__name__, fromlist)
         ##     print("   ", sorted(mod.__globalnames__))
@@ -146,6 +146,9 @@ class ModuleFinder:
         being made from, and the level adjustment.
 
         """
+        # __main__ is always the current main module; do never import that.
+        if name == "__main__":
+            raise ImportError()
 
         self._sanity_check(name, package, level)
         if level > 0:
