@@ -83,7 +83,7 @@ class ModuleFinder:
                 continue
             if name in mod.__globalnames__:
                 continue
-            ## if mod.__name__ == "collections":
+            ## if "path" in fromlist:
             ##     print("FROMLIST", mod.__name__, name, caller)
             ##     print("   ", sorted(mod.__globalnames__))
         ## if mod.__name__.startswith("collections"):
@@ -283,7 +283,14 @@ class ModuleFinder:
         certain to be missing, and which *may* be missing.
 
         """
-        return self.badmodules
+        missing = set()
+        for name in self.badmodules:
+            package, _, symbol = name.rpartition(".")
+            if not package or package in missing:
+                continue
+            if symbol not in self.modules[package].__globalnames__:
+                missing.add(name)
+        return missing
 
 
     def report(self):

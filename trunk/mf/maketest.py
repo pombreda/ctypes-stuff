@@ -169,6 +169,7 @@ class SimpleTests(unittest.TestCase):
         mf.import_hook("os", None, ["path"])
         self.assertIn("os", mf.modules)
         self.assertIn("ntpath", mf.modules)
+        self.assertNotIn("os.path", mf.missing())
 
     def test_collections_abc(self):
         from collections import abc
