@@ -198,8 +198,9 @@ class SimpleTests(unittest.TestCase):
         mf = ModuleFinder()
         mf.import_hook("encodings", None, ["big5"])
         mf.import_hook("encodings", None, ["codecs"])
+        mf.safe_import_hook("encodings", None, ["foo"])
         self.assertIn("encodings.big5", mf.modules)
-        self.assertEqual(set(), mf.missing())
+        self.assertEqual({"encodings.foo"}, mf.missing())
 
 if __name__ == "__main__":
     unittest.main()
