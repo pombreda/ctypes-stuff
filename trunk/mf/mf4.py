@@ -3,6 +3,8 @@
 """ModuleFinder based on importlib
 """
 
+# /python33-64/lib/modulefinder.py
+
 import dis
 import importlib
 import os
@@ -77,19 +79,20 @@ class ModuleFinder:
 
         Names on the fromlist can be modules or global symbols.
         """
-
-        for name in fromlist:
-            if name == "*":
+        for x in fromlist:
+            if x == "*":
+                for n in mod.__globalnames__:
+                    setattr(caller, n, "*")
                 continue
-            if name in mod.__globalnames__:
+            if hasattr(mod, x):
+                continue # subpackage already loaded
+            if x in mod.__globalnames__:
                 continue
-            ## if "path" in fromlist:
-            ##     print("FROMLIST", mod.__name__, name, caller)
-            ##     print("   ", sorted(mod.__globalnames__))
-        ## if mod.__name__.startswith("collections"):
-        ##     print("HANDLE_FROMLIST", mod.__name__, fromlist)
-        ##     print("   ", sorted(mod.__globalnames__))
-        ## return fromlist
+            if hasattr(mod, "__path__"):
+                try:
+                    self._gcd_import('{}.{}'.format(mod.__name__, x))
+                except ImportError:
+                    raise
 
 
     # /python33/lib/importlib/_bootstrap.py 1455

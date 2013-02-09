@@ -86,7 +86,7 @@ class Test_NamesImport(_TestPackageBase):
             from testmods.tools import baz
             from testmods.tools import spam
             from testmods.tools import foo
-            try: import testmods.tools.spam_and_eggs
+            try: from testmods.tools import spam_and_eggs
             except ImportError: pass
 
     testmods/__init__.py
@@ -111,6 +111,7 @@ class Test_NamesImport(_TestPackageBase):
                "testmods.tools",
                "testmods.tools.bazbar",
                "testmods.tools.spamfoo"}
+
     missing = {"testmods.tools.spam_and_eggs"}
 
     def test_imports(self):
@@ -191,6 +192,14 @@ class SimpleTests(unittest.TestCase):
         self.assertIn("collections.abc", mf.modules)
         self.assertNotIn("collections.namedtuple", mf.missing())
 
+    def test_encodings(self):
+        from encodings import big5
+        # /python33-64/lib/encodings
+        mf = ModuleFinder()
+        mf.import_hook("encodings", None, ["big5"])
+        mf.import_hook("encodings", None, ["codecs"])
+        self.assertIn("encodings.big5", mf.modules)
+        self.assertEqual(set(), mf.missing())
 
 if __name__ == "__main__":
     unittest.main()
