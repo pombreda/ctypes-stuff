@@ -68,7 +68,7 @@ class ModuleFinder:
                 package = self._calc___package__(caller)
                 module = self._gcd_import(name, package, level)
             if fromlist:
-                symbols = self._handle_fromlist(module, fromlist, caller)
+                self._handle_fromlist(module, fromlist, caller)
         finally:
             self.__last_caller = self.__old_last_caller
 
@@ -101,7 +101,9 @@ class ModuleFinder:
                 try:
                     self._gcd_import('{}.{}'.format(mod.__name__, x))
                 except ImportError:
-                    raise
+                    # self._gcd_import has put an entry into self.badmodules,
+                    # so continue processing
+                    pass
 
 
     # /python33/lib/importlib/_bootstrap.py 1455
@@ -162,8 +164,8 @@ class ModuleFinder:
         if name == "__main__":
             raise ImportError()
 
-        if name.endswith("array"):
-            print("GCD_IMPORT", name, package)
+        if name == "numpy.core._dummy":
+            import pdb; pdb.set_trace()
 
         self._sanity_check(name, package, level)
         if level > 0:
@@ -172,8 +174,8 @@ class ModuleFinder:
 
         self.depgraph[name].add(self.__last_caller.__name__ if self.__last_caller else "-")
 
-        if name in self.excludes:
-            raise ImportError(_ERR_MSG.format(name), name=name)
+        ## if name in self.excludes:
+        ##     raise ImportError(_ERR_MSG.format(name), name=name)
         if name in self.modules:
             return self.modules[name]
         return self._find_and_load(name)
@@ -335,10 +337,9 @@ class ModuleFinder:
             else:
                 print("m", end=" ")
             print("%-35s" % name, getattr(m, "__file__", ""))
-            deps = sorted(self.depgraph[name])
-            text = "\n".join(textwrap.wrap(", ".join(deps)))
-            print("   imported from:\n%s" % textwrap.indent(text, "      "))
-##            print()
+            ## deps = sorted(self.depgraph[name])
+            ## text = "\n".join(textwrap.wrap(", ".join(deps)))
+            ## print("   imported from:\n%s" % textwrap.indent(text, "      "))
 
 
     def report_missing(self):
