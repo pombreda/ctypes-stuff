@@ -50,34 +50,14 @@ def create_package(source, test_dir):
 
 class _TestPackageBase(unittest.TestCase):
     def setUp(self):
-        create_package(self.data, "foo")
+        create_package(self.data, self.__class__.__name__)
         self.sys_path = sys.path[:]
-        sys.path.insert(0, "foo")
+        sys.path.insert(0, self.__class__.__name__)
 
     def tearDown(self):
-        shutil.rmtree("foo")
+        shutil.rmtree(self.__class__.__name__)
         sys.path = self.sys_path
 
-##     data = """
-##     package/__init__.py
-##     package/sub1/__init__.py
-##             from ..sub2.modZ import eggs
-##             from ..modA import foo
-##     package/sub1/modX.py
-##             from .modY import spam
-##             from .modY import spam as ham
-##             from . import modY
-##             from ..sub1 import modY
-##     package/sub1/modY.py
-##             spam = "spam"
-##             # from ...package import bar
-##             # from ...sys import path
-##     package/sub2/__init__.py
-##     package/sub2/modZ.py
-##         eggs = "eggs"
-##     """
-##     create_package(data, test_dir)
-##     shutil.rmtree(test_dir)
 
 class Test_NamesImport(_TestPackageBase):
     data = """
@@ -114,6 +94,13 @@ class Test_NamesImport(_TestPackageBase):
 
     missing = {"testmods.tools.spam_and_eggs"}
 
+    def test_modulefinder(self):
+        mf = ModuleFinder(path=sys.path)
+        mf.import_hook("testmods.test_tools")
+        found = mf.modules.keys()
+        self.assertEqual(set(found), self.modules)
+        self.assertEqual(mf.missing(), self.missing)
+
     def test_imports(self):
         for name in self.modules:
             self.assertNotIn(name, sys.modules)
@@ -130,31 +117,64 @@ class Test_NamesImport(_TestPackageBase):
         for name in self.modules:
             self.assertNotIn(name, sys.modules)
 
+
+class Test_NestedStarImports(_TestPackageBase):
+    data = """
+    nested/test_tools.py
+            from nested import foo, bar, baz
+
+    nested/__init__.py
+            from .tools import *
+
+    nested/tools/__init__.py
+            from .sub import *
+
+    nested/tools/sub.py
+            baz = 'baz'
+            bar = 'bar'
+
+    """
+
+    modules = {"nested",
+               "nested.test_tools",
+               "nested.tools",
+               "nested.tools.sub"}
+
+    missing = {"nested.foo"}
+
     def test_modulefinder(self):
         mf = ModuleFinder(path=sys.path)
-        mf.import_hook("testmods.test_tools")
+        mf.import_hook("nested.test_tools")
         found = mf.modules.keys()
-        self.assertEqual(set(found), self.modules)
-        self.assertEqual(mf.missing(), self.missing)
+        try:
+            self.assertEqual(set(found), self.modules)
+            self.assertEqual(mf.missing(), self.missing)
+        except AssertionError:
+            mf.report()
+            raise
 
+    def test_imports(self):
+        with self.assertRaises(ImportError):
+            import nested.test_tools
+        from nested import bar, baz
 
 class Test_PEP328(_TestPackageBase):
     data = """
-    package/__init__.py
-    package/sub1/__init__.py
+    pep328/__init__.py
+    pep328/sub1/__init__.py
             from ..sub2.modZ import eggs
             from ..modA import foo
-    package/sub1/modX.py
+    pep328/sub1/modX.py
             from .modY import spam
             from .modY import spam as ham
             from . import modY
             from ..sub1 import modY
-    package/sub1/modY.py
+    pep328/sub1/modY.py
             spam = "spam"
-            # from ...package import bar
+            # from ...pep328 import bar
             # from ...sys import path
-    package/sub2/__init__.py
-    package/sub2/modZ.py
+    pep328/sub2/__init__.py
+    pep328/sub2/modZ.py
         eggs = "eggs"
     """
 
