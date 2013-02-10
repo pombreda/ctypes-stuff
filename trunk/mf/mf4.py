@@ -37,7 +37,8 @@ if sys.version_info[:3] == (3, 3, 0):
 ################################################################
 
 class ModuleFinder:
-    def __init__(self, path=None):
+    def __init__(self, excludes=(), path=None):
+        self.excludes = excludes
         self.path = path
         self.modules = {}
         self.badmodules = set()
@@ -171,8 +172,8 @@ class ModuleFinder:
 
         self.depgraph[name].add(self.__last_caller.__name__ if self.__last_caller else "-")
 
-        ## if name in self.excludes:
-        ##     raise ImportError(_ERR_MSG.format(name), name=name)
+        if name in self.excludes:
+            raise ImportError(_ERR_MSG.format(name), name=name)
         if name in self.modules:
             return self.modules[name]
         return self._find_and_load(name)
@@ -455,7 +456,7 @@ if __name__ == "__main__":
         raise getopt.error("No arguments expected, got '%s'" % ", ".join(args))
 
     mf = ModuleFinder(
-##        excludes=excludes,
+        excludes=excludes,
 ##        debug=debug,
         )
     sys.path.insert(0, ".")
