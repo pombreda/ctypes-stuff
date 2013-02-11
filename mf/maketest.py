@@ -128,9 +128,15 @@ class Test_NestedStarImports(_TestPackageBase):
 
     nested/tools/__init__.py
             from .sub import *
+            from .subtools import *
 
     nested/tools/sub.py
             baz = 'baz'
+
+    nested/tools/subtools/__init__.py
+            from .subsub import *
+
+    nested/tools/subtools/subsub.py
             bar = 'bar'
 
     """
@@ -138,7 +144,9 @@ class Test_NestedStarImports(_TestPackageBase):
     modules = {"nested",
                "nested.test_tools",
                "nested.tools",
-               "nested.tools.sub"}
+               "nested.tools.sub",
+               "nested.tools.subtools",
+               "nested.tools.subtools.subsub"}
 
     missing = {"nested.foo"}
 
