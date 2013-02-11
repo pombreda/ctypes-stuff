@@ -1,4 +1,4 @@
-#!/usr/bin/python3.3
+#!/usr/bin/python3.3-32
 # -*- coding: utf-8 -*-
 """ModuleFinder based on importlib
 """
@@ -91,7 +91,7 @@ class ModuleFinder:
         for x in fromlist:
             if x == "*":
                 for n in mod.__globalnames__:
-                    setattr(caller, n, "*")
+                    caller.__globalnames__.add(n)
                 continue
             if hasattr(mod, x):
                 continue # subpackage already loaded
@@ -164,8 +164,8 @@ class ModuleFinder:
         if name == "__main__":
             raise ImportError()
 
-        if name == "numpy.core._dummy":
-            import pdb; pdb.set_trace()
+        ## if name == "numpy.core._dummy":
+        ##     import pdb; pdb.set_trace()
 
         self._sanity_check(name, package, level)
         if level > 0:
