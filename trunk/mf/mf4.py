@@ -37,13 +37,15 @@ if sys.version_info[:3] == (3, 3, 0):
 ################################################################
 
 class ModuleFinder:
-    def __init__(self, excludes=(), path=None):
+    def __init__(self, excludes=(), path=None, verbose=0):
         self.excludes = excludes
         self.path = path
+        self._verbose = verbose
         self.modules = {}
         self.badmodules = set()
         self.__last_caller = None
-        self.depgraph = defaultdict(set)
+        self._depgraph = defaultdict(set)
+        self._indent = ""
 
     # /python33/lib/importlib/_bootstrap.py 1647
     def import_hook(self, name, caller=None, fromlist=(), level=0):
@@ -77,14 +79,42 @@ class ModuleFinder:
         """Wrapper for import_hook() that catches ImportError.
 
         """
+        INDENT = "  "
+        self._info(name, caller, fromlist, level)
+        self._indent = self._indent + INDENT
         try:
             self.import_hook(name, caller, fromlist, level)
         except ImportError as exc:
             pass
+        finally:
+            self._indent = self._indent[:-len(INDENT)]
+
+    def _info(self, name, caller, fromlist, level):
+        """Print the call as a Python import statement, indented.
+
+        """
+        if caller:
+            caller_info = " # in %s" % caller.__name__
+        else:
+            caller_info = ""
+
+        if level == 0:
+            if fromlist:
+                text = "%sfrom %s import %s" % (self._indent, name, ", ".join(fromlist)) + caller_info
+            else:
+                text = "%simport %s" % (self._indent, name) + caller_info
+        elif name:
+            text = "%sfrom %s import %s" % (self._indent, "."*level + name, ", ".join(fromlist)) + caller_info
+        else:
+            text = "%sfrom %s import %s" % (self._indent, "."*level, ", ".join(fromlist)) + caller_info
+        if self._verbose > 0:
+            print(text)
+            if "arcsinh" in text:
+                import pdb; pdb.set_trace()
 
     # /python33-64/lib/collections
     def _handle_fromlist(self, mod, fromlist, caller):
-        """handele the fromlist.
+        """handle the fromlist.
 
         Names on the fromlist can be modules or global symbols.
         """
@@ -164,15 +194,12 @@ class ModuleFinder:
         if name == "__main__":
             raise ImportError()
 
-        ## if name == "numpy.core._dummy":
-        ##     import pdb; pdb.set_trace()
-
         self._sanity_check(name, package, level)
         if level > 0:
             name = self._resolve_name(name, package, level)
         # 'name' is now the fully qualified, absolute name of the module we want to import.
 
-        self.depgraph[name].add(self.__last_caller.__name__ if self.__last_caller else "-")
+        self._depgraph[name].add(self.__last_caller.__name__ if self.__last_caller else "-")
 
         ## if name in self.excludes:
         ##     raise ImportError(_ERR_MSG.format(name), name=name)
@@ -337,7 +364,7 @@ class ModuleFinder:
             else:
                 print("m", end=" ")
             print("%-35s" % name, getattr(m, "__file__", ""))
-            ## deps = sorted(self.depgraph[name])
+            ## deps = sorted(self._depgraph[name])
             ## text = "\n".join(textwrap.wrap(", ".join(deps)))
             ## print("   imported from:\n%s" % textwrap.indent(text, "      "))
 
@@ -351,7 +378,7 @@ class ModuleFinder:
         print("  %-35s" % "Missing Modules")
         print("  %-35s" % "---------------")
         for name in sorted(self.missing()):
-            deps = sorted(self.depgraph[name])
+            deps = sorted(self._depgraph[name])
             print("? %-35s imported from %s" % (name, ", ".join(deps)))
 
 ################################################################
@@ -435,11 +462,18 @@ class Module:
 
 if __name__ == "__main__":
     import getopt
-    opts, args = getopt.getopt(sys.argv[1:],
-                               "dm:x:r",
-                               ["module=", "exclude=", "debug", "report"])
+    try:
+        opts, args = getopt.getopt(sys.argv[1:],
+                                   "m:x:vr",
+                                   ["module=",
+                                    "exclude=",
+                                    "verbose",
+                                    "report"])
+    except getopt.GetoptError as err:
+        print("Error: %s." % err)
+        sys.exit(2)
 
-    debug = 0
+    verbose = 0
     excludes = []
     report = 0
     modules = []
@@ -448,8 +482,8 @@ if __name__ == "__main__":
             excludes.append(a)
         elif o in ("-m", "--module"):
             modules.append(a)
-        elif o in ("-d", "--debug"):
-            debug = 1
+        elif o in ("-v", "--verbose"):
+            verbose += 1
         elif o in ("-r", "--report"):
             report += 1
 
@@ -458,7 +492,7 @@ if __name__ == "__main__":
 
     mf = ModuleFinder(
         excludes=excludes,
-##        debug=debug,
+        verbose=verbose,
         )
     sys.path.insert(0, ".")
     for name in modules:
@@ -470,3 +504,6 @@ if __name__ == "__main__":
     if report:
         mf.report_modules()
         mf.report_missing()
+
+# /python33/lib/site-packages/numpy
+
