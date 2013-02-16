@@ -191,8 +191,8 @@ class SimpleTests(unittest.TestCase):
     """Simple import tests on the Python standard library. """
 
     def test_os_path(self):
-        from os import path
-        import os.path
+        ## from os import path
+        ## import os.path
 
         mf = ModuleFinder()
         mf.import_hook("os", None, ["path"])
@@ -202,6 +202,23 @@ class SimpleTests(unittest.TestCase):
         self.assertIn("posix", mf.missing())
         self.assertIn("fcntl", mf.missing())
         self.assertIn("os2", mf.missing())
+
+    def test_sys(self):
+        mf = ModuleFinder(excludes=["posix"])
+        mf.import_hook("os", None, ["path"])
+        mf.import_hook("sys", None, ["spam"])
+        self.assertNotIn("os.path", mf.missing())
+        self.assertNotIn("posix", mf.missing())
+        # Fails:
+##        self.assertIn("sys.spam", mf.missing())
+
+
+    @unittest.skip("raises ImportError")
+    def test_sys2(self):
+        mf = ModuleFinder()
+        # This raises ImportError:
+        mf.import_hook("os.path")
+        mf.report()
 
     def test_collections_abc(self):
         from collections import abc

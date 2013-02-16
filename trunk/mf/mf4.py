@@ -143,6 +143,8 @@ class ModuleFinder:
                     # self._gcd_import has put an entry into self.badmodules,
                     # so continue processing
                     pass
+            ## else:
+            ##     self._add_badmodule('{}.{}'.format(mod.__name__, x))
 
 
     # /python33/lib/importlib/_bootstrap.py 1455
@@ -210,8 +212,8 @@ class ModuleFinder:
 
         self._depgraph[name].add(self.__last_caller.__name__ if self.__last_caller else "-")
 
-        ## if name in self.excludes:
-        ##     raise ImportError(_ERR_MSG.format(name), name=name)
+        if name in self.excludes:
+            raise ImportError('No module named {!r}'.format(name), name=name)
         if name in self.modules:
             return self.modules[name]
         return self._find_and_load(name)
