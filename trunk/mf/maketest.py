@@ -199,6 +199,9 @@ class SimpleTests(unittest.TestCase):
         self.assertIn("os", mf.modules)
         self.assertIn("ntpath", mf.modules)
         self.assertNotIn("os.path", mf.missing())
+        self.assertIn("posix", mf.missing())
+        self.assertIn("fcntl", mf.missing())
+        self.assertIn("os2", mf.missing())
 
     def test_collections_abc(self):
         from collections import abc
@@ -226,7 +229,7 @@ class SimpleTests(unittest.TestCase):
         mf = ModuleFinder()
         mf.import_hook("encodings", None, ["big5"])
         mf.import_hook("encodings", None, ["codecs"])
-        mf.safe_import_hook("encodings", None, ["foo"])
+        mf.import_hook("encodings", None, ["foo"])
         self.assertIn("encodings.big5", mf.modules)
         self.assertEqual({"encodings.foo"}, mf.missing())
 

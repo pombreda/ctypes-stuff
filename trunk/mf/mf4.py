@@ -8,6 +8,7 @@
 from collections import defaultdict
 import dis
 import importlib
+import importlib.machinery
 import os
 import struct
 import sys
@@ -47,6 +48,12 @@ class ModuleFinder:
         self._depgraph = defaultdict(set)
         self._indent = ""
 
+    def run_script(self, path):
+        ldr = importlib.machinery.SourceFileLoader("__main__", path)
+        mod = Module(ldr, "__main__")
+        self.modules["__main__"] = mod
+        self._scan_code(mod.__code__, mod)
+
     # /python33/lib/importlib/_bootstrap.py 1647
     def import_hook(self, name, caller=None, fromlist=(), level=0):
         """Import a module.
@@ -85,7 +92,9 @@ class ModuleFinder:
         try:
             self.import_hook(name, caller, fromlist, level)
         except ImportError as exc:
-            pass
+            if self._verbose > 0:
+                print("ERROR", name, caller, fromlist)
+                print("    ", self.badmodules)
         finally:
             self._indent = self._indent[:-len(INDENT)]
 
@@ -330,7 +339,10 @@ class ModuleFinder:
         missing = set()
         for name in self.badmodules:
             package, _, symbol = name.rpartition(".")
-            if not package or package in missing:
+            if not package:
+                missing.add(name)
+                continue
+            elif package in missing:
                 continue
             if symbol not in self.modules[package].__globalnames__:
                 missing.add(name)
@@ -463,12 +475,12 @@ class Module:
 if __name__ == "__main__":
     import getopt
     try:
-        opts, args = getopt.getopt(sys.argv[1:],
-                                   "m:x:vr",
-                                   ["module=",
-                                    "exclude=",
-                                    "verbose",
-                                    "report"])
+        opts, args = getopt.gnu_getopt(sys.argv[1:],
+                                       "m:x:vr",
+                                       ["module=",
+                                        "exclude=",
+                                        "verbose",
+                                        "report"])
     except getopt.GetoptError as err:
         print("Error: %s." % err)
         sys.exit(2)
@@ -487,8 +499,8 @@ if __name__ == "__main__":
         elif o in ("-r", "--report"):
             report += 1
 
-    if args:
-        raise getopt.error("No arguments expected, got '%s'" % ", ".join(args))
+    ## if args:
+    ##     raise getopt.error("No arguments expected, got '%s'" % ", ".join(args))
 
     mf = ModuleFinder(
         excludes=excludes,
@@ -498,12 +510,13 @@ if __name__ == "__main__":
     for name in modules:
         # Hm, call import_hook() or safe_import_hook() here?
         if name.endswith(".*"):
-            mf.safe_import_hook(name[:-2], None, ["*"])
+            mf.import_hook(name[:-2], None, ["*"])
         else:
-            mf.safe_import_hook(name)
+            mf.import_hook(name)
+    for path in args:
+        mf.run_script(path)
     if report:
-        mf.report_modules()
-        mf.report_missing()
+        mf.report()
 
 # /python33/lib/site-packages/numpy
 
