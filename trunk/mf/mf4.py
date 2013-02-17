@@ -38,9 +38,10 @@ if sys.version_info[:3] == (3, 3, 0):
 ################################################################
 
 class ModuleFinder:
-    def __init__(self, excludes=(), path=None, verbose=0):
+    def __init__(self, excludes=(), path=None, verbose=0, optimize=0):
         self.excludes = excludes
         self.path = path
+        self._optimize = optimize
         self._verbose = verbose
         self.modules = {}
         self.badmodules = set()
@@ -50,7 +51,7 @@ class ModuleFinder:
 
     def run_script(self, path):
         ldr = importlib.machinery.SourceFileLoader("__main__", path)
-        mod = Module(ldr, "__main__")
+        mod = Module(ldr, "__main__", self._optimize)
         self.modules["__main__"] = mod
         self._scan_code(mod.__code__, mod)
 
@@ -274,7 +275,7 @@ class ModuleFinder:
         self.badmodules.add(name)
 
     def _load_module(self, loader, name):
-        self.modules[name] = Module(loader, name)
+        self.modules[name] = Module(loader, name, self._optimize)
 
     def _scan_code(self, code, mod):
         """
@@ -402,30 +403,38 @@ class Module:
 
     These attributes are set, depending on the loader:
 
-    __name__: The name of the module.
+    __code__: the code object provided by the loader; can be None.
 
     __file__: The path to where the module data is stored (not set for
-    built-in modules).
+              built-in modules).
 
-    __path__: A list of strings specifying the search path within a
-    package. This attribute is not set on modules.
-
-    __package__: The parent package for the module/package. If the
-    module is top-level then it has a value of the empty string.
+    __globalnames__: a set containing the global names that are defined.
 
     __loader__: The loader for this module.
 
-    __code__: the code object provided by the loader; can be None.
+    __name__: The name of the module.
 
-    __globalnames__: a set containing the global names that are defined.
-    
+    __optimize__: Optimization level for the module's byte-code.
+
+    __package__: The parent package for the module/package. If the
+                 module is top-level then it has a value of the empty
+                 string.
+
+    __path__: A list of strings specifying the search path within a
+              package. This attribute is not set on modules.
+
+    __source__: a property that gives access to the source code (if
+                the __loader__ provides it, not for builtin or
+                extension modules)
     """
 
-    def __init__(self, loader, name):
+    def __init__(self, loader, name, optimize):
+        self.__optimize__ = optimize
         self.__globalnames__ = set()
 
         self.__name__ = name
         self.__loader__ = loader
+        self.__code_object__ = None
 
         if hasattr(loader, "get_filename"):
             # python modules
@@ -452,8 +461,6 @@ class Module:
             except AttributeError:
                 pass
 
-        self.__code__ = loader.get_code(name)
-
         # This would allow to find submodules (but it has to be extended for ziparchives):
         ## if hasattr(self, "__path__"):
         ##     print(self)
@@ -463,6 +470,23 @@ class Module:
         ##         if modname != "__init__" and ext in (".py", ".pyc", ".pyo", ".pyd"):
         ##             print("   ", modname)
         ##     print()
+        # But what about pkgutil.walk_packages() and pkgutil.iter_modules()?
+        #
+        # Hm, pkgutil *imports* stuff, which is (probably) not what we want...
+
+    @property
+    def __code__(self):
+        if self.__optimize__ == sys.flags.optimize:
+            return self.__loader__.get_code(self.__name__)
+        if self.__code_object__ is None:
+            source = self.__source__
+            if source:
+                self.__code_object__ = compile(source, self.__file__, "exec")
+        return self.__code_object__
+
+    @property
+    def __source__(self):
+        return self.__loader__.get_source(self.__name__)
 
     def __repr__(self):
         s = "Module(%s" % self.__name__
@@ -478,10 +502,12 @@ if __name__ == "__main__":
     import getopt
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:],
-                                       "m:x:vr",
-                                       ["module=",
+                                       "i:f:Orvrx:",
+                                       ["import=",
+                                        "from=",
                                         "exclude=",
                                         "verbose",
+                                        "optimize"
                                         "report"])
     except getopt.GetoptError as err:
         print("Error: %s." % err)
@@ -491,22 +517,30 @@ if __name__ == "__main__":
     excludes = []
     report = 0
     modules = []
+    show_from = []
+    optimize = 0
     for o, a in opts:
         if o in ("-x", "--excludes"):
             excludes.append(a)
-        elif o in ("-m", "--module"):
+        elif o in ("-i", "--import"):
             modules.append(a)
+        elif o in ("-f", "--from"):
+            show_from.append(a)
         elif o in ("-v", "--verbose"):
             verbose += 1
         elif o in ("-r", "--report"):
             report += 1
+        elif o in ("-O", "--optimize"):
+            optimize += 1
 
     ## if args:
     ##     raise getopt.error("No arguments expected, got '%s'" % ", ".join(args))
-
+    from watch import Watch
+    w = Watch()
     mf = ModuleFinder(
         excludes=excludes,
         verbose=verbose,
+        optimize=optimize
         )
     sys.path.insert(0, ".")
     for name in modules:
@@ -519,6 +553,10 @@ if __name__ == "__main__":
         mf.run_script(path)
     if report:
         mf.report()
-
+    for modname in sorted(show_from):
+        print(modname, "imported from:")
+        for x in sorted(mf._depgraph[modname]):
+            print("   ", x)
+    w()
 # /python33/lib/site-packages/numpy
 
