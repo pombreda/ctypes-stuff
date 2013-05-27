@@ -64,15 +64,16 @@ import_module(PyObject *self, PyObject *args)
 	ULONG_PTR cookie = 0;
 	PyObject *findproc;
 	/* code, initfuncname, fqmodulename, path */
-	if (!PyArg_ParseTuple(args, "s#sss|O:import_module",
-			      &data, &size,
-			      &initfuncname, &modname, &pathname,
+	if (!PyArg_ParseTuple(args, "sssO:import_module",
+			      &modname, &pathname,
+			      &initfuncname,
 			      &findproc))
 		return NULL;
     
 	cookie = _My_ActivateActCtx();//try some windows manifest magic...
 
-	hmem = MemoryLoadLibraryEx(data, _LoadLibrary, _GetProcAddress, _FreeLibrary, (void *)findproc);
+	hmem = _LoadLibrary(pathname, findproc);
+
 	printf("MemoryLoadLibrary(%s) -> %p\n", pathname, (void *)hmem);
 
 	_My_DeactivateActCtx(cookie);
@@ -108,7 +109,7 @@ get_verbose_flag(PyObject *self, PyObject *args)
 
 static PyMethodDef methods[] = {
 	{ "import_module", import_module, METH_VARARGS,
-	  "import_module(code, initfunc, modname, pathname[, finder]) -> module" },
+	  "import_module(modname, pathname, initfuncname, finder) -> module" },
 	{ "get_verbose_flag", get_verbose_flag, METH_NOARGS,
 	  "Return the Py_Verbose flag" },
 //	{ "set_find_proc", set_find_proc, METH_VARARGS },
