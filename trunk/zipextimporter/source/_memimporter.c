@@ -122,7 +122,6 @@ import_module(PyObject *self, PyObject *args)
 
 	_My_DeactivateActCtx(cookie);
 	if (!hmem) {
-		printf("ERROR %d\n", GetLastError());
 		PyErr_Format(PyExc_ImportError,
 			     "MemoryLoadLibrary failed loading %s", pathname);
 		return NULL;
