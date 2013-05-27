@@ -12,6 +12,50 @@ static char module_doc[] =
 #include "MemoryModule.h"
 #include "actctx.h"
 
+/*
+ * A linked list of loaded MemoryModules.
+ */
+typedef struct tagLIST {
+	HCUSTOMMODULE module;
+	LPCSTR name;
+	struct tagLIST *next;
+	struct tagLIST *prev;
+	int refcount;
+} LIST;
+
+static LIST *libraries;
+
+/*
+ * Search for a loaded MemoryModule in the linked list 
+ */
+static LIST *_FindMemoryModule(LPCSTR name)
+{
+	LIST *lib = libraries;
+	while (lib) {
+		if (0 == stricmp(name, lib->name)) {
+			return lib;
+		} else {
+			lib = lib->next;
+		}
+	}
+	return NULL;
+}
+
+/*
+ * Insert a MemoryModule into the linked list of loaded modules
+ */
+static LIST *_AddMemoryModule(LPCSTR name, HCUSTOMMODULE module)
+{
+	LIST *entry = (LIST *)malloc(sizeof(LIST));
+	entry->name = strdup(name);
+	entry->module = module;
+	entry->next = libraries;
+	entry->prev = NULL;
+	entry->refcount = 1;
+	libraries = entry;
+	return entry;
+}
+
 static FARPROC _GetProcAddress(HCUSTOMMODULE module, LPCSTR name, void *userdata)
 {
 	FARPROC res;
@@ -31,7 +75,11 @@ static void _FreeLibrary(HCUSTOMMODULE module, void *userdata)
 static HCUSTOMMODULE _LoadLibrary(LPCSTR filename, void *userdata)
 {
 	HCUSTOMMODULE result;
-//	printf("LoadLibrary(%s)\n", filename);
+	LIST *lib = _FindMemoryModule(filename);
+	if (lib) {
+		lib->refcount += 1;
+		return lib->module;
+	}
 	if (userdata) {
 		PyObject *findproc = (PyObject *)userdata;
 		PyObject *res = PyObject_CallFunction(findproc, "s", filename);
@@ -40,8 +88,8 @@ static HCUSTOMMODULE _LoadLibrary(LPCSTR filename, void *userdata)
 						     _LoadLibrary, _GetProcAddress, _FreeLibrary,
 						     userdata);
 			Py_DECREF(res);
-			printf("MemoryLoadLibrary(%s) -> %p\n", filename, (void *)result);
-			return (HCUSTOMMODULE)result;
+			lib = _AddMemoryModule(filename, result);
+			return lib->module;
 		} else {
 			PyErr_Clear();
 		}
@@ -52,8 +100,6 @@ static HCUSTOMMODULE _LoadLibrary(LPCSTR filename, void *userdata)
 static PyObject *
 import_module(PyObject *self, PyObject *args)
 {
-	char *data;
-	int size;
 	char *initfuncname;
 	char *modname;
 	char *pathname;
@@ -73,8 +119,6 @@ import_module(PyObject *self, PyObject *args)
 	cookie = _My_ActivateActCtx();//try some windows manifest magic...
 
 	hmem = _LoadLibrary(pathname, findproc);
-
-	printf("MemoryLoadLibrary(%s) -> %p\n", pathname, (void *)hmem);
 
 	_My_DeactivateActCtx(cookie);
 	if (!hmem) {
