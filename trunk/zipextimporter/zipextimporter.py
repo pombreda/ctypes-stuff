@@ -88,9 +88,8 @@ class ZipExtensionImporter(zipimport.zipimporter):
             if path in self._files:
                 if _memimporter.get_verbose_flag():
                     sys.stderr.write("# found %s in zipfile %s\n" % (path, self.archive))
-                code = self.get_data(path)
                 print "_MEMIMPORTER.IMPORT_MODULE", (initname, fullname, path)
-                mod = _memimporter.import_module(code, initname, fullname, path, self.get_data)
+                mod = _memimporter.import_module(fullname, path, initname, self.get_data)
                 mod.__file__ = "%s\\%s" % (self.archive, path)
                 mod.__loader__ = self
                 if _memimporter.get_verbose_flag():

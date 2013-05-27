@@ -1,5 +1,5 @@
-# This help module allows to import the _memimporter.pyd extension
-# which is in the distutils build directory.
+# This file imports the _memimporter.pyd extension from the distutils
+# build directory.
 
 def __load():
     import imp, os, sys, struct
