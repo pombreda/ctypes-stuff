@@ -38,7 +38,7 @@ if sys.version_info[:3] == (3, 3, 0):
 ################################################################
 
 class ModuleFinder:
-    def __init__(self, excludes=(), path=None, verbose=0, optimize=0):
+    def __init__(self, path=None, verbose=0, excludes=[], optimize=0):
         self.excludes = excludes
         self.path = path
         self._optimize = optimize
@@ -93,9 +93,10 @@ class ModuleFinder:
         try:
             self.import_hook(name, caller, fromlist, level)
         except ImportError as exc:
-            if self._verbose > 0:
-                print("ERROR", name, caller, fromlist)
-                print("    ", self.badmodules)
+            if self._verbose > 1:
+                print("%s# -> ImportError" % self._indent[:-len(INDENT)])
+                ## print("ERROR", name, caller, fromlist)
+                ## print("    ", self.badmodules)
         finally:
             self._indent = self._indent[:-len(INDENT)]
 
@@ -103,6 +104,8 @@ class ModuleFinder:
         """Print the call as a Python import statement, indented.
 
         """
+        if self._verbose == 0:
+            return
         if caller:
             caller_info = " # in %s" % caller.__name__
         else:
@@ -117,10 +120,7 @@ class ModuleFinder:
             text = "%sfrom %s import %s" % (self._indent, "."*level + name, ", ".join(fromlist)) + caller_info
         else:
             text = "%sfrom %s import %s" % (self._indent, "."*level, ", ".join(fromlist)) + caller_info
-        if self._verbose > 0:
-            print(text)
-            if "arcsinh" in text:
-                import pdb; pdb.set_trace()
+        print(text)
 
     # /python33-64/lib/collections
     def _handle_fromlist(self, mod, fromlist, caller):
@@ -378,10 +378,10 @@ class ModuleFinder:
                 print("P", end=" ")
             else:
                 print("m", end=" ")
-            print("%-35s" % name, getattr(m, "__file__", ""))
-            ## deps = sorted(self._depgraph[name])
-            ## text = "\n".join(textwrap.wrap(", ".join(deps)))
-            ## print("   imported from:\n%s" % textwrap.indent(text, "      "))
+            print("%-35s" % name, getattr(m, "__file__", "(built-in)"))
+            deps = sorted(self._depgraph[name])
+            text = "\n".join(textwrap.wrap(", ".join(deps)))
+            print("   imported from:\n%s" % textwrap.indent(text, "      "))
 
 
     def report_missing(self):
@@ -535,8 +535,6 @@ if __name__ == "__main__":
 
     ## if args:
     ##     raise getopt.error("No arguments expected, got '%s'" % ", ".join(args))
-    from watch import Watch
-    w = Watch()
     mf = ModuleFinder(
         excludes=excludes,
         verbose=verbose,
@@ -557,6 +555,5 @@ if __name__ == "__main__":
         print(modname, "imported from:")
         for x in sorted(mf._depgraph[modname]):
             print("   ", x)
-    w()
 # /python33/lib/site-packages/numpy
 
