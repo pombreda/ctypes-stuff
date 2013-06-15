@@ -191,9 +191,6 @@ class SimpleTests(unittest.TestCase):
     """Simple import tests on the Python standard library. """
 
     def test_os_path(self):
-        ## from os import path
-        ## import os.path
-
         mf = ModuleFinder()
         mf.import_hook("os", None, ["path"])
         self.assertIn("os", mf.modules)
@@ -209,16 +206,14 @@ class SimpleTests(unittest.TestCase):
         mf.import_hook("sys", None, ["spam"])
         self.assertNotIn("os.path", mf.missing())
         self.assertNotIn("posix", mf.missing())
-        # Fails:
-##        self.assertIn("sys.spam", mf.missing())
 
 
-    @unittest.skip("raises ImportError")
     def test_sys2(self):
         mf = ModuleFinder()
-        # This raises ImportError:
+##        # This raises ImportError:
         mf.import_hook("os.path")
-        mf.report()
+        self.assertNotIn("os.path", mf.missing())
+        self.assertIn("posix", mf.missing())
 
     def test_collections_abc(self):
         from collections import abc
@@ -249,8 +244,6 @@ class SimpleTests(unittest.TestCase):
         mf.import_hook("encodings", None, ["foo"])
         self.assertIn("encodings.big5", mf.modules)
         self.assertEqual({"encodings.foo"}, mf.missing())
-
-# /python33/lib/site-packages/numpy
 
 if __name__ == "__main__":
     unittest.main()

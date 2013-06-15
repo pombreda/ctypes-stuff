@@ -3,8 +3,6 @@
 """ModuleFinder based on importlib
 """
 
-# /python33-64/lib/modulefinder.py
-
 from collections import defaultdict
 import dis
 import importlib
@@ -21,21 +19,6 @@ STORE_NAME = bytes([dis.opname.index('STORE_NAME')])
 STORE_GLOBAL = bytes([dis.opname.index('STORE_GLOBAL')])
 STORE_OPS = [STORE_NAME, STORE_GLOBAL]
 HAVE_ARGUMENT = bytes([dis.HAVE_ARGUMENT])
-
-################################################################
-if sys.version_info[:3] == (3, 3, 0):
-    def patch():
-        # Work around Python bug #17098:
-        # Set __loader__ on modules imported by the C level
-        for name in sys.builtin_module_names + ("_frozen_importlib",):
-            m = __import__(name)
-            try:
-                m.__loader__
-            except AttributeError:
-                m.__loader__ = importlib.machinery.BuiltinImporter
-    patch()
-    del patch
-################################################################
 
 class ModuleFinder:
     def __init__(self, path=None, verbose=0, excludes=[], optimize=0):
@@ -55,7 +38,6 @@ class ModuleFinder:
         self.modules["__main__"] = mod
         self._scan_code(mod.__code__, mod)
 
-    # /python33/lib/importlib/_bootstrap.py 1647
     def import_hook(self, name, caller=None, fromlist=(), level=0):
         """Import a module.
 
@@ -95,8 +77,6 @@ class ModuleFinder:
         except ImportError as exc:
             if self._verbose > 1:
                 print("%s# -> ImportError" % self._indent[:-len(INDENT)])
-                ## print("ERROR", name, caller, fromlist)
-                ## print("    ", self.badmodules)
         finally:
             self._indent = self._indent[:-len(INDENT)]
 
@@ -122,7 +102,6 @@ class ModuleFinder:
             text = "%sfrom %s import %s" % (self._indent, "."*level, ", ".join(fromlist)) + caller_info
         print(text)
 
-    # /python33-64/lib/collections
     def _handle_fromlist(self, mod, fromlist, caller):
         """handle the fromlist.
 
@@ -130,6 +109,13 @@ class ModuleFinder:
         """
         for x in fromlist:
             if x == "*":
+                if mod.__code__ is None:
+                    # 'from <mod> import *' We have no information
+                    # about the symbols that are imported from
+                    # extension, builtin, or frozen modules. Put a '*'
+                    # symbol into __globalnames__ so that we can later
+                    # use it in report_missing().
+                    mod.__globalnames__.add("*")
                 for n in mod.__globalnames__:
                     caller.__globalnames__.add(n)
                 continue
@@ -148,7 +134,6 @@ class ModuleFinder:
             ##     self._add_badmodule('{}.{}'.format(mod.__name__, x))
 
 
-    # /python33/lib/importlib/_bootstrap.py 1455
     def _resolve_name(self, name, package, level):
         """Resolve a relative module name to an absolute one."""
         assert level > 0
@@ -162,7 +147,6 @@ class ModuleFinder:
         return '{}.{}'.format(base, name) if name else base
 
 
-    # /python33/lib/importlib/_bootstrap.py 1481
     def _sanity_check(self, name, package, level):
         """Verify arguments are 'sane'."""
         if not isinstance(name, str):
@@ -180,7 +164,6 @@ class ModuleFinder:
             raise ValueError("Empty module name")
 
 
-    # /python33/lib/importlib/_bootstrap.py 1621
     def _calc___package__(self, caller):
         """Calculate what __package__ should be.
 
@@ -196,7 +179,6 @@ class ModuleFinder:
         return package
 
 
-    # /python33/lib/importlib/_bootstrap.py 1563
     def _gcd_import(self, name, package=None, level=0):
         """Import and return the module based on its name, the package the call is
         being made from, and the level adjustment.
@@ -220,7 +202,6 @@ class ModuleFinder:
         return self._find_and_load(name)
 
 
-    # /python33/lib/importlib/_bootstrap.py 1500
     def _find_and_load(self, name):
         """Find and load the module.
 
@@ -236,11 +217,26 @@ class ModuleFinder:
             # Crazy side-effects!
             if name in self.modules:
                 return self.modules[name]
+## ####
+##             if 0:
+##                 # this fixes 'import os.path', but creates other problems
+##                 child = name.rpartition('.')[2]
+##                 if child in parent_module.__globalnames__:
+##                     return parent_module
+## ####
             # Backwards-compatibility; be nicer to skip the dict lookup.
             parent_module = self.modules[parent]
             try:
                 path = parent_module.__path__
             except AttributeError:
+####
+                if 1:
+                    # this fixes 'import os.path'. Does it create other problems?
+                    child = name.rpartition('.')[2]
+                    if child in parent_module.__globalnames__:
+##                        print("FOO", name, self.modules["ntpath"])
+                        return parent_module
+####
                 msg = ('No module named {!r}; {} is not a package').format(name, parent)
                 self._add_badmodule(name)
                 raise ImportError(msg, name=name)
@@ -274,8 +270,10 @@ class ModuleFinder:
     def _add_badmodule(self, name):
         self.badmodules.add(name)
 
+
     def _load_module(self, loader, name):
         self.modules[name] = Module(loader, name, self._optimize)
+
 
     def _scan_code(self, code, mod):
         """
@@ -331,8 +329,6 @@ class ModuleFinder:
                 code = code[1:]
 
 
-    ################################
-
     def missing(self):
         """Return a list of modules that appear to be missing. Use
         any_missing_maybe() if you want to know which modules are
@@ -351,6 +347,37 @@ class ModuleFinder:
                 missing.add(name)
         return missing
 
+    def missing_maybe(self):
+        """Return two lists, one with modules that are certainly missing
+        and one with modules that *may* be missing. The latter names could
+        either be submodules *or* just global names in the package.
+
+        The reason it can't always be determined is that it's impossible to
+        tell which names are imported when "from module import *" is done
+        with an extension module, short of actually importing it.
+        """
+        missing = set()
+        maybe = set()
+        for name in self.badmodules:
+            package, _, symbol = name.rpartition(".")
+            if not package:
+                missing.add(name)
+                continue
+            elif package in missing:
+                continue
+            if symbol not in self.modules[package].__globalnames__:
+                if "*" in self.modules[package].__globalnames__:
+                    maybe.add(name)
+                else:
+                    missing.add(name)
+        return missing, maybe
+
+
+    def report_summary(self):
+        """Print a short summary of module found and missing"""
+        missing, maybe = self.missing_maybe()
+        print("Found %d modules, %d are missing, %d could be missing"
+              % (len(self.modules), len(missing), len(maybe)))
 
     def report(self):
         """Print a report to stdout, listing the found modules with
@@ -378,7 +405,7 @@ class ModuleFinder:
                 print("P", end=" ")
             else:
                 print("m", end=" ")
-            print("%-35s" % name, getattr(m, "__file__", "(built-in)"))
+            print("%-35s" % name, getattr(m, "__file__", "(built-in or frozen)"))
             deps = sorted(self._depgraph[name])
             text = "\n".join(textwrap.wrap(", ".join(deps)))
             print("   imported from:\n%s" % textwrap.indent(text, "      "))
@@ -389,12 +416,27 @@ class ModuleFinder:
         missing.
 
         """
+        missing, maybe = self.missing_maybe()
         print()
-        print("  %-35s" % "Missing Modules")
-        print("  %-35s" % "---------------")
-        for name in sorted(self.missing()):
+        print("  %-35s" % ("%d missing Modules" % len(missing)))
+        print("  %-35s" % "------------------")
+        for name in sorted(missing):
             deps = sorted(self._depgraph[name])
             print("? %-35s imported from %s" % (name, ", ".join(deps)))
+
+        # Print modules that may be missing, but then again, maybe not...
+        if maybe:
+            print()
+            print("  %-35s" %
+                  ("%d submodules that appear to be missing, but"
+                   " could also be global names in the parent package" % len(maybe)))
+            print("  %-35s" %
+                  "-----------------------------------------"
+                  "----------------------------------------------------")
+            for name in sorted(maybe):
+                deps = sorted(self._depgraph[name])
+                print("? %-35s imported from %s" % (name, ", ".join(deps)))
+
 
 ################################################################
 
@@ -406,7 +448,7 @@ class Module:
     __code__: the code object provided by the loader; can be None.
 
     __file__: The path to where the module data is stored (not set for
-              built-in modules).
+              built-in or frozen modules).
 
     __globalnames__: a set containing the global names that are defined.
 
@@ -474,6 +516,7 @@ class Module:
         #
         # Hm, pkgutil *imports* stuff, which is (probably) not what we want...
 
+
     @property
     def __code__(self):
         if self.__optimize__ == sys.flags.optimize:
@@ -484,9 +527,11 @@ class Module:
                 self.__code_object__ = compile(source, self.__file__, "exec")
         return self.__code_object__
 
+
     @property
     def __source__(self):
         return self.__loader__.get_source(self.__name__)
+
 
     def __repr__(self):
         s = "Module(%s" % self.__name__
@@ -498,17 +543,18 @@ class Module:
 
 ################################################################
 
-if __name__ == "__main__":
+def main():
     import getopt
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:],
-                                       "i:f:Orvrx:",
+                                       "i:f:Orsvrx:",
                                        ["import=",
                                         "from=",
                                         "exclude=",
                                         "verbose",
                                         "optimize"
-                                        "report"])
+                                        "report",
+                                        "summary"])
     except getopt.GetoptError as err:
         print("Error: %s." % err)
         sys.exit(2)
@@ -519,6 +565,7 @@ if __name__ == "__main__":
     modules = []
     show_from = []
     optimize = 0
+    summary = 0
     for o, a in opts:
         if o in ("-x", "--excludes"):
             excludes.append(a)
@@ -532,6 +579,8 @@ if __name__ == "__main__":
             report += 1
         elif o in ("-O", "--optimize"):
             optimize += 1
+        elif o in ("-s", "--summary"):
+            summary = 1
 
     ## if args:
     ##     raise getopt.error("No arguments expected, got '%s'" % ", ".join(args))
@@ -551,9 +600,13 @@ if __name__ == "__main__":
         mf.run_script(path)
     if report:
         mf.report()
+    if summary:
+        mf.report_summary()
     for modname in sorted(show_from):
         print(modname, "imported from:")
         for x in sorted(mf._depgraph[modname]):
             print("   ", x)
-# /python33/lib/site-packages/numpy
 
+
+if __name__ == "__main__":
+    main()
