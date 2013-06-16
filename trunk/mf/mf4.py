@@ -8,6 +8,7 @@ import dis
 import importlib
 import importlib.machinery
 import os
+import pkgutil
 import struct
 import sys
 import textwrap
@@ -37,6 +38,15 @@ class ModuleFinder:
         mod = Module(ldr, "__main__", self._optimize)
         self.modules["__main__"] = mod
         self._scan_code(mod.__code__, mod)
+        
+    def import_package(self, name):
+        """Import a complete package.
+
+        """
+        self.import_hook(name)
+        package = self.modules[name]
+        for finder, modname, ispkg in pkgutil.iter_modules(package.__path__):
+            self.safe_import_hook("%s.%s" % (name, modname))
 
     def import_hook(self, name, caller=None, fromlist=(), level=0):
         """Import a module.
@@ -109,15 +119,16 @@ class ModuleFinder:
         """
         for x in fromlist:
             if x == "*":
-                if mod.__code__ is None:
-                    # 'from <mod> import *' We have no information
-                    # about the symbols that are imported from
-                    # extension, builtin, or frozen modules. Put a '*'
-                    # symbol into __globalnames__ so that we can later
-                    # use it in report_missing().
-                    mod.__globalnames__.add("*")
-                for n in mod.__globalnames__:
-                    caller.__globalnames__.add(n)
+                if caller is not None:
+                    if mod.__code__ is None:
+                        # 'from <mod> import *' We have no information
+                        # about the symbols that are imported from
+                        # extension, builtin, or frozen modules. Put a '*'
+                        # symbol into __globalnames__ so that we can later
+                        # use it in report_missing().
+                        caller.__globalnames__.add("*")
+                    for n in mod.__globalnames__:
+                        caller.__globalnames__.add(n)
                 continue
             if hasattr(mod, x):
                 continue # subpackage already loaded
@@ -374,7 +385,7 @@ class ModuleFinder:
 
 
     def report_summary(self):
-        """Print a short summary of module found and missing"""
+        """Print the count of modules found and missing"""
         missing, maybe = self.missing_maybe()
         print("Found %d modules, %d are missing, %d could be missing"
               % (len(self.modules), len(missing), len(maybe)))
@@ -524,7 +535,8 @@ class Module:
         if self.__code_object__ is None:
             source = self.__source__
             if source:
-                self.__code_object__ = compile(source, self.__file__, "exec")
+                self.__code_object__ = compile(source, self.__file__, "exec",
+                                               optimize=self.__optimize__)
         return self.__code_object__
 
 
@@ -547,14 +559,16 @@ def main():
     import getopt
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:],
-                                       "i:f:Orsvrx:",
-                                       ["import=",
+                                       "x:f:i:Op:rsv",
+                                       ["exclude=",
                                         "from=",
-                                        "exclude=",
-                                        "verbose",
-                                        "optimize"
+                                        "import=",
+                                        "optimize",
+                                        "package",
                                         "report",
-                                        "summary"])
+                                        "summary",
+                                        "verbose",
+                                        ])
     except getopt.GetoptError as err:
         print("Error: %s." % err)
         sys.exit(2)
@@ -566,6 +580,7 @@ def main():
     show_from = []
     optimize = 0
     summary = 0
+    packages = []
     for o, a in opts:
         if o in ("-x", "--excludes"):
             excludes.append(a)
@@ -581,6 +596,8 @@ def main():
             optimize += 1
         elif o in ("-s", "--summary"):
             summary = 1
+        elif o in ("-p", "--package"):
+            packages.append(a)
 
     ## if args:
     ##     raise getopt.error("No arguments expected, got '%s'" % ", ".join(args))
@@ -596,6 +613,8 @@ def main():
             mf.import_hook(name[:-2], None, ["*"])
         else:
             mf.import_hook(name)
+    for name in packages:
+        mf.import_package(name)
     for path in args:
         mf.run_script(path)
     if report:
