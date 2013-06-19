@@ -21,6 +21,29 @@ STORE_GLOBAL = bytes([dis.opname.index('STORE_GLOBAL')])
 STORE_OPS = [STORE_NAME, STORE_GLOBAL]
 HAVE_ARGUMENT = bytes([dis.HAVE_ARGUMENT])
 
+def __patch_py33():
+    if sys.version_info < (3, 4):
+        def is_package(self, fullname):
+            return True
+
+        def get_source(self, fullname):
+            return ''
+
+        def get_code(self, fullname):
+            return compile('', '<string>', 'exec', dont_inherit=True)
+
+        def init_module_attrs(self, module):
+            module.__loader__ = self
+            module.__package__ = module.__name__
+        from importlib._bootstrap import NamespaceLoader
+        NamespaceLoader.is_package = is_package
+        NamespaceLoader.get_source = get_source
+        NamespaceLoader.get_code = get_code
+        NamespaceLoader.init_module_attrs = init_module_attrs
+
+__patch_py33()
+del __patch_py33
+
 class ModuleFinder:
     def __init__(self, path=None, verbose=0, excludes=[], optimize=0):
         self.excludes = excludes
@@ -416,7 +439,7 @@ class ModuleFinder:
                 print("P", end=" ")
             else:
                 print("m", end=" ")
-            print("%-35s" % name, getattr(m, "__file__", "(built-in or frozen)"))
+            print("%-35s" % name, getattr(m, "__file__", "(built-in, frozen, or namespace)"))
             deps = sorted(self._depgraph[name])
             text = "\n".join(textwrap.wrap(", ".join(deps)))
             print("   imported from:\n%s" % textwrap.indent(text, "      "))
