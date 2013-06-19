@@ -5,10 +5,8 @@ from __future__ import division, with_statement, absolute_import, print_function
 from mf4 import ModuleFinder
 
 import errno
-import imp
 import os
 import shutil
-import string
 import sys
 import textwrap
 import unittest
@@ -237,7 +235,6 @@ class SimpleTests(unittest.TestCase):
 
     def test_encodings(self):
         from encodings import big5
-        # /python33-64/lib/encodings
         mf = ModuleFinder()
         mf.import_hook("encodings", None, ["big5"])
         mf.import_hook("encodings", None, ["codecs"])
