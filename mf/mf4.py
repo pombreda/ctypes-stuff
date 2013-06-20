@@ -55,8 +55,20 @@ class ModuleFinder:
         self.__last_caller = None
         self._depgraph = defaultdict(set)
         self._indent = ""
+        self._package_paths = defaultdict(list)
+
+    def add_packagepath(self, packagename, path):
+        """ModuleFinder can not handle __path__ modifications packages
+        make at runtime.
+
+        This method registers extra paths for a package.
+        """
+        self._package_paths[packagename].append(path)
 
     def run_script(self, path):
+        """Run a script.
+
+        """
         ldr = importlib.machinery.SourceFileLoader("__main__", path)
         mod = Module(ldr, "__main__", self._optimize)
         self.modules["__main__"] = mod
@@ -243,7 +255,7 @@ class ModuleFinder:
         If the module is not found or could not be imported,
         it is inserted in self.badmodules.
         """
-        path = None
+        path = self.path
         parent = name.rpartition('.')[0]
         if parent:
             if parent not in self.modules:
@@ -306,8 +318,9 @@ class ModuleFinder:
 
 
     def _load_module(self, loader, name):
-        self.modules[name] = Module(loader, name, self._optimize)
-
+        mod = self.modules[name] = Module(loader, name, self._optimize)
+        if name in self._package_paths:
+            mod.__path__.extend(self._package_paths[name])
 
     def _scan_code(self, code, mod):
         """
@@ -578,13 +591,74 @@ class Module:
 
 ################################################################
 
+def usage(script):
+    import textwrap
+    helptext = """\
+    Usage: {0} [options] [scripts]
+
+    ModuleFinder scans the bytecode of Python scripts and modules for
+    import statements, and collects the modules that are needed to run
+    this code.
+
+    Options:
+
+        -h
+        --help
+            Print this help
+
+    What to scan:
+
+        -i <modname>
+        --import <modname>
+            Import a module
+
+        -p <packagename>
+        --package <packagename>
+            Import a complete package with all its modules
+
+        -x <modname>
+        --exclude <modname>
+            Exclude a module
+
+    How to scan:
+
+        -O
+        --optimize
+            Use the optimized bytecode
+
+        -v
+        --verbose
+            Print reconstructed import statements that are found while
+            scanning the byte code.
+
+    Reporting:
+
+        -f <modname>
+        --from <modname>
+            Print a listing of modules that import modname
+
+        -r
+        --report
+            Print a detailed eport listing all the found modules, the
+            missing modules, and which module imported them.
+
+        -s
+        --summary
+            Print a single line listing how many modules were found
+            and how many modules are missing
+    """
+
+    text = textwrap.dedent(helptext.format(os.path.basename(script)))
+    print(text)
+
 def main():
     import getopt
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:],
-                                       "x:f:i:Op:rsv",
+                                       "x:f:hi:Op:rsv",
                                        ["exclude=",
                                         "from=",
+                                        "help",
                                         "import=",
                                         "optimize",
                                         "package",
@@ -605,6 +679,9 @@ def main():
     summary = 0
     packages = []
     for o, a in opts:
+        if o in ("-h", "--help"):
+            usage(sys.argv[0])
+            return 0
         if o in ("-x", "--excludes"):
             excludes.append(a)
         elif o in ("-i", "--import"):
@@ -622,14 +699,13 @@ def main():
         elif o in ("-p", "--package"):
             packages.append(a)
 
-    ## if args:
-    ##     raise getopt.error("No arguments expected, got '%s'" % ", ".join(args))
     mf = ModuleFinder(
         excludes=excludes,
         verbose=verbose,
-        optimize=optimize
+        optimize=optimize,
         )
-    sys.path.insert(0, ".")
+##    mf.add_packagepath("win32com",
+##                       r"c:\Python33\lib\site-packages\win32comext")
     for name in modules:
         # Hm, call import_hook() or safe_import_hook() here?
         if name.endswith(".*"):
