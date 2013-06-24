@@ -3,8 +3,10 @@ from distutils.core import setup, Extension
 
 _memimporter = Extension("_memimporter",
                          ["source/MemoryModule.c",
+                          "source/MyLoadLibrary.c",
                           "source/_memimporter.c",
                           "source/actctx.c"],
+                         define_macros=[("STANDALONE", "1")],
                          )
 setup(name="zipextimporter",
       description="import extension modules from zipfiles without unpacking them",

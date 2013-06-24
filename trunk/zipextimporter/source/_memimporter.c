@@ -3,99 +3,22 @@
   For the standalone .pyd we need <Python.h>
 */
 
-#include <Python.h>
+#ifdef STANDALONE
+#  include <Python.h>
+#  include "Python-version.h"
+#else
+#  include "Python-dynload.h"
+#  include <stdio.h>
+#endif
 #include <windows.h>
 
 static char module_doc[] =
 "Importer which can load extension modules from memory";
 
-#include "MemoryModule.h"
+#include "MyLoadLibrary.h"
 #include "actctx.h"
 
-/*
- * A linked list of loaded MemoryModules.
- */
-typedef struct tagLIST {
-	HCUSTOMMODULE module;
-	LPCSTR name;
-	struct tagLIST *next;
-	struct tagLIST *prev;
-	int refcount;
-} LIST;
-
-static LIST *libraries;
-
-/*
- * Search for a loaded MemoryModule in the linked list 
- */
-static LIST *_FindMemoryModule(LPCSTR name)
-{
-	LIST *lib = libraries;
-	while (lib) {
-		if (0 == stricmp(name, lib->name)) {
-			return lib;
-		} else {
-			lib = lib->next;
-		}
-	}
-	return NULL;
-}
-
-/*
- * Insert a MemoryModule into the linked list of loaded modules
- */
-static LIST *_AddMemoryModule(LPCSTR name, HCUSTOMMODULE module)
-{
-	LIST *entry = (LIST *)malloc(sizeof(LIST));
-	entry->name = strdup(name);
-	entry->module = module;
-	entry->next = libraries;
-	entry->prev = NULL;
-	entry->refcount = 1;
-	libraries = entry;
-	return entry;
-}
-
-static FARPROC _GetProcAddress(HCUSTOMMODULE module, LPCSTR name, void *userdata)
-{
-	FARPROC res;
-	res = (FARPROC)GetProcAddress((HMODULE)module, name);
-	if (res == NULL) {
-		SetLastError(0);
-		return MemoryGetProcAddress(module, name);
-	} else
-		return res;
-}
-
-static void _FreeLibrary(HCUSTOMMODULE module, void *userdata)
-{
-    FreeLibrary((HMODULE) module);
-}
-
-static HCUSTOMMODULE _LoadLibrary(LPCSTR filename, void *userdata)
-{
-	HCUSTOMMODULE result;
-	LIST *lib = _FindMemoryModule(filename);
-	if (lib) {
-		lib->refcount += 1;
-		return lib->module;
-	}
-	if (userdata) {
-		PyObject *findproc = (PyObject *)userdata;
-		PyObject *res = PyObject_CallFunction(findproc, "s", filename);
-		if (res && PyString_AsString(res)) {
-			result = MemoryLoadLibraryEx(PyString_AsString(res),
-						     _LoadLibrary, _GetProcAddress, _FreeLibrary,
-						     userdata);
-			Py_DECREF(res);
-			lib = _AddMemoryModule(filename, result);
-			return lib->module;
-		} else {
-			PyErr_Clear();
-		}
-	}
-	return (HCUSTOMMODULE)LoadLibraryA(filename);
-}
+extern char *LastErrorString;
 
 static PyObject *
 import_module(PyObject *self, PyObject *args)
@@ -103,7 +26,7 @@ import_module(PyObject *self, PyObject *args)
 	char *initfuncname;
 	char *modname;
 	char *pathname;
-	HMEMORYMODULE hmem;
+	HMODULE hmem;
 	FARPROC do_init;
 
 	char *oldcontext;
@@ -117,18 +40,32 @@ import_module(PyObject *self, PyObject *args)
 		return NULL;
     
 	cookie = _My_ActivateActCtx();//try some windows manifest magic...
-
-	hmem = _LoadLibrary(pathname, findproc);
-
+	hmem = MyLoadLibrary(pathname, NULL, findproc);
 	_My_DeactivateActCtx(cookie);
+
 	if (!hmem) {
+		char *msg;
+		FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+			      NULL,
+			      GetLastError(),
+			      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			      &msg,
+			      0, NULL);
+		msg[strlen(msg)-2] = '\0';
 		PyErr_Format(PyExc_ImportError,
-			     "MemoryLoadLibrary failed loading %s", pathname);
+			     "MemoryLoadLibrary failed loading %s (%s: %s)",
+			     pathname, LastErrorString, msg);
+		LocalFree(msg);
+		/* PyErr_Format(PyExc_ImportError, */
+		/* 	     "MemoryLoadLibrary failed loading %s (Error %d loading %s)", */
+		/* 	     pathname, GetLastError(), LastErrorString); */
+		/* PyErr_Format(PyExc_ImportError, */
+		/* 	     "MemoryLoadLibrary failed loading %s", pathname); */
 		return NULL;
 	}
-	do_init = MemoryGetProcAddress(hmem, initfuncname);
+	do_init = MyGetProcAddress(hmem, initfuncname);
 	if (!do_init) {
-		MemoryFreeLibrary(hmem);
+		MyFreeLibrary(hmem);
 		PyErr_Format(PyExc_ImportError,
 			     "Could not find function %s", initfuncname);
 		return NULL;
