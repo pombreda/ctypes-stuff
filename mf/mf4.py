@@ -1,4 +1,4 @@
-#!/usr/bin/python3.3-32
+#!/usr/bin/python3.3
 # -*- coding: utf-8 -*-
 """ModuleFinder based on importlib
 """
@@ -570,9 +570,13 @@ class Module:
             return self.__loader__.get_code(self.__name__)
         if self.__code_object__ is None:
             source = self.__source__
-            if source:
+            if source is not None:
                 self.__code_object__ = compile(source, self.__file__, "exec",
                                                optimize=self.__optimize__)
+
+            # XXX Remove the following line if the Bug is never triggered!
+            elif hasattr(self, "__file__") and not self.__file__.endswith(".pyd"):
+                raise Bug("should read __file__ to get the source???")
         return self.__code_object__
 
 
@@ -720,7 +724,7 @@ def main():
         mf.report()
     if summary:
         mf.report_summary()
-    for modname in sorted(show_from):
+    for modname in show_from:
         print(modname, "imported from:")
         for x in sorted(mf._depgraph[modname]):
             print("   ", x)
