@@ -69,9 +69,10 @@ class ModuleFinder:
         """Run a script.
 
         """
-        ldr = importlib.machinery.SourceFileLoader("__main__", path)
-        mod = Module(ldr, "__main__", self._optimize)
-        self.modules["__main__"] = mod
+        assert "__SCRIPT__" not in sys.modules
+        ldr = importlib.machinery.SourceFileLoader("__SCRIPT__", path)
+        mod = Module(ldr, "__SCRIPT__", self._optimize)
+        self.modules["__SCRIPT__"] = mod
         self._scan_code(mod.__code__, mod)
         
     def import_package(self, name):
