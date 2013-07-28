@@ -60,7 +60,19 @@ class Runtime(object):
         if self.options.summary:
             self.mf.report_summary()
             self.mf.report_missing()
+
         runner = os.path.splitext(self.options.script)[0] + ".bat"
+        shutil.copyfile(sys.executable, "_py.exe")
+        with open(runner, "wt") as ofi:
+            ofi.write('@echo off\n')
+            ofi.write('setlocal\n')
+            ofi.write('set PY2EXE_DLLDIR=%TMP%\\py2exe-%RANDOM%-%TIME:~6,5%\n')
+            ofi.write('for /f %%i in ("%0") do set PYTHONHOME=%%~dpi\n')
+            ofi.write('for /f %%i in ("%0") do set PYTHONPATH=%%~dpi\\{0}\n'.format(filename))
+            ofi.write('mkdir "%PY2EXE_DLLDIR%"\n')
+            ofi.write('%PYTHONHOME%\\_py.exe -S -m __SCRIPT__\n')
+            ofi.write('rmdir /s/q "%PY2EXE_DLLDIR%"\n')
+        logger.info('Wrote runner: %s' , runner)
 
         arc = zipfile.ZipFile(filename,
                               "w",
@@ -79,9 +91,10 @@ class Runtime(object):
                 stream.write(b"\0\0\0\0") # faked size
                 marshal.dump(code, stream)
                 arc.writestr(path, stream.getvalue())
+
             elif hasattr(mod, "__file__"):
                 pydfile = mod.__name__ + ".pyd"
-                src = LOADER.format(pydfile, runner)
+                src = LOADER.format(pydfile)
                 code = compile(src, "<string>", "exec")
                 if hasattr(mod, "__path__"):
                     path = mod.__name__.replace(".", "\\") + "\\__init__" + PYC
@@ -104,33 +117,17 @@ class Runtime(object):
         logger.info("Wrote archive: %s", filename)
         ################################
 
-        with open(runner, "wt") as ofi:
-            ofi.write("@echo off\n")
-            ofi.write("setlocal\n")
-            ofi.write("set PYTHONHOME=.\n")
-            ofi.write("set PYTHONPATH=%s\n" % filename)
-##            ofi.write("mkdir DLLs\n")
-            ofi.write("%s -S -m __SCRIPT__\n" % sys.executable)
-            ofi.write("if exist cleanup.bat echo del cleanup.bat >> cleanup.bat\n")
-            ofi.write("if exist cleanup.bat cleanup.bat 2> NUL\n")
-        logger.info("Wrote runner: %s" , runner)
-
 # Hm, imp.load_dynamic is deprecated.  What is the replacement?
 LOADER = r"""\
 def __load():
-    import imp, os, sys
-    try:
-        dirname = os.path.dirname(__loader__.archive)
-    except NameError:
-        dirname = sys.prefix
-    path = os.path.join(dirname, '{0}')
-    data = __loader__.get_data("--DLLs--\\" + path)
-    with open(path, "wb") as dll:
+    import imp, os
+    py2exe_dlldir = os.environ["PY2EXE_DLLDIR"]
+    path = os.path.join(__loader__.archive, "--DLLs--", '{0}')
+    data = __loader__.get_data(path)
+    dstpath = os.path.join(py2exe_dlldir, '{0}')
+    with open(dstpath, "wb") as dll:
         dll.write(data)
-    with open('cleanup.bat', "a") as ofi:
-        ofi.write("if exist %s del %s\n" % (path, path))
-##    print("\t\t\tload_dynamic", __name__, path)
-    mod = imp.load_dynamic(__name__, path)
+    mod = imp.load_dynamic(__name__, dstpath)
     mod.frozen = 1
 __load()
 del __load
