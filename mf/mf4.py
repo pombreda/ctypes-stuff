@@ -567,17 +567,18 @@ class Module:
 
     @property
     def __code__(self):
-        if self.__optimize__ == sys.flags.optimize:
-            return self.__loader__.get_code(self.__name__)
         if self.__code_object__ is None:
-            source = self.__source__
-            if source is not None:
-                self.__code_object__ = compile(source, self.__file__, "exec",
-                                               optimize=self.__optimize__)
+            if self.__optimize__ == sys.flags.optimize:
+                self.__code_object__ = self.__loader__.get_code(self.__name__)
+            else:
+                source = self.__source__
+                if source is not None:
+                    self.__code_object__ = compile(source, self.__file__, "exec",
+                                                   optimize=self.__optimize__)
 
-            # XXX Remove the following line if the Bug is never triggered!
-            elif hasattr(self, "__file__") and not self.__file__.endswith(".pyd"):
-                raise Bug("should read __file__ to get the source???")
+                elif hasattr(self, "__file__") and not self.__file__.endswith(".pyd"):
+                    # XXX Remove the following line if the Bug is never triggered!
+                    raise Bug("should read __file__ to get the source???")
         return self.__code_object__
 
 
