@@ -54,28 +54,27 @@ class Runtime(object):
 
         mf.run_script(self.options.script)
 
-    def build(self, filename):
+    def build_bat(self, filename, libname):
+        with open(filename, "wt") as ofi:
+            ofi.write('@echo off\n')
+            ofi.write('setlocal\n')
+            ofi.write('set PY2EXE_DLLDIR=%TMP%\\py2exe-%RANDOM%-%TIME:~6,5%\n')
+            ofi.write('for /f %%i in ("%0") do set PYTHONHOME=%%~dpi\n')
+            ofi.write('for /f %%i in ("%0") do set PYTHONPATH=%%~dpi\\{0}\n'.format(libname))
+            ofi.write('mkdir "%PY2EXE_DLLDIR%"\n')
+            ofi.write('%PYTHONHOME%\\{0} -S -m __SCRIPT__\n'.format(libname))
+            ofi.write('rmdir /s/q "%PY2EXE_DLLDIR%"\n')
+
+
+    def build(self, library):
         if self.options.report:
             self.mf.report()
         if self.options.summary:
             self.mf.report_summary()
             self.mf.report_missing()
 
-        runner = os.path.splitext(self.options.script)[0] + ".bat"
-        shutil.copyfile(sys.executable, "_py.exe")
-        with open(runner, "wt") as ofi:
-            ofi.write('@echo off\n')
-            ofi.write('setlocal\n')
-            ofi.write('set PY2EXE_DLLDIR=%TMP%\\py2exe-%RANDOM%-%TIME:~6,5%\n')
-            ofi.write('for /f %%i in ("%0") do set PYTHONHOME=%%~dpi\n')
-            ofi.write('for /f %%i in ("%0") do set PYTHONPATH=%%~dpi\\{0}\n'.format(filename))
-            ofi.write('mkdir "%PY2EXE_DLLDIR%"\n')
-            ofi.write('%PYTHONHOME%\\_py.exe -S -m __SCRIPT__\n')
-            ofi.write('rmdir /s/q "%PY2EXE_DLLDIR%"\n')
-        logger.info('Wrote runner: %s' , runner)
-
-        arc = zipfile.ZipFile(filename,
-                              "w",
+        shutil.copyfile(sys.executable, library)
+        arc = zipfile.ZipFile(library, "a",
                               compression=zipfile.ZIP_DEFLATED)
 
         for mod in self.mf.modules.values():
@@ -114,7 +113,6 @@ class Runtime(object):
                 ## shutil.copyfile(mod.__file__, dest)
                 ## print("copy", mod.__file__, dest)
         arc.close()
-        logger.info("Wrote archive: %s", filename)
         ################################
 
 # Hm, imp.load_dynamic is deprecated.  What is the replacement?
@@ -184,8 +182,6 @@ def main():
 
     parser.add_argument("script",
                         metavar="script",
-##                        action="append",
-##                        nargs="*"
                         )
     parser.add_argument("-v",
                         help="""
@@ -197,11 +193,14 @@ def main():
     level = logging.INFO if options.verbose else logging.WARNING
     logging.basicConfig(level=level)
 
+    runner = os.path.splitext(options.script)[0] + ".bat"
+    libname = "_" + os.path.splitext(options.script)[0] + ".exe"
+
     runtime = Runtime(options)
-    logger.info("Analyzing...")
+    runtime.build_bat(runner, libname)
+
     runtime.analyze()
-    logger.info("Building...")
-    runtime.build("python33.zip")
-    
+    runtime.build(libname)
+
 if __name__ == "__main__":
     main()
