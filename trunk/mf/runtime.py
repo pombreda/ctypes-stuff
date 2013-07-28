@@ -4,11 +4,14 @@ from mf4 import ModuleFinder
 
 import imp
 import io
+import logging
 import marshal
 import os
 import shutil
 import sys
 import zipfile
+
+logger = logging.getLogger("runtime")
 
 class Runtime(object):
     """This class represents the Python runtime: all needed modules
@@ -57,9 +60,12 @@ class Runtime(object):
         if self.options.summary:
             self.mf.report_summary()
             self.mf.report_missing()
+        runner = os.path.splitext(self.options.script)[0] + ".bat"
+
         arc = zipfile.ZipFile(filename,
                               "w",
                               compression=zipfile.ZIP_DEFLATED)
+
         for mod in self.mf.modules.values():
             code = mod.__code__
             if code:
@@ -75,7 +81,7 @@ class Runtime(object):
                 arc.writestr(path, stream.getvalue())
             elif hasattr(mod, "__file__"):
                 pydfile = mod.__name__ + ".pyd"
-                src = LOADER % pydfile
+                src = LOADER.format(pydfile, runner)
                 code = compile(src, "<string>", "exec")
                 if hasattr(mod, "__path__"):
                     path = mod.__name__.replace(".", "\\") + "\\__init__" + PYC
@@ -95,17 +101,19 @@ class Runtime(object):
                 ## shutil.copyfile(mod.__file__, dest)
                 ## print("copy", mod.__file__, dest)
         arc.close()
-        print("Wrote archive: %s" % filename)
+        logger.info("Wrote archive: %s", filename)
         ################################
 
-        path = os.path.splitext(self.options.script)[0] + ".bat"
-        with open(path, "wt") as ofi:
+        with open(runner, "wt") as ofi:
             ofi.write("@echo off\n")
             ofi.write("setlocal\n")
             ofi.write("set PYTHONHOME=.\n")
             ofi.write("set PYTHONPATH=%s\n" % filename)
+##            ofi.write("mkdir DLLs\n")
             ofi.write("%s -S -m __SCRIPT__\n" % sys.executable)
-        print("Wrote runner: %s" % path)
+            ofi.write("if exist cleanup.bat echo del cleanup.bat >> cleanup.bat\n")
+            ofi.write("if exist cleanup.bat cleanup.bat 2> NUL\n")
+        logger.info("Wrote runner: %s" , runner)
 
 # Hm, imp.load_dynamic is deprecated.  What is the replacement?
 LOADER = r"""\
@@ -115,40 +123,18 @@ def __load():
         dirname = os.path.dirname(__loader__.archive)
     except NameError:
         dirname = sys.prefix
-    path = os.path.join(dirname, '%s')
+    path = os.path.join(dirname, '{0}')
     data = __loader__.get_data("--DLLs--\\" + path)
     with open(path, "wb") as dll:
         dll.write(data)
+    with open('cleanup.bat', "a") as ofi:
+        ofi.write("if exist %s del %s\n" % (path, path))
 ##    print("\t\t\tload_dynamic", __name__, path)
     mod = imp.load_dynamic(__name__, path)
     mod.frozen = 1
 __load()
 del __load
 """
-
-################################################################
-
-## if __name__ == "__main__":
-##     runtime = Runtime(
-##         optimize=2,
-## ##        excludes=["importlib"],
-##         )
-## ##    runtime.run_script("hello.py")
-## ##    runtime.run_script(r"c:/users/thomas/devel/mytss5/dist/components/_Pythonlib/prog/sme.py")
-##     runtime.run_script(r"c:/users/thomas/devel/mytss5/dist/components/_Pythonlib/prog/toflogviewer2.py")
-##     runtime.import_package("encodings")
-##     runtime.import_module("compat.rename_modules")
-##     runtime.import_module("fpgui.controls")
-##     runtime.import_module("fpgui.dialogs")
-##     ## runtime.import_module("ctypes")
-##     ## runtime.import_module("os")
-## ##    runtime.import_module("bz2")
-## ##    runtime.import_module("zipfile")
-## ##    runtime.import_module("_lzma")
-##     ## runtime.import_module("importlib.machinery")
-##     ## runtime.import_module("importlib._bootstrap")
-## ##    runtime.build("dist\\library.zip")
-##     runtime.build("python33.zip")
 
 ################################################################
 
@@ -204,12 +190,20 @@ def main():
 ##                        action="append",
 ##                        nargs="*"
                         )
-
+    parser.add_argument("-v",
+                        help="""
+                        """,
+                        dest="verbose",
+                        action="store_true")
     options = parser.parse_args()
-    print(options)
+
+    level = logging.INFO if options.verbose else logging.WARNING
+    logging.basicConfig(level=level)
 
     runtime = Runtime(options)
+    logger.info("Analyzing...")
     runtime.analyze()
+    logger.info("Building...")
     runtime.build("python33.zip")
     
 if __name__ == "__main__":
