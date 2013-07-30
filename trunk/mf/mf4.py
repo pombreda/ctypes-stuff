@@ -44,6 +44,7 @@ def __patch_py33():
 __patch_py33()
 del __patch_py33
 
+
 class ModuleFinder:
     def __init__(self, path=None, verbose=0, excludes=[], optimize=0):
         self.excludes = excludes
@@ -57,6 +58,7 @@ class ModuleFinder:
         self._indent = ""
         self._package_paths = defaultdict(list)
 
+
     def add_packagepath(self, packagename, path):
         """ModuleFinder can not handle __path__ modifications packages
         make at runtime.
@@ -64,6 +66,7 @@ class ModuleFinder:
         This method registers extra paths for a package.
         """
         self._package_paths[packagename].append(path)
+
 
     def run_script(self, path):
         """Run a script.
@@ -74,7 +77,8 @@ class ModuleFinder:
         mod = Module(ldr, "__SCRIPT__", self._optimize)
         self.modules["__SCRIPT__"] = mod
         self._scan_code(mod.__code__, mod)
-        
+
+
     def import_package(self, name):
         """Import a complete package.
 
@@ -83,6 +87,7 @@ class ModuleFinder:
         package = self.modules[name]
         for finder, modname, ispkg in pkgutil.iter_modules(package.__path__):
             self.safe_import_hook("%s.%s" % (name, modname))
+
 
     def import_hook(self, name, caller=None, fromlist=(), level=0):
         """Import a module.
@@ -110,7 +115,7 @@ class ModuleFinder:
         finally:
             self.__last_caller = self.__old_last_caller
 
-    # for now:
+
     def safe_import_hook(self, name, caller=None, fromlist=(), level=0):
         """Wrapper for import_hook() that catches ImportError.
 
@@ -125,6 +130,7 @@ class ModuleFinder:
                 print("%s# -> ImportError" % self._indent[:-len(INDENT)])
         finally:
             self._indent = self._indent[:-len(INDENT)]
+
 
     def _info(self, name, caller, fromlist, level):
         """Print the call as a Python import statement, indented.
@@ -147,6 +153,7 @@ class ModuleFinder:
         else:
             text = "%sfrom %s import %s" % (self._indent, "."*level, ", ".join(fromlist)) + caller_info
         print(text)
+
 
     def _handle_fromlist(self, mod, fromlist, caller):
         """handle the fromlist.
@@ -314,6 +321,7 @@ class ModuleFinder:
 
         return module
 
+
     def _add_badmodule(self, name):
         self.badmodules.add(name)
 
@@ -322,6 +330,7 @@ class ModuleFinder:
         mod = self.modules[name] = Module(loader, name, self._optimize)
         if name in self._package_paths:
             mod.__path__.extend(self._package_paths[name])
+
 
     def _scan_code(self, code, mod):
         """
@@ -394,6 +403,7 @@ class ModuleFinder:
             if symbol not in self.modules[package].__globalnames__:
                 missing.add(name)
         return missing
+
 
     def missing_maybe(self):
         """Return two lists, one with modules that are certainly missing
@@ -488,6 +498,7 @@ class ModuleFinder:
 
 ################################################################
 
+
 class Module:
     """Represents a Python module.
 
@@ -573,9 +584,10 @@ class Module:
             else:
                 source = self.__source__
                 if source is not None:
-                    self.__code_object__ = compile(source, self.__file__, "exec",
+                    # XXX??? for py3exe:
+                    __file__ = self.__file__ if hasattr(self, "__file__") else "<string>"
+                    self.__code_object__ = compile(source, __file__, "exec",
                                                    optimize=self.__optimize__)
-
                 elif hasattr(self, "__file__") and not self.__file__.endswith(".pyd"):
                     # XXX Remove the following line if the Bug is never triggered!
                     raise Bug("should read __file__ to get the source???")
@@ -595,7 +607,9 @@ class Module:
             s = s + ", %r" % (self.__path__,)
         return s + ")"
 
+
 ################################################################
+
 
 def usage(script):
     import textwrap
