@@ -55,6 +55,12 @@ class Runtime(object):
         mf.run_script(self.options.script)
 
     def build_bat(self, filename, libname):
+        if not self.options.optimize:
+            options = ""
+        elif self.options.optimize == 1:
+            options = " -O "
+        else:
+            options = " -OO "
         with open(filename, "wt") as ofi:
             ofi.write('@echo off\n')
             ofi.write('setlocal\n')
@@ -62,7 +68,7 @@ class Runtime(object):
             ofi.write('for /f %%i in ("%0") do set PYTHONHOME=%%~dpi\n')
             ofi.write('for /f %%i in ("%0") do set PYTHONPATH=%%~dpi\\{0}\n'.format(libname))
             ofi.write('mkdir "%PY2EXE_DLLDIR%"\n')
-            ofi.write('%PYTHONHOME%\\{0} -S -m __SCRIPT__\n'.format(libname))
+            ofi.write('%PYTHONHOME%\\{0} -S{1}-m __SCRIPT__\n'.format(libname, options))
             ofi.write('rmdir /s/q "%PY2EXE_DLLDIR%"\n')
 
 
