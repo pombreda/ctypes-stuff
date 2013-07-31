@@ -33,6 +33,7 @@ class Runtime(object):
 
 
     def analyze(self):
+        logger.info("Analyzing the code")
         global PYC
         PYC = ".pyc" if not self.options.optimize else ".pyo"
 
@@ -58,13 +59,24 @@ class Runtime(object):
 
         mf.run_script(self.options.script)
 
-        if self.options.show_from:
-            for modname in self.options.show_from:
-                print(modname, "imported from:")
-                for x in sorted(mf._depgraph[modname]):
-                    print("   ", x)
+        missing, maybe = mf.missing_maybe()
+        logger.info("Found %d modules, %d are missing, %d may be missing",
+                    len(mf.modules), len(missing), len(maybe))
+
+        pyds = [mod.__file__ for mod in mf.modules.values()
+                if mod.__code__ is None and hasattr(mod, "__file__")] + [sys.executable]
+        logger.info("Scanning %d python extensions for needed dlls", len(pyds))
+        from bindeps import collect_deps
+        dlls = collect_deps(pyds)
+        logger.info("Found %d dlls", len(dlls))
+        for dll in dlls:
+            dst = os.path.join(self.options.destdir or ".",
+                               os.path.basename(dll))
+            shutil.copyfile(dll, dst)
+        
 
     def build_bat(self, filename, libname):
+        logger.info("Building batch-file %r", filename)
         if not self.options.optimize:
             options = ""
         elif self.options.optimize == 1:
@@ -88,6 +100,7 @@ class Runtime(object):
 
 
     def build(self, library):
+        logger.info("Building the code archive %r", library)
         if self.options.report:
             self.mf.report()
         if self.options.summary:
@@ -134,7 +147,7 @@ class Runtime(object):
                 arc.writestr(path, stream.getvalue())
 
                 assert mod.__file__.endswith(".pyd")
-                arc.write(mod.__file__, os.path.join("--DLLs--", pydfile))
+                arc.write(mod.__file__, os.path.join("--EXTENSIONS--", pydfile))
 
         arc.close()
         ################################
@@ -146,7 +159,7 @@ LOADER = r"""\
 def __load():
     import imp, os
     py2exe_dlldir = os.environ["PY2EXE_DLLDIR"]
-    path = os.path.join(__loader__.archive, "--DLLs--", '{0}')
+    path = os.path.join(__loader__.archive, "--EXTENSIONS--", '{0}')
     data = __loader__.get_data(path)
     dstpath = os.path.join(py2exe_dlldir, '{0}')
     with open(dstpath, "wb") as dll:
