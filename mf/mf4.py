@@ -85,6 +85,9 @@ class ModuleFinder:
         """
         self.import_hook(name)
         package = self.modules[name]
+        if not hasattr(package, "__path__"):
+            # Hm, should we raise ImportError instead?
+            raise TypeError("{0} is not a package".format(name))
         for finder, modname, ispkg in pkgutil.iter_modules(package.__path__):
             self.safe_import_hook("%s.%s" % (name, modname))
 
