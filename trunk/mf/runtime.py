@@ -27,6 +27,10 @@ class Runtime(object):
 
     def __init__(self, options):
         self.options = options
+        if self.options.destdir:
+            if not os.path.exists(self.options.destdir):
+                os.mkdir(self.options.destdir)
+
 
     def analyze(self):
         global PYC
@@ -54,6 +58,12 @@ class Runtime(object):
 
         mf.run_script(self.options.script)
 
+        if self.options.show_from:
+            for modname in self.options.show_from:
+                print(modname, "imported from:")
+                for x in sorted(mf._depgraph[modname]):
+                    print("   ", x)
+
     def build_bat(self, filename, libname):
         if not self.options.optimize:
             options = ""
@@ -61,14 +71,19 @@ class Runtime(object):
             options = " -O "
         else:
             options = " -OO "
-        with open(filename, "wt") as ofi:
+        if self.options.destdir:
+            path = os.path.join(self.options.destdir, filename)
+        else:
+            path = filename
+
+        with open(path, "wt") as ofi:
             ofi.write('@echo off\n')
             ofi.write('setlocal\n')
-            ofi.write('set PY2EXE_DLLDIR=%TMP%\\py2exe-%RANDOM%-%TIME:~6,5%\n')
+            ofi.write('set PY2EXE_DLLDIR=%TMP%\\~py2exe-%RANDOM%-%TIME:~6,5%\n')
             ofi.write('for /f %%i in ("%0") do set PYTHONHOME=%%~dpi\n')
             ofi.write('for /f %%i in ("%0") do set PYTHONPATH=%%~dpi\\{0}\n'.format(libname))
             ofi.write('mkdir "%PY2EXE_DLLDIR%"\n')
-            ofi.write('%PYTHONHOME%\\{0} -S{1}-m __SCRIPT__\n'.format(libname, options))
+            ofi.write('%PYTHONHOME%\\{0} -S {1} -m __SCRIPT__\n'.format(libname, options))
             ofi.write('rmdir /s/q "%PY2EXE_DLLDIR%"\n')
 
 
@@ -79,8 +94,14 @@ class Runtime(object):
             self.mf.report_summary()
             self.mf.report_missing()
 
-        shutil.copyfile(sys.executable, library)
-        arc = zipfile.ZipFile(library, "a",
+        if self.options.destdir:
+            libpath = os.path.join(self.options.destdir, library)
+        else:
+            libpath = library
+                
+
+        shutil.copyfile(sys.executable, libpath)
+        arc = zipfile.ZipFile(libpath, "a",
                               compression=zipfile.ZIP_DEFLATED)
 
         for mod in self.mf.modules.values():
@@ -115,11 +136,10 @@ class Runtime(object):
                 assert mod.__file__.endswith(".pyd")
                 arc.write(mod.__file__, os.path.join("--DLLs--", pydfile))
 
-                ## dest = os.path.join("dist", mod.__name__) + ".pyd"
-                ## shutil.copyfile(mod.__file__, dest)
-                ## print("copy", mod.__file__, dest)
         arc.close()
         ################################
+
+################################################################
 
 # Hm, imp.load_dynamic is deprecated.  What is the replacement?
 LOADER = r"""\
@@ -183,15 +203,13 @@ def main():
                         help="""print a detailed report listing all found modules,
                         the missing modules, and which module imported them.""",
                         metavar="modname",
-                        dest="from",
+                        dest="show_from",
                         action="append")
 
     parser.add_argument("script",
                         metavar="script",
                         )
     parser.add_argument("-v",
-                        help="""
-                        """,
                         dest="verbose",
                         action="store_true")
     options = parser.parse_args()
@@ -199,8 +217,10 @@ def main():
     level = logging.INFO if options.verbose else logging.WARNING
     logging.basicConfig(level=level)
 
-    runner = os.path.splitext(options.script)[0] + ".bat"
-    libname = "_" + os.path.splitext(options.script)[0] + ".exe"
+    basename = os.path.basename(options.script)
+
+    runner = os.path.splitext(basename)[0] + ".bat"
+    libname = "_" + os.path.splitext(basename)[0] + ".exe"
 
     runtime = Runtime(options)
     runtime.build_bat(runner, libname)
