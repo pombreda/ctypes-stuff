@@ -76,10 +76,10 @@ def main():
 
     builder = runtime.Runtime(options)
 
-    builder.build_bat(runner, libname)
-
     builder.analyze()
     builder.build(libname)
+
+    builder.build_bat(runner, libname)
 
 if __name__ == "__main__":
     main()
