@@ -81,16 +81,23 @@ def main():
     level = logging.INFO if options.verbose else logging.WARNING
     logging.basicConfig(level=level)
 
+    if options.destdir:
+        if not os.path.exists(options.destdir):
+            os.mkdir(options.destdir)
+        destdir = options.destdir
+    else:
+        destdir = "."
 
     basename = os.path.basename(options.script)
 
-    runner = os.path.splitext(basename)[0] + ".bat"
-    libname = "_" + os.path.splitext(basename)[0] + ".exe"
+    runner = os.path.join(destdir, os.path.splitext(basename)[0] + ".bat")
+    os.mkdir("dist\\lib")
+    libname = os.path.join("lib", "_" + os.path.splitext(basename)[0] + ".exe")
 
     builder = runtime.Runtime(options)
 
     builder.analyze()
-    builder.build(libname)
+    builder.build(os.path.join(destdir, libname))
 
     builder.build_bat(runner, libname)
 
