@@ -91,12 +91,14 @@ class Runtime(object):
         with open(path, "wt") as ofi:
             ofi.write('@echo off\n')
             ofi.write('setlocal\n')
-            ofi.write('set PY2EXE_DLLDIR=%TMP%\\~py2exe-%RANDOM%-%TIME:~6,5%\n')
+            if self.options.bundle_files < 3:
+                ofi.write('set PY2EXE_DLLDIR=%TMP%\\~py2exe-%RANDOM%-%TIME:~6,5%\n')
+                ofi.write('mkdir "%PY2EXE_DLLDIR%"\n')
             ofi.write('for /f %%i in ("%0") do set PYTHONHOME=%%~dpi\n')
             ofi.write('for /f %%i in ("%0") do set PYTHONPATH=%%~dpi\\{0}\n'.format(libname))
-            ofi.write('mkdir "%PY2EXE_DLLDIR%"\n')
             ofi.write('%PYTHONHOME%\\{0} -S {1} -m __SCRIPT__\n'.format(libname, options))
-            ofi.write('rmdir /s/q "%PY2EXE_DLLDIR%"\n')
+            if self.options.bundle_files < 3:
+                ofi.write('rmdir /s/q "%PY2EXE_DLLDIR%"\n')
 
 
     def build(self, library):
@@ -126,14 +128,25 @@ class Runtime(object):
                     path = mod.__name__.replace(".", "\\") + PYC
                 stream = io.BytesIO()
                 stream.write(imp.get_magic())
-                stream.write(b"\0\0\0\0") # faked timestamp
-                stream.write(b"\0\0\0\0") # faked size
+                stream.write(b"\0\0\0\0") # null timestamp
+                stream.write(b"\0\0\0\0") # null size
                 marshal.dump(code, stream)
                 arc.writestr(path, stream.getvalue())
 
             elif hasattr(mod, "__file__"):
+                assert mod.__file__.endswith(".pyd")
+
+                # bundle_files == 3: put .pyds in the same directory as the zip.archive
+                # bundle_files <= 2: put .pyds into the zip-archive, extract to TEMP dir when needed
+
                 pydfile = mod.__name__ + ".pyd"
-                src = LOADER.format(pydfile)
+
+                # Build the loader which is contained in the zip-archive
+                if self.options.bundle_files < 3:
+                    src = EXTRACT_THEN_LOAD.format(pydfile)
+                else:
+                    src = LOAD_FROM_DIR.format(pydfile)
+
                 code = compile(src, "<string>", "exec")
                 if hasattr(mod, "__path__"):
                     path = mod.__name__.replace(".", "\\") + "\\__init__" + PYC
@@ -141,21 +154,23 @@ class Runtime(object):
                     path = mod.__name__.replace(".", "\\") + PYC
                 stream = io.BytesIO()
                 stream.write(imp.get_magic())
-                stream.write(b"\0\0\0\0") # faked timestamp
-                stream.write(b"\0\0\0\0") # faked size
+                stream.write(b"\0\0\0\0") # null timestamp
+                stream.write(b"\0\0\0\0") # null size
                 marshal.dump(code, stream)
                 arc.writestr(path, stream.getvalue())
 
-                assert mod.__file__.endswith(".pyd")
-                arc.write(mod.__file__, os.path.join("--EXTENSIONS--", pydfile))
+                if self.options.bundle_files < 3:
+                    arc.write(mod.__file__, os.path.join("--EXTENSIONS--", pydfile))
+                else:
+                    shutil.copyfile(mod.__file__,
+                                    os.path.join(os.path.dirname(libpath), pydfile))
 
         arc.close()
         ################################
 
 ################################################################
 
-# Hm, imp.load_dynamic is deprecated.  What is the replacement?
-LOADER = r"""\
+EXTRACT_THEN_LOAD = r"""\
 def __load():
     import imp, os
     py2exe_dlldir = os.environ["PY2EXE_DLLDIR"]
@@ -170,76 +185,14 @@ __load()
 del __load
 """
 
+LOAD_FROM_DIR = r"""\
+def __load():
+    import imp, os
+    dllpath = os.path.join(os.path.dirname(__loader__.archive), '{0}')
+    mod = imp.load_dynamic(__name__, dllpath)
+    mod.frozen = 1
+__load()
+del __load
+"""
+
 ################################################################
-
-def main():
-    import argparse
-    parser = argparse.ArgumentParser(description="Build runtime archive for a script")
-
-    parser.add_argument("-i", "--include",
-                        help="module to include",
-                        dest="includes",
-                        metavar="modname",
-##                        nargs="*",
-                        action="append"
-                        )
-    parser.add_argument("-x", "--exclude",
-                        help="module to exclude",
-                        dest="excludes",
-                        metavar="modname",
-                        action="append")
-    parser.add_argument("-p", "--package",
-                        help="module to exclude",
-                        dest="packages",
-                        metavar="package_name",
-##                        nargs="*",
-                        action="append")
-
-    # how to scan...
-    parser.add_argument("-O", "--optimize",
-                        help="scan optimized bytecode",
-                        dest="optimize",
-                        action="count")
-
-    # reporting options...
-    parser.add_argument("-s", "--summary",
-                        help="""print a single line listing how many modules were
-                        found and how many modules are missing""",
-                        dest="summary",
-                        action="store_true")
-    parser.add_argument("-r", "--report",
-                        help="""print a detailed report listing all found modules,
-                        the missing modules, and which module imported them.""",
-                        dest="report",
-                        action="store_true")
-    parser.add_argument("-f", "--from",
-                        help="""print a detailed report listing all found modules,
-                        the missing modules, and which module imported them.""",
-                        metavar="modname",
-                        dest="show_from",
-                        action="append")
-
-    parser.add_argument("script",
-                        metavar="script",
-                        )
-    parser.add_argument("-v",
-                        dest="verbose",
-                        action="store_true")
-    options = parser.parse_args()
-
-    level = logging.INFO if options.verbose else logging.WARNING
-    logging.basicConfig(level=level)
-
-    basename = os.path.basename(options.script)
-
-    runner = os.path.splitext(basename)[0] + ".bat"
-    libname = "_" + os.path.splitext(basename)[0] + ".exe"
-
-    runtime = Runtime(options)
-    runtime.build_bat(runner, libname)
-
-    runtime.analyze()
-    runtime.build(libname)
-
-if __name__ == "__main__":
-    main()

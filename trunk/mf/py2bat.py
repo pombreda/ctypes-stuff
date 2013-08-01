@@ -60,8 +60,21 @@ def main():
 
     # what to build
     parser.add_argument("-d", "--dest",
+##                        required=True,
+                        default="dist",
                         help="""destination directory""",
                         dest="destdir")
+
+    parser.add_argument("-b", "--bundle-files",
+                        help="""How to bundle the files. 3 - create an .exe, a zip-archive, and .pyd
+                        files in the file system.  2 - create .exe and
+                        a zip-archive that contains the pyd files.
+                        pyd files are extracted on demand to a
+                        temporary directory, this directory is removed
+                        after the program has finished.""",
+                        choices=[1, 2, 3],
+                        type=int,
+                        default=3)
 
     options = parser.parse_args()
 
