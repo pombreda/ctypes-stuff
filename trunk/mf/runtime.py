@@ -27,13 +27,11 @@ class Runtime(object):
 
     def __init__(self, options):
         self.options = options
-        if self.options.destdir:
-            if not os.path.exists(self.options.destdir):
-                os.mkdir(self.options.destdir)
 
 
     def analyze(self):
         logger.info("Analyzing the code")
+        # XXX Use importlib!!! to get extensions...
         global PYC
         PYC = ".pyc" if not self.options.optimize else ".pyo"
 
@@ -63,18 +61,6 @@ class Runtime(object):
         logger.info("Found %d modules, %d are missing, %d may be missing",
                     len(mf.modules), len(missing), len(maybe))
 
-        pyds = [mod.__file__ for mod in mf.modules.values()
-                if mod.__code__ is None and hasattr(mod, "__file__")] + [sys.executable]
-        logger.info("Scanning %d python extensions for needed dlls", len(pyds))
-        from bindeps import collect_deps
-        dlls = collect_deps(pyds)
-        logger.info("Found %d dlls", len(dlls))
-        for dll in dlls:
-            dst = os.path.join(self.options.destdir or ".",
-                               os.path.basename(dll))
-            shutil.copyfile(dll, dst)
-        
-
     def build_bat(self, filename, libname):
         logger.info("Building batch-file %r", filename)
         if not self.options.optimize:
@@ -83,10 +69,11 @@ class Runtime(object):
             options = " -O "
         else:
             options = " -OO "
-        if self.options.destdir:
-            path = os.path.join(self.options.destdir, filename)
-        else:
-            path = filename
+        ## if self.options.destdir:
+        ##     path = os.path.join(self.options.destdir, filename)
+        ## else:
+        ##     path = filename
+        path = filename
 
         with open(path, "wt") as ofi:
             ofi.write('@echo off\n')
@@ -100,6 +87,14 @@ class Runtime(object):
             if self.options.bundle_files < 3:
                 ofi.write('rmdir /s/q "%PY2EXE_DLLDIR%"\n')
 
+    def build_exe(self, filename, libname):
+        logger.info("Building exe %r", filename)
+        import pkgutil
+        exe_bytes = pkgutil.get_data("py3exe", "run.exe")
+        with open(filename, "wb") as ofi:
+            ofi.write(exe_bytes)
+        from resources import add_resources
+        add_resources(filename)
 
     def build(self, library):
         logger.info("Building the code archive %r", library)
@@ -109,11 +104,11 @@ class Runtime(object):
             self.mf.report_summary()
             self.mf.report_missing()
 
-        if self.options.destdir:
-            libpath = os.path.join(self.options.destdir, library)
-        else:
-            libpath = library
-                
+        ## if self.options.destdir:
+        ##     libpath = os.path.join(self.options.destdir, library)
+        ## else:
+        ##     libpath = library
+        libpath = library
 
         shutil.copyfile(sys.executable, libpath)
         arc = zipfile.ZipFile(libpath, "a",
@@ -134,6 +129,7 @@ class Runtime(object):
                 arc.writestr(path, stream.getvalue())
 
             elif hasattr(mod, "__file__"):
+                # XXX use importlib to get extensions...
                 assert mod.__file__.endswith(".pyd")
 
                 # bundle_files == 3: put .pyds in the same directory as the zip.archive
@@ -166,6 +162,19 @@ class Runtime(object):
                                     os.path.join(os.path.dirname(libpath), pydfile))
 
         arc.close()
+        dlldir = os.path.dirname(libpath)
+
+        pyds = [mod.__file__ for mod in self.mf.modules.values()
+                if mod.__code__ is None and hasattr(mod, "__file__")] + [sys.executable]
+        logger.info("Scanning %d python extensions for needed dlls", len(pyds))
+        from bindeps import collect_deps
+        dlls = collect_deps(pyds)
+        logger.info("Found %d dlls", len(dlls))
+        for dll in dlls:
+            dst = os.path.join(dlldir, os.path.basename(dll))
+            shutil.copyfile(dll, dst)
+        
+
         ################################
 
 ################################################################
