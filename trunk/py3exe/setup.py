@@ -3,7 +3,9 @@
 import os
 import sys
 
-from distutils.core import setup, Extension, Command
+from setuptools import setup, find_packages
+
+from distutils.core import Extension, Command
 from distutils.dist import Distribution
 from distutils.command import build_ext, build
 from distutils.command.install_data import install_data
@@ -39,6 +41,8 @@ class Dist(Distribution):
     def has_interpreters(self):
         return self.interpreters and len(self.interpreters) > 0
 
+    ## def has_extensions(self):
+    ##     return self.has_interpreters()
 
 class BuildInterpreters(build_ext.build_ext):
     description = "build special python interpreter stubs"
@@ -359,11 +363,12 @@ setup(name="py3exe",
                  },
 
       interpreters = interpreters,
-      packages=['py3exe',
-##                'py2exe.resources',
-               ],
+      packages = find_packages(),
+##       packages=['py3exe',
+## ##                'py2exe.resources',
+##                ],
       )
 
 # Local Variables:
-# compile-command: "setup.py install"
+# compile-command: "py -3.3 setup.py bdist_egg"
 # End:
