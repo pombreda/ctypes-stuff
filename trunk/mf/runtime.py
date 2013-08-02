@@ -181,13 +181,15 @@ class Runtime(object):
 
 EXTRACT_THEN_LOAD = r"""\
 def __load():
-    import imp, os
-    py2exe_dlldir = os.environ["PY2EXE_DLLDIR"]
+    import imp, os, _p2e
     path = os.path.join(__loader__.archive, "--EXTENSIONS--", '{0}')
+    py2exe_dlldir = os.path.dirname(__loader__.archive)
     data = __loader__.get_data(path)
     dstpath = os.path.join(py2exe_dlldir, '{0}')
     with open(dstpath, "wb") as dll:
         dll.write(data)
+    # register BEFORE importing
+    _p2e.register_dll(dstpath)
     mod = imp.load_dynamic(__name__, dstpath)
     mod.frozen = 1
 __load()
