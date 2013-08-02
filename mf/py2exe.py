@@ -65,6 +65,10 @@ def main():
                         help="""destination directory""",
                         dest="destdir")
 
+    parser.add_argument("-l", "--library",
+                        help="""relative pathname of the python archive""",
+                        dest="libname")
+
     parser.add_argument("-b", "--bundle-files",
                         help="""How to bundle the files. 3 - create an .exe, a zip-archive, and .pyd
                         files in the file system.  2 - create .exe and
@@ -88,24 +92,27 @@ def main():
     # basename of the exe to create
     dest_base = os.path.splitext(os.path.basename(options.script))[0]
 
+    # full path to exe-file
     exe_path = os.path.join(destdir, dest_base + ".exe")
+
+    # XXX move to builder...
     if os.path.isfile(exe_path):
         os.remove(exe_path)
 
     # 'libname' is the path of the runtime library RELATIVE to the runner directory.
-    libname = "lib\\archive.zip"
+    # XXX move to builder...
+    if options.libname:
+        libpath = os.path.join(destdir, options.libname)
+        if os.path.isfile(libpath):
+            os.remove(libpath)
 
-    libpath = os.path.join(destdir, libname)
-    if os.path.isfile(libpath):
-        os.remove(libpath)
-
-    if not os.path.exists(os.path.dirname(libpath)):
-        os.mkdir(os.path.dirname(libpath))
+        if not os.path.exists(os.path.dirname(libpath)):
+            os.mkdir(os.path.dirname(libpath))
 
     builder = runtime.Runtime(options)
     builder.analyze()
-    builder.build_exe(exe_path, libname)
-    builder.build(libpath)
+    builder.build_exe(exe_path, options.libname)
+    builder.build(exe_path, options.libname)
 
 if __name__ == "__main__":
     main()

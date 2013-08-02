@@ -87,12 +87,13 @@ class Runtime(object):
             if self.options.bundle_files < 3:
                 ofi.write('rmdir /s/q "%PY2EXE_DLLDIR%"\n')
 
-    def build_exe(self, filename, libname):
-        logger.info("Building exe %r", filename)
+    def build_exe(self, exe_path, libname):
+        logger.info("Building exe '%s'", exe_path)
         import pkgutil
         exe_bytes = pkgutil.get_data("py3exe", "run.exe")
-        with open(filename, "wb") as ofi:
+        with open(exe_path, "wb") as ofi:
             ofi.write(exe_bytes)
+
         from resources import add_resources
         import struct
 
@@ -100,7 +101,11 @@ class Runtime(object):
         unbuffered = False
         data_bytes=0
 
-        zippath = libname.encode("mbcs")
+        if libname is None:
+            zippath = b""
+        else:
+            zippath = libname.encode("mbcs")
+            
 
         script_info = struct.pack("IIII",
                                   0x78563412,
@@ -108,23 +113,24 @@ class Runtime(object):
                                   unbuffered,
                                   data_bytes) + zippath + b"\0"
 
-        add_resources(filename, script_info)
+        add_resources(exe_path, script_info)
 
-    def build(self, library):
-        logger.info("Building the code archive %r", library)
+    def build(self, exe_path, libname):
         if self.options.report:
             self.mf.report()
         if self.options.summary:
             self.mf.report_summary()
             self.mf.report_missing()
 
-        ## if self.options.destdir:
-        ##     libpath = os.path.join(self.options.destdir, library)
-        ## else:
-        ##     libpath = library
-        libpath = library
+        if libname is None:
+            libpath = exe_path
+            libmode = "a"
+        else:
+            libpath = os.path.join(os.path.dirname(exe_path), libname)
+            libmode = "w"
+        logger.info("Building the code archive %r", libpath)
 
-        arc = zipfile.ZipFile(libpath, "a",
+        arc = zipfile.ZipFile(libpath, libmode,
                               compression=zipfile.ZIP_DEFLATED)
 
         for mod in self.mf.modules.values():
