@@ -1,5 +1,5 @@
 /*
- *	   Copyright (c) 2000, 2001 Thomas Heller
+ *	   Copyright (c) 2000 - 2013 Thomas Heller
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -51,14 +51,35 @@ void fini(void);
 char *pScript;
 char *pZipBaseName;
 int numScriptBytes;
-char modulename[_MAX_PATH + _MAX_FNAME + _MAX_EXT]; // from GetModuleName()
-char dirname[_MAX_PATH]; // directory part of GetModuleName()
-char libdirname[_MAX_PATH]; // library directory - probably same as above.
-char libfilename[_MAX_PATH + _MAX_FNAME + _MAX_EXT]; // library filename
+wchar_t modulename[_MAX_PATH + _MAX_FNAME + _MAX_EXT]; // from GetModuleName()
+wchar_t dirname[_MAX_PATH]; // directory part of GetModuleName()
+wchar_t libdirname[_MAX_PATH]; // library directory - probably same as above.
+wchar_t libfilename[_MAX_PATH + _MAX_FNAME + _MAX_EXT]; // library filename
 struct scriptinfo *p_script_info;
 
-#if 0
+void SystemError(int error, char *msg)
+{
+	char Buffer[1024];
 
+	if (msg)
+		fprintf(stderr, msg);
+	if (error) {
+		LPVOID lpMsgBuf;
+		FormatMessage( 
+			FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+			FORMAT_MESSAGE_FROM_SYSTEM,
+			NULL,
+			error,
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			(LPSTR)&lpMsgBuf,
+			0,
+			NULL 
+			);
+		strncpy(Buffer, lpMsgBuf, sizeof(Buffer));
+		LocalFree(lpMsgBuf);
+		fprintf(stderr, Buffer);
+	}
+}
 
 /*
 static int dprintf(char *fmt, ...)
@@ -77,10 +98,10 @@ static int dprintf(char *fmt, ...)
 BOOL calc_dirname(HMODULE hmod)
 {
 	int is_special;
-	char *modulename_start;
-	char *cp;
+	wchar_t *modulename_start;
+	wchar_t *cp;
 	// get module filename
-	if (!GetModuleFileName(hmod, modulename, sizeof(modulename))) {
+	if (!GetModuleFileNameW(hmod, modulename, sizeof(modulename))) {
 		SystemError(GetLastError(), "Retrieving module name");
 		return FALSE;
 	}
@@ -90,22 +111,20 @@ BOOL calc_dirname(HMODULE hmod)
 	// to avoid MAX_PATH limitations).  Python currently can't understand
 	// such names, and as it uses the ANSI API, neither does Windows!
 	// So fix that up here.
-	is_special = strlen(modulename) > 4 &&
-				 strncmp(modulename, "\\\\?\\", 4)==0;
+	is_special = wcslen(modulename) > 4 &&
+		wcsncmp(modulename, L"\\\\?\\", 4)==0;
 	modulename_start = is_special ? modulename + 4 : modulename;
-	strcpy(dirname, modulename_start);
-	cp = strrchr(dirname, '\\');
-	*cp = '\0';
+	wcscpy(dirname, modulename_start);
+	cp = wcsrchr(dirname, L'\\');
+	*cp = L'\0';
 	return TRUE;
 }
 
-BOOL _LocateScript(HMODULE hmod)
+
+BOOL locate_script(HMODULE hmod)
 {
 	HRSRC hrsrc = FindResource(hmod, MAKEINTRESOURCE(1), "PYTHONSCRIPT");
 	HGLOBAL hgbl;
-
-	if (!dirname[0])
-		calc_dirname(hmod);
 
 	// load the script resource
 	if (!hrsrc) {
@@ -134,328 +153,18 @@ BOOL _LocateScript(HMODULE hmod)
 
 	// get full pathname of the 'library.zip' file
 	if(p_script_info->zippath[0]) {
-		snprintf(libfilename, sizeof(libfilename),
-			 "%s\\%s", dirname, p_script_info->zippath);
+		_snwprintf(libfilename, sizeof(libfilename),
+			   L"%s\\%S", dirname, p_script_info->zippath);
 	} else {
-		GetModuleFileName(hmod, libfilename, sizeof(libfilename));
+		GetModuleFileNameW(hmod, libfilename, sizeof(libfilename));
 	}
+	printf("LIBFILENAME %S\n", libfilename);
 	return TRUE; // success
 }
 
-static char *MapExistingFile(char *pathname, DWORD *psize)
-{
-	HANDLE hFile, hFileMapping;
-	DWORD nSizeLow, nSizeHigh;
-	char *data;
-
-	hFile = CreateFile(pathname,
-				GENERIC_READ, FILE_SHARE_READ, NULL,
-				OPEN_EXISTING,
-				FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hFile == INVALID_HANDLE_VALUE)
-		return NULL;
-	nSizeLow = GetFileSize(hFile, &nSizeHigh);
-	hFileMapping = CreateFileMapping(hFile,
-					 NULL, PAGE_READONLY, 0, 0, NULL);
-	CloseHandle(hFile);
-
-	if (hFileMapping == INVALID_HANDLE_VALUE)
-		return NULL;
-
-	data = MapViewOfFile(hFileMapping,
-				 FILE_MAP_READ, 0, 0, 0);
-
-	CloseHandle(hFileMapping);
-	if (psize)
-		*psize = nSizeLow;
-	return data;
-}
-
-BOOL _LoadPythonDLL(HMODULE hmod)
-{
-	HRSRC hrsrc;
-	char *pBaseAddress;
-	int size;
-
-	if (!dirname[0])
-		calc_dirname(hmod);
-
-	// Try to locate pythonxy.dll as resource in the exe
-	hrsrc = FindResource(hmod, MAKEINTRESOURCE(1), PYTHONDLL);
-	if (hrsrc) {
-		HGLOBAL hgbl = LoadResource(hmod, hrsrc);
-		if (!_load_python(PYTHONDLL, LockResource(hgbl))) {
-			SystemError(GetLastError(), "Could not load python dll");
-			return FALSE;
-		}
-//		dprintf("Loaded pythondll as RESOURCE\n");
-		return TRUE;
-	}
-
-	// try to load pythonxy.dll as bytes at the start of the zipfile
-	pBaseAddress = MapExistingFile(libfilename, &size);
-	if (pBaseAddress) {
-		int res = 0;
-		if (0 == strncmp(pBaseAddress, "<pythondll>", 11))
-			res = _load_python(PYTHONDLL, pBaseAddress + 11 + sizeof(int));
-		UnmapViewOfFile(pBaseAddress);
-		if (res) {
-//			dprintf("Loaded pythondll as <pythondll> from %s\n", libfilename);
-			return TRUE;
-		}
-	}
-
-	// try to load pythonxy.dll from the file system
-	{
-		char buffer[_MAX_PATH + _MAX_FNAME + _MAX_EXT];
-		snprintf(buffer, sizeof(buffer), "%s\\%s", dirname, PYTHONDLL);
-
-		if (!_load_python(buffer, NULL)) {
-			SystemError(GetLastError(), "LoadLibrary(pythondll) failed");
-			SystemError(0, buffer);
-			return FALSE;
-		}
-//		dprintf("Loaded pythondll from file %s\n", buffer);
-	}
-	return TRUE;
-}
-
-void _Import_Zlib(char *pdata)
-{
-	HMODULE hlib;
-	hlib = MyLoadLibrary("zlib.pyd", pdata, NULL);
-	if (hlib) {
-		void (*proc)(void);
-		proc = (void(*)(void))MyGetProcAddress(hlib, "initzlib");
-		if (proc)
-			proc();
-	}
-}
-
-void _TryLoadZlib(HMODULE hmod)
-{
-	char *pBaseAddress;
-	char *pdata;
-	HRSRC hrsrc;
-
-	// Try to locate pythonxy.dll as resource in the exe
-	hrsrc = FindResource(hmod, MAKEINTRESOURCE(1), "ZLIB.PYD");
-	if (hrsrc) {
-		HGLOBAL hglb = LoadResource(hmod, hrsrc);
-		if (hglb) {
-			_Import_Zlib(LockResource(hglb));
-		}
-		return;
-	}
-
-	// try to load zlib.pyd from the file system
-	{
-		HMODULE hlib;
-		char buffer[_MAX_PATH + _MAX_FNAME + _MAX_EXT];
-		snprintf(buffer, sizeof(buffer), "%s\\%s", dirname, "zlib.pyd");
-
-		hlib = LoadLibrary(buffer);
-		if(hlib) {
-			void (*proc)(void);
-			proc = (void(*)(void))GetProcAddress(hlib, "initzlib");
-			if(proc) {
-				proc();
-				return;
-			}
-		}
-	}
-
-	// try to load zlib.pyd as bytes at the start of the zipfile
-	pdata = pBaseAddress = MapExistingFile(libfilename, NULL);
-	if (pBaseAddress) {
-		if (0 == strncmp(pBaseAddress, "<pythondll>", 11)) {
-			pdata += 11;
-			pdata += *(int *)pdata + sizeof(int);
-		}
-		if (0 == strncmp(pdata, "<zlib.pyd>", 10)) {
-			pdata += 10 + sizeof(int);
-			_Import_Zlib(pdata);
-		}
-		UnmapViewOfFile(pBaseAddress);
-	}
-}
-
-static void calc_path()
-{
-	/* If the zip path has any path component, then build our Python
-	   home directory from that.
-	*/
-	char *fname;
-	size_t lib_dir_len;
-	pZipBaseName = libfilename + strlen(libfilename);
-	/* let pZipBaseName point to the basename of the zippath */
-	while (pZipBaseName > libfilename && \
-		   *(pZipBaseName-1) != '\\')
-		pZipBaseName--;
-
- 	/* length of lib director name */
-	lib_dir_len = pZipBaseName-libfilename; /* incl. tail slash */
- 	if (lib_dir_len) {
-		char *p = libdirname;
-		strncpy(p, libfilename, lib_dir_len-1);
- 		p += lib_dir_len-1;
- 		*p++ = '\0';
-	} else {
-		libdirname[0] = '\0';
- 	}
-	/* Fully-qualify it */
-	GetFullPathName(libdirname, sizeof(libdirname), libdirname, &fname);
-}
-
-// Set the Python path before initialization
-static int set_path_early()
-{
-	char *ppath;
-	Py_SetPythonHome(libdirname);
-	/* Let Python calculate its initial path, according to the
-	   builtin rules */
-	ppath = Py_GetPath();
-//	printf("Initial path: %s\n", ppath);
-
-	/* We know that Py_GetPath points to writeable memory,
-	   so we copy our own path into it.
-	*/
-	if (strlen(ppath) <= strlen(libdirname) + strlen(pZipBaseName) + 1) {
-		/* Um. Not enough space. What now? */
-		SystemError(0, "Not enough space for new sys.path");
-		return -1;
-	}
-
-	strcpy(ppath, libdirname);
-	strcat(ppath, "\\");
-	strcat(ppath, pZipBaseName);
-	return 0;
-}
-
-// Set the Python path after initialization
-static int set_path_late()
-{
-	size_t buflen = strlen(libdirname) + strlen(pZipBaseName) + 2;
-	char *ppath = (char *)malloc(buflen);
-	PyObject *syspath, *newEntry;
-	if (!ppath) {
-		SystemError(ERROR_NOT_ENOUGH_MEMORY, "no mem for late sys.path");
-		return -1;
-	}
-	strcpy(ppath, libdirname);
-	strcat(ppath, "\\");
-	strcat(ppath, pZipBaseName);
-	syspath = PySys_GetObject("path");
-	newEntry = PyString_FromString(ppath);
-	if (newEntry) {
-		PyList_Append(syspath, newEntry);
-		Py_DECREF(newEntry);
-	}
-	free(ppath);
-	return 0;
-}
-
-
-/*
- * returns an error code if initialization fails
- */
-int init_with_instance(HMODULE hmod, char *frozen)
-{
-	int rc;
-	if (!_LocateScript(hmod))
-		return 255;
-
-	if (!_LoadPythonDLL(hmod))
-		return 255;
-	if (p_script_info->unbuffered) {
-#if defined(MS_WINDOWS) || defined(__CYGWIN__)
-		_setmode(fileno(stdin), O_BINARY);
-		_setmode(fileno(stdout), O_BINARY);
-#endif
-#ifdef HAVE_SETVBUF
-		setvbuf(stdin,	(char *)NULL, _IONBF, BUFSIZ);
-		setvbuf(stdout, (char *)NULL, _IONBF, BUFSIZ);
-		setvbuf(stderr, (char *)NULL, _IONBF, BUFSIZ);
-#else /* !HAVE_SETVBUF */
-		setbuf(stdin,  (char *)NULL);
-		setbuf(stdout, (char *)NULL);
-		setbuf(stderr, (char *)NULL);
-#endif /* !HAVE_SETVBUF */
-	}
-
-	if (getenv("PY2EXE_VERBOSE"))
-		Py_VerboseFlag = atoi(getenv("PY2EXE_VERBOSE"));
-	else
-		Py_VerboseFlag = 0;
-
-	Py_IgnoreEnvironmentFlag = 1;
-	Py_NoSiteFlag = 1;
-	Py_OptimizeFlag = p_script_info->optimize;
-
-	Py_SetProgramName(modulename);
-
-	calc_path();
-
-	if (!Py_IsInitialized()) {
-		// First time round and the usual case - set sys.path
-		// statically.
-		rc = set_path_early();
-		if (rc != 0)
-			return rc;
-	
-	//	printf("Path before Py_Initialize(): %s\n", Py_GetPath());
-	
-		Py_Initialize();
-	//	printf("Path after Py_Initialize(): %s\n", PyString_AsString(PyObject_Str(PySys_GetObject("path"))));
-	} else {
-		// Python already initialized.  This likely means there are
-		// 2 py2exe based apps in the same process (eg, 2 COM objects
-		// in a single host, 2 ISAPI filters in the same site, ...)
-		// Until we get a better answer, add what we need to sys.path
-		rc = set_path_late();
-		if (rc != 0)
-			return rc;
-	}
-	/* Set sys.frozen so apps that care can tell.
-	   If the caller did pass NULL, sys.frozen will be set zo True.
-	   If a string is passed this is used as the frozen attribute.
-	   run.c passes "console_exe", run_w.c passes "windows_exe",
-	   run_dll.c passes "dll"
-	   This falls apart when you consider that in some cases, a single
-	   process may end up with two py2exe generated apps - but still, we
-	   reset frozen to the correct 'current' value for the newly
-	   initializing app.
-	*/
-	if (frozen == NULL)
-		PySys_SetObject("frozen", PyBool_FromLong(1));
-	else {
-		PyObject *o = PyString_FromString(frozen);
-		if (o) {
-			PySys_SetObject("frozen", o);
-			Py_DECREF(o);
-		}
-	}
-
-	// If zlib is builtin to pythonxx.dll, we don't need to take any
-	// special action (and worse, if it so happens an old version of
-	// the app built with python 2.4 is installed, we might attempt to
-	// load that python24 pyd, causing death...)
-#ifndef PYZLIB_BUILTIN
-	_TryLoadZlib(hmod);
-#endif
-
-	return 0;
-}
-
-int init(char *frozen)
-{
-	return init_with_instance(NULL, frozen);
-}
-#endif
-
 void fini(void)
 {
-	/* The standard Python 2.3 does also allow this: Set PYTHONINSPECT
+	/* The standard Python does also allow this: Set PYTHONINSPECT
 	   in the script and examine it afterwards
 	*/
 	if (getenv("PYTHONINSPECT") && Py_FdIsInteractive(stdin, "<stdin>"))
@@ -494,30 +203,155 @@ int run_script(void)
 	return rc;
 }
 
+BOOL unpack_python_dll(HMODULE hmod)
+{
+	HANDLE hrsrc;
+	// Try to locate pythonxy.dll as resource in the exe
+	hrsrc = FindResource(hmod, MAKEINTRESOURCE(1), PYTHONDLL);
+	printf("FindResource %s %p\n", PYTHONDLL, hrsrc);
+	if (hrsrc) {
+		char pydll[260];
+		HGLOBAL hgbl;
+		DWORD size;
+		char *ptr;
+		FILE *f;
+		hgbl = LoadResource(hmod, hrsrc);
+		size = SizeofResource(hmod, hrsrc);
+		ptr = LockResource(hgbl);
+		snprintf(pydll, sizeof(pydll), "%S\\%s", dirname, PYTHONDLL);
+		printf("PYTHONDLL: %s\n", pydll);
+		f = fopen(pydll, "wb");
+		fwrite(ptr, size, 1, f);
+		fclose(f);
+	}
+	return TRUE;
+}
+
+
+void set_vars(void)
+{
+	HMODULE py = GetModuleHandle(PYTHONDLL);
+	int *pflag = (int *)GetProcAddress(py, "Py_NoSiteFlag");
+	printf("GetProcAddress(%p, 'Py_NoSiteFlag') -> %p\n", py, pflag);
+	*pflag = 1;
+}
+
+void free_lib(char *name)
+{
+	HMODULE hmod = GetModuleHandleA(name);
+	int res;
+	do {
+		res = (int)FreeLibrary(hmod);
+		printf("Free %s -> %d\n", name, res);
+	} while (res);
+	res = _unlink(name);
+	printf("unlinked %s -> %d\n", name, res);
+}
+
+/*****************************************************************/
+
+static struct DLL {
+	char *dllname;
+	struct DLL *next;
+} *dll_pointer;
+
+void free_dlls()
+{
+	struct DLL *ptr = dll_pointer;
+	while(ptr) {
+		printf("FOUND %s\n", ptr->dllname);
+		free_lib(ptr->dllname);
+		ptr = ptr->next;
+	}
+}
+
+static PyObject *
+_p2e_register_dll(PyObject *self, PyObject *args)
+{
+	char *dll;
+	struct DLL *ptr;
+	if (!PyArg_ParseTuple(args, "s", &dll))
+		return NULL;
+	printf("REGISTERED %s\n", dll);
+	ptr = (struct DLL *)malloc(sizeof(struct DLL));
+	ptr->dllname = _strdup(dll);
+	ptr->next = dll_pointer;
+	dll_pointer = ptr;
+	return PyLong_FromLong(42);
+}
+
+static PyMethodDef _p2eMethods[] = {
+	{"register_dll", _p2e_register_dll, METH_VARARGS, "something"},
+	{NULL, NULL, 0, NULL},
+};
+
+static struct PyModuleDef _p2emodule = {
+	PyModuleDef_HEAD_INIT,
+	"_p2e",
+	"_p2e doc",
+	-1,
+	_p2eMethods
+};
+
+PyMODINIT_FUNC
+PyInit__p2e(void)
+{
+	return PyModule_Create(&_p2emodule);
+}
+
+/*****************************************************************/
+
 int wmain (int argc, wchar_t **argv)
 {
 	int rc = 0;
 
-	Py_NoSiteFlag = 1; /* Suppress 'import site' */
-	Py_InspectFlag = 1; /* Needed to determine whether to exit at SystemExit */
+/*	Py_NoSiteFlag = 1; /* Suppress 'import site' */
+/*	Py_InspectFlag = 1; /* Needed to determine whether to exit at SystemExit */
 
-	Py_SetProgramName(L"c:\\Users\\thomas\\devel\\google\\ctypes-stuff\\py3exe\\build\\lib\\py2exe\\run.exe");
-	Py_SetPath(L"c:\\Users\\thomas\\devel\\google\\ctypes-stuff\\py3exe\\runtime.zip");
+	calc_dirname(NULL);
+	wprintf(L"modulename %s\n", modulename);
+	wprintf(L"dirname %s\n", dirname);
+	_snwprintf(libfilename, sizeof(libfilename), L"%s\\library.zip", dirname);
+//	_snwprintf(libfilename, sizeof(libfilename), modulename);
+
+	wprintf(L"libfilename %s\n", libfilename);
+//	return 0;
+
+	printf("PYTHONDLL NOT YET LOADED: press any key...\n");
+	getch();
+
+	unpack_python_dll(GetModuleHandle(NULL));
+
+	locate_script(GetModuleHandle(NULL));
+
+	Py_IsInitialized();
+	printf("Called Py_SetProgramName and Py_SetPath. Weiter...\n");
+	getch();
+
+	set_vars();
+
+	PyImport_AppendInittab("_p2e", PyInit__p2e);
+	
+	printf("WEITER...\n");
+	Py_SetProgramName(modulename);
+	Py_SetPath(libfilename);
 	Py_Initialize();
 	PySys_SetArgvEx(argc, argv, 0);
-	PyRun_SimpleString("import sys; print(sys.executable, sys.executable)");
-	PyRun_SimpleString("import sys; print('path', sys.path)");
-	PyRun_SimpleString("import sys; print('argv', sys.argv)");
 /*
 	rc = run_script();
 */
-	PyRun_SimpleString("import os; print('os', os)");
-	PyRun_SimpleString("import threading; print(threading)");
-	PyRun_SimpleString("import yaml; print(yaml)");
 	PyRun_SimpleString("import __SCRIPT__; __SCRIPT__.main()");
-//	PyRun_SimpleString("mod = __import__(input('import: ')); print(mod)");
-//	PyImport_ImportModule("fpgui");
 
 	fini();
+
+        free_dlls();
+	{
+		char pydll[260];
+		HMODULE hmod = GetModuleHandle(PYTHONDLL);
+		GetModuleFileName(hmod, pydll, sizeof(pydll));
+		free_lib(pydll);
+	}
+	printf("Please examine with PROCESS EXPLORER\n");
+	getch();
 	return rc;
 }

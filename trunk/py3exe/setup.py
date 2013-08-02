@@ -312,11 +312,9 @@ else:
     macros = [("PYTHONDLL", '\\"PYTHON%d%d.DLL\\"' % sys.version_info[:2]),
               ("PYTHONCOM", '\\"pythoncom%d%d.dll\\"' % sys.version_info[:2]),
               ("_CRT_SECURE_NO_WARNINGS", '1')]
-if 'zlib' in sys.builtin_module_names:
-    macros.append(("PYZLIB_BUILTIN", None))
 
 extra_compile_args = []
-extra_link_args = []
+extra_link_args = ["/DELAYLOAD:python%d%d.dll" % sys.version_info[:2], "delayimp.lib"]
 
 if 0:
     # enable this to debug a release build
@@ -336,7 +334,7 @@ run = Interpreter("py3exe.run",
                    ],
                   libraries=["user32"],
 ##                  depends=depends,
-##                  define_macros=macros,
+                  define_macros=macros,
                   extra_compile_args=extra_compile_args,
                   extra_link_args=extra_link_args,
                   )
