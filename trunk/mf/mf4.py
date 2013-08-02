@@ -79,14 +79,6 @@ class ModuleFinder:
         self._scan_code(mod.__code__, mod)
 
 
-    def _add_module(self, name, mod):
-        """Add a module to self.modules.
-
-        """
-        if hasattr(mod, "__file__") and mod.__file__.endswith(".pyd"):
-            self.find_needed_dlls(mod.__file__)
-        self.modules[name] = mod
-
     def import_package(self, name):
         """Import a complete package.
 
@@ -282,26 +274,15 @@ class ModuleFinder:
             # Crazy side-effects!
             if name in self.modules:
                 return self.modules[name]
-## ####
-##             if 0:
-##                 # this fixes 'import os.path', but creates other problems
-##                 child = name.rpartition('.')[2]
-##                 if child in parent_module.__globalnames__:
-##                     return parent_module
-## ####
             # Backwards-compatibility; be nicer to skip the dict lookup.
             parent_module = self.modules[parent]
             try:
                 path = parent_module.__path__
             except AttributeError:
-####
-                if 1:
-                    # this fixes 'import os.path'. Does it create other problems?
-                    child = name.rpartition('.')[2]
-                    if child in parent_module.__globalnames__:
-##                        print("FOO", name, self.modules["ntpath"])
-                        return parent_module
-####
+                # this fixes 'import os.path'. Does it create other problems?
+                child = name.rpartition('.')[2]
+                if child in parent_module.__globalnames__:
+                    return parent_module
                 msg = ('No module named {!r}; {} is not a package').format(name, parent)
                 self._add_badmodule(name)
                 raise ImportError(msg, name=name)
@@ -335,6 +316,10 @@ class ModuleFinder:
 
     def _add_badmodule(self, name):
         self.badmodules.add(name)
+
+
+    def _add_module(self, name, mod):
+        self.modules[name] = mod
 
 
     def _load_module(self, loader, name):
