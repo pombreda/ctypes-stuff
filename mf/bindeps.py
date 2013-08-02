@@ -18,8 +18,11 @@ _wapi.GetModuleFileNameW(sys.dllhandle, _buf, len(_buf))
 pydll = _buf.value.lower()
 
 def search_path(imagename, path,
+                loaded=None,
                 _buf=_wapi.create_unicode_buffer(256)):
     """Find an image (exe or dll) on the PATH."""
+    if loaded and imagename.lower() in loaded:
+        return loaded[imagename.lower()]
     # SxS files (like msvcr90.dll or msvcr100.dll) are only found in
     # the SxS directory when the PATH is NULL.
     pfile = _wapi.c_wchar_p()
@@ -40,7 +43,7 @@ def search_path(imagename, path,
         return _buf.value
     return None
 
-def depends(imagename):
+def depends(imagename, loaded=None):
     """Call BindImageEx and collect all dlls that are bound.
     """
     path = ";".join([os.path.dirname(imagename),
@@ -51,7 +54,7 @@ def depends(imagename):
     @_wapi.PIMAGEHLP_STATUS_ROUTINE
     def status_routine(reason, imagename, dllname, va, parameter):
         if reason == _wapi.BindImportModule: # 5
-            dllname = search_path(dllname.decode("mbcs"), path).lower()
+            dllname = search_path(dllname.decode("mbcs"), path, loaded).lower()
             result.add(dllname)
             # imagename binds to dllname
         return True
@@ -65,11 +68,11 @@ def depends(imagename):
                        status_routine)
     return result
 
-def is_system_dll(imagename):
+def is_system_dll(imagename, loaded=None):
     """is_system_dll must be called with a full pathname.
 
     For any dll in the Windows or System directory or any subdirectory
-    of those, except when the dll binds to or is the current python
+    of those, except when the dll binds to or IS the current python
     dll.
 
     For any other dll it returns False.
@@ -77,25 +80,29 @@ def is_system_dll(imagename):
     fnm = imagename.lower()
     if fnm == pydll:
         return False
-    deps = depends(imagename)
+    deps = depends(imagename, loaded)
     if pydll in deps:
         return False
     return fnm.startswith(windir + os.sep) or fnm.startswith(sysdir + os.sep)
 
-def collect_deps(dlls):
+def collect_deps(dlls, loaded=None):
     """Return all dlls that are required by the input dlls.
     The input dlls are not included in the result
     """
-    result = set()
+    result = set(dlls)
     current = set(dlls)
+    if loaded is None:
+        loaded = {}
 
     while current:
         dll = current.pop()
-        res = {x for x in depends(dll)
-               if not is_system_dll(x)}
-        current |= res
-        result |= res
-
+        loaded[os.path.basename(dll).lower()] = dll
+        deps = depends(dll, loaded)
+        for x in deps:
+            loaded[os.path.basename(x).lower()] = x
+            if not is_system_dll(x):
+                result.add(x)
+                current.add(x)
     return result
 
 ################################################################
