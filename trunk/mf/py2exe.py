@@ -1,4 +1,4 @@
-#!/usr/bin/python3.3-32
+#!/usr/bin/python3.3
 # -*- coding: utf-8 -*-
 import argparse
 import logging
@@ -81,28 +81,31 @@ def main():
     level = logging.INFO if options.verbose else logging.WARNING
     logging.basicConfig(level=level)
 
-    if options.destdir:
-        if not os.path.exists(options.destdir):
-            os.mkdir(options.destdir)
-        destdir = options.destdir
-    else:
-        destdir = "."
+    if not os.path.exists(options.destdir):
+        os.mkdir(options.destdir)
+    destdir = options.destdir
 
-    basename = os.path.basename(options.script)
+    # basename of the exe to create
+    dest_base = os.path.splitext(os.path.basename(options.script))[0]
 
-    runner = os.path.join(destdir, os.path.splitext(basename)[0] + ".exe")
+    exe_path = os.path.join(destdir, dest_base + ".exe")
+    if os.path.isfile(exe_path):
+        os.remove(exe_path)
 
     # 'libname' is the path of the runtime library RELATIVE to the runner directory.
-    libname = "library.zip"
-##    libname = os.path.splitext(basename)[0] + ".exe"
+    libname = "lib\\archive.zip"
+
+    libpath = os.path.join(destdir, libname)
+    if os.path.isfile(libpath):
+        os.remove(libpath)
+
+    if not os.path.exists(os.path.dirname(libpath)):
+        os.mkdir(os.path.dirname(libpath))
 
     builder = runtime.Runtime(options)
-
     builder.analyze()
-
-    builder.build_exe(runner, libname)
-
-    builder.build(os.path.join(destdir, libname))
+    builder.build_exe(exe_path, libname)
+    builder.build(libpath)
 
 if __name__ == "__main__":
     main()

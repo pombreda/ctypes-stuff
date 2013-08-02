@@ -1,6 +1,6 @@
 #!/usr/bin/python3.3-32
 # -*- coding: utf-8 -*-
-from mf4 import ModuleFinder
+from dllfinder import Scanner
 
 import imp
 import io
@@ -38,8 +38,8 @@ class Runtime(object):
         excludes = self.options.excludes if self.options.excludes else ()
         optimize = self.options.optimize if self.options.optimize else 0
 
-        mf = self.mf = ModuleFinder(excludes=excludes,
-                                    optimize=optimize)
+        mf = self.mf = Scanner(excludes=excludes,
+                               optimize=optimize)
 
         for modname in self.bootstrap_modules:
             if modname.endswith(".*"):
@@ -94,7 +94,21 @@ class Runtime(object):
         with open(filename, "wb") as ofi:
             ofi.write(exe_bytes)
         from resources import add_resources
-        add_resources(filename)
+        import struct
+
+        optimize=True
+        unbuffered = False
+        data_bytes=0
+
+        zippath = libname.encode("mbcs")
+
+        script_info = struct.pack("IIII",
+                                  0x78563412,
+                                  optimize,
+                                  unbuffered,
+                                  data_bytes) + zippath + b"\0"
+
+        add_resources(filename, script_info)
 
     def build(self, library):
         logger.info("Building the code archive %r", library)
@@ -110,7 +124,6 @@ class Runtime(object):
         ##     libpath = library
         libpath = library
 
-        shutil.copyfile(sys.executable, libpath)
         arc = zipfile.ZipFile(libpath, "a",
                               compression=zipfile.ZIP_DEFLATED)
 
@@ -161,21 +174,16 @@ class Runtime(object):
                     shutil.copyfile(mod.__file__,
                                     os.path.join(os.path.dirname(libpath), pydfile))
 
-        arc.close()
         dlldir = os.path.dirname(libpath)
+        for src in self.mf.required_dlls():
+            if self.options.bundle_files < 3:
+                dst = os.path.join("--DLLS--", os.path.basename(src))
+                arc.write(src, dst)
+            else:
+                dst = os.path.join(dlldir, os.path.basename(src))
+                shutil.copyfile(src, dst)
 
-        pyds = [mod.__file__ for mod in self.mf.modules.values()
-                if mod.__code__ is None and hasattr(mod, "__file__")] + [sys.executable]
-        logger.info("Scanning %d python extensions for needed dlls", len(pyds))
-        from bindeps import collect_deps
-        dlls = collect_deps(pyds)
-        logger.info("Found %d dlls", len(dlls))
-        for dll in dlls:
-            dst = os.path.join(dlldir, os.path.basename(dll))
-            shutil.copyfile(dll, dst)
-        
-
-        ################################
+        arc.close()
 
 ################################################################
 
@@ -188,8 +196,7 @@ def __load():
     dstpath = os.path.join(py2exe_dlldir, '{0}')
     with open(dstpath, "wb") as dll:
         dll.write(data)
-    # register BEFORE importing
-    _p2e.register_dll(dstpath)
+    _p2e.register_dll(dstpath) # register before importing; just in case.
     mod = imp.load_dynamic(__name__, dstpath)
     mod.frozen = 1
 __load()
