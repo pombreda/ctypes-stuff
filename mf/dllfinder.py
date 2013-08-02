@@ -3,6 +3,7 @@
 """dllfinder
 """
 import _wapi
+import collections
 import os
 import sys
 
@@ -38,25 +39,33 @@ class DllFinder:
         # _loaded_dlls contains ALL dlls that are bound;
         # maps lower case basename to full pathname.
         self._loaded_dlls = {}
+
         # _dlls contains the full pathname of the dlls (and pyds) that
         # are NOT considered system dlls.
-        self._dlls = set()
+        #
+        # The pathname is mapped to a set of modules/dlls that require
+        # this dll. This allows to find out WHY a certain dll has to
+        # be included.
+        self._dlls = collections.defaultdict(set)
 
-    def import_extension(self, pyd):
+    def import_extension(self, pyd, callers=None):
         """Add an extension module and scan it for dependencies.
 
         """
-        self._dlls.add(pyd)
+        self._dlls[pyd] |= callers if callers else {"-"}
 
-        todo = {pyd}
+        todo = {pyd} # todo contains the dlls that we have to examine
+
         while todo:
-            dll = todo.pop()
-            self._loaded_dlls[os.path.basename(dll).lower()] = dll
+            dll = todo.pop() # get one and check it
+            if dll in self._loaded_dlls:
+                continue
             for dep_dll in self.bind_image(dll):
-                self._loaded_dlls[os.path.basename(dep_dll).lower()] = dep_dll
+                if dep_dll in self._loaded_dlls:
+                    continue
                 if not self.is_system_dll(dep_dll):
                     todo.add(dep_dll)
-                    self._dlls.add(dep_dll)
+                    self._dlls[dep_dll].add(dll)
 
 
     def bind_image(self, imagename):
@@ -75,6 +84,7 @@ class DllFinder:
                 result.add(dllname)
             return True
 
+        self._loaded_dlls[os.path.basename(imagename).lower()] = imagename
         _wapi.BindImageEx(_wapi.BIND_ALL_IMAGES
                            | _wapi.BIND_CACHE_IMPORT_DLLS
                            | _wapi.BIND_NO_UPDATE,
@@ -125,14 +135,15 @@ class DllFinder:
         """Return a set containing the pathnames of system dlls.
         The required_dlls are NOT included in the result.
         """
-        return set(self._loaded_dlls.values()) - self._dlls
-
-##    def report(self):
-        
+        return set(self._loaded_dlls.values()) - set(self._dlls)
 
 ################################################################
     
 if __name__ == "__main__":
+    # test script and usage example
+    #
+    # Should we introduce an 'offical' subclass of ModuleFinder
+    # and DllFinder?
     from  mf4 import ModuleFinder
     from importlib.machinery import EXTENSION_SUFFIXES
 
@@ -146,15 +157,17 @@ if __name__ == "__main__":
             super(Scanner, self)._add_module(name, mod)
             if hasattr(mod, "__file__") \
                    and mod.__file__.endswith(tuple(EXTENSION_SUFFIXES)):
-                self._add_pyd(mod.__file__)
+                callers = {self.modules[n]
+                           for n in self._depgraph[name]}
+                self._add_pyd(mod.__file__, callers)
 
-        def _add_pyd(self, name):
-            self.dllfinder.import_extension(name)
+        def _add_pyd(self, name, callers):
+            self.dllfinder.import_extension(name, callers)
 
         def report_dlls(self):
             import pprint
-            pprint.pprint(self.dllfinder.required_dlls())
-            pprint.pprint(self.dllfinder.system_dlls())
+            pprint.pprint(set(self.dllfinder.required_dlls()))
+            pprint.pprint(set(self.dllfinder.system_dlls()))
 
     scanner = Scanner()
     scanner.import_hook("numpy")
