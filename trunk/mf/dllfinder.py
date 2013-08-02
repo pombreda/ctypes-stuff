@@ -22,7 +22,7 @@ pydll = _buf.value.lower()
 
 def SearchPath(imagename, path=None):
     pfile = _wapi.c_wchar_p()
-    if _wapi.SearchPathW(None,
+    if _wapi.SearchPathW(path,
                          imagename,
                          None,
                          len(_buf),
@@ -36,11 +36,12 @@ def SearchPath(imagename, path=None):
 class DllFinder:
 
     def __init__(self):
-        # _loaded_dlls contains ALL dlls that are bound;
-        # maps lower case basename to full pathname.
+        # _loaded_dlls contains ALL dlls that are bound, this includes
+        # the loaded extension modules; maps lower case basename to
+        # full pathname.
         self._loaded_dlls = {}
 
-        # _dlls contains the full pathname of the dlls (and pyds) that
+        # _dlls contains the full pathname of the dlls that
         # are NOT considered system dlls.
         #
         # The pathname is mapped to a set of modules/dlls that require
@@ -52,8 +53,6 @@ class DllFinder:
         """Add an extension module and scan it for dependencies.
 
         """
-        self._dlls[pyd] |= callers if callers else {"-"}
-
         todo = {pyd} # todo contains the dlls that we have to examine
 
         while todo:
@@ -138,37 +137,43 @@ class DllFinder:
         return set(self._loaded_dlls.values()) - set(self._dlls)
 
 ################################################################
+
+from  mf4 import ModuleFinder
+from importlib.machinery import EXTENSION_SUFFIXES
+
+class Scanner(ModuleFinder):
+
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        self.dllfinder = DllFinder()
+
+    def _add_module(self, name, mod):
+        super()._add_module(name, mod)
+        if hasattr(mod, "__file__") \
+               and mod.__file__.endswith(tuple(EXTENSION_SUFFIXES)):
+            callers = {self.modules[n]
+                       for n in self._depgraph[name]}
+            self._add_pyd(mod.__file__, callers)
+
+    def _add_pyd(self, name, callers):
+        self.dllfinder.import_extension(name, callers)
+
+    def required_dlls(self):
+        return self.dllfinder.required_dlls()
+
+    ## def report_dlls(self):
+    ##     import pprint
+    ##     pprint.pprint(set(self.dllfinder.required_dlls()))
+    ##     pprint.pprint(set(self.dllfinder.system_dlls()))
+
+################################################################
     
 if __name__ == "__main__":
     # test script and usage example
     #
     # Should we introduce an 'offical' subclass of ModuleFinder
     # and DllFinder?
-    from  mf4 import ModuleFinder
-    from importlib.machinery import EXTENSION_SUFFIXES
-
-    class Scanner(ModuleFinder):
-
-        def __init__(self, *args, **kw):
-            super(Scanner, self).__init__(*args, **kw)
-            self.dllfinder = DllFinder()
-
-        def _add_module(self, name, mod):
-            super(Scanner, self)._add_module(name, mod)
-            if hasattr(mod, "__file__") \
-                   and mod.__file__.endswith(tuple(EXTENSION_SUFFIXES)):
-                callers = {self.modules[n]
-                           for n in self._depgraph[name]}
-                self._add_pyd(mod.__file__, callers)
-
-        def _add_pyd(self, name, callers):
-            self.dllfinder.import_extension(name, callers)
-
-        def report_dlls(self):
-            import pprint
-            pprint.pprint(set(self.dllfinder.required_dlls()))
-            pprint.pprint(set(self.dllfinder.system_dlls()))
 
     scanner = Scanner()
-    scanner.import_hook("numpy")
+    scanner.import_package("numpy")
     scanner.report_dlls()
