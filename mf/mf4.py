@@ -75,9 +75,17 @@ class ModuleFinder:
         assert "__SCRIPT__" not in sys.modules
         ldr = importlib.machinery.SourceFileLoader("__SCRIPT__", path)
         mod = Module(ldr, "__SCRIPT__", self._optimize)
-        self.modules["__SCRIPT__"] = mod
+        self._add_module("__SCRIPT__", mod)
         self._scan_code(mod.__code__, mod)
 
+
+    def _add_module(self, name, mod):
+        """Add a module to self.modules.
+
+        """
+        if hasattr(mod, "__file__") and mod.__file__.endswith(".pyd"):
+            self.find_needed_dlls(mod.__file__)
+        self.modules[name] = mod
 
     def import_package(self, name):
         """Import a complete package.
@@ -330,7 +338,8 @@ class ModuleFinder:
 
 
     def _load_module(self, loader, name):
-        mod = self.modules[name] = Module(loader, name, self._optimize)
+        mod = Module(loader, name, self._optimize)
+        self._add_module(name, mod)
         if name in self._package_paths:
             mod.__path__.extend(self._package_paths[name])
 
