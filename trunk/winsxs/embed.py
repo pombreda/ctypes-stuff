@@ -1,6 +1,7 @@
 # -*- coding: latin-1 -*-
 """embed python into python."""
-from __future__ import division, with_statement, absolute_import
+from __future__ import division, with_statement, absolute_import, print_function
+
 
 import os
 import sys
@@ -30,24 +31,29 @@ with ctx.activate():
 
     # Replace the initial path in the Python dll by another one (assuming
     # the pointer returned by Py_GetPath points to writeable memory)
-    interp.Py_GetPath.restype = ctypes.POINTER(ctypes.c_char)
+    interp.Py_GetPath.restype = ctypes.POINTER(py.CHAR)
     ppath = interp.Py_GetPath()
     for i, c in enumerate(newpath + "\0"):
         ppath[i] = c
 
-    interp.Py_GetPath.restype = ctypes.c_char_p
-    print interp.Py_GetPath()
+    interp.Py_GetPath.restype = py.STRING
+    print("2nd PATH", interp.Py_GetPath())
 
     interp.Py_Initialize()
-    interp.PyRun_SimpleString("import sys; print sys.path")
-    interp.PyRun_SimpleString("import sys; print 'DllHandle:', hex(sys.dllhandle)")
-    interp.PyRun_SimpleString("import _socket; print _socket")
+    interp.PyRun_SimpleString(b"import sys; print('sys.path', sys.path)")
+    interp.PyRun_SimpleString(b"import sys; print('DllHandle:', hex(sys.dllhandle))")
+    interp.PyRun_SimpleString(b"import _socket; print(_socket)")
 
-    interp.PyRun_SimpleString("print __name__")
+    interp.PyRun_SimpleString(b"print(__name__)")
 
     import sys
-    print "DllHandle", hex(sys.dllhandle)
-    print
-    raw_input("""\
+    print("DllHandle", hex(sys.dllhandle))
+    print()
+    text = """\
     Please examine the python process to see that 2 instances of
-    pythonXY.dll are loaded into one process; then press Enter.""")
+    pythonXY.dll are loaded into one process; then press Enter."""
+
+    if py.PY3:
+        input(text)
+    else:
+        raw_input(text)
