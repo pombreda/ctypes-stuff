@@ -2,7 +2,6 @@
 """embed python into python."""
 from __future__ import division, with_statement, absolute_import, print_function
 
-
 import os
 import sys
 import ctypes
@@ -13,7 +12,12 @@ from actctx import Context
 dllname = "python%d%d.dll" % sys.version_info[:2]
 assembly = "python%d%d.private" % sys.version_info[:2]
 
-ctx = Context(os.path.join(assembly, dllname))
+path = os.path.join(assembly, dllname)
+ctx = Context(path)
+
+## http://blogs.msdn.com/b/junfeng/archive/2007/06/26/rt-manifest-resource-and-isolation-aware-enabled.aspx
+## http://msdn.microsoft.com/en-us/library/windows/desktop/aa375197.aspx (the comment at the end!!!)
+## http://omnicognate.wordpress.com/2009/10/05/winsxs/
 
 with ctx.activate():
     interp = py.Python(dllname)
