@@ -1,12 +1,14 @@
 #!/usr/bin/python3.3-32
 # -*- coding: utf-8 -*-
-from dllfinder import Scanner
+from dllfinder import Scanner, pydll
 
+import distutils.util
 import imp
 import io
 import logging
 import marshal
 import os
+import pkgutil
 import shutil
 import sys
 import zipfile
@@ -22,7 +24,6 @@ class Runtime(object):
     # modules which are always needed
     bootstrap_modules = ("codecs",
                          "io",
-                         "runpy",
                          "encodings.*")
 
     def __init__(self, options):
@@ -89,8 +90,11 @@ class Runtime(object):
 
     def build_exe(self, exe_path, libname):
         logger.info("Building exe '%s'", exe_path)
-        import pkgutil
-        exe_bytes = pkgutil.get_data("py3exe", "run.exe")
+        run_stub = '%s-py%s.%s-%s.exe' % ("run",
+                                          sys.version_info[0],
+                                          sys.version_info[1],
+                                          distutils.util.get_platform())
+        exe_bytes = pkgutil.get_data("py3exe", run_stub)
         with open(exe_path, "wb") as ofi:
             ofi.write(exe_bytes)
 
@@ -175,15 +179,22 @@ class Runtime(object):
                 arc.writestr(path, stream.getvalue())
 
                 if self.options.bundle_files < 3:
+                    print("Add %s to %s" % (os.path.basename(mod.__file__), libpath))
                     arc.write(mod.__file__, os.path.join("--EXTENSIONS--", pydfile))
                 else:
+                    print("Copy %s to %s" % (os.path.basename(mod.__file__),
+                                             os.path.dirname(libpath)))
                     shutil.copyfile(mod.__file__,
                                     os.path.join(os.path.dirname(libpath), pydfile))
 
         dlldir = os.path.dirname(libpath)
         for src in self.mf.required_dlls():
+            if src.lower() == pydll:
+##                print("Skipping %s" % pydll)
+                continue
             if self.options.bundle_files < 3:
                 dst = os.path.join("--DLLS--", os.path.basename(src))
+                print("Adding %s to %s" % (os.path.basename(dst), libpath))
                 arc.write(src, dst)
             else:
                 dst = os.path.join(dlldir, os.path.basename(src))

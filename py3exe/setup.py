@@ -12,6 +12,7 @@ from distutils.command.install_data import install_data
 from distutils.sysconfig import customize_compiler
 from distutils.dep_util import newer_group
 from distutils.errors import *
+from distutils.util import get_platform
 
 if sys.version_info < (3, 3):
     raise DistutilsError("This package requires Python 3.3 or later")
@@ -41,8 +42,8 @@ class Dist(Distribution):
     def has_interpreters(self):
         return self.interpreters and len(self.interpreters) > 0
 
-    ## def has_extensions(self):
-    ##     return self.has_interpreters()
+    def has_extensions(self):
+        return False
 
 class BuildInterpreters(build_ext.build_ext):
     description = "build special python interpreter stubs"
@@ -146,8 +147,10 @@ class BuildInterpreters(build_ext.build_ext):
     def get_exe_filename (self, inter_name):
         ext_path = inter_name.split('.')
         if self.debug:
-            return os.path.join(*ext_path) + '_d'
-        return os.path.join(*ext_path)
+            fnm = os.path.join(*ext_path) + '_d'
+        else:
+            fnm = os.path.join(*ext_path)
+        return '%s-py%s.%s-%s' % (fnm, sys.version_info[0], sys.version_info[1], get_platform())
 
     def setup_compiler(self):
         # This method *should* be available separately in build_ext!
@@ -305,11 +308,11 @@ def _is_debug_build():
     return False
 
 if _is_debug_build():
-    macros = [("PYTHONDLL", '\\"PYTHON%d%d_d.DLL\\"' % sys.version_info[:2]),
+    macros = [("PYTHONDLL", '\\"python%d%d_d.dll\\"' % sys.version_info[:2]),
               ("PYTHONCOM", '\\"pythoncom%d%d_d.dll\\"' % sys.version_info[:2]),
               ("_CRT_SECURE_NO_WARNINGS", '1')]
 else:
-    macros = [("PYTHONDLL", '\\"PYTHON%d%d.DLL\\"' % sys.version_info[:2]),
+    macros = [("PYTHONDLL", '\\"python%d%d.dll\\"' % sys.version_info[:2]),
               ("PYTHONCOM", '\\"pythoncom%d%d.dll\\"' % sys.version_info[:2]),
               ("_CRT_SECURE_NO_WARNINGS", '1')]
 
@@ -342,7 +345,7 @@ run = Interpreter("py3exe.run",
 interpreters = [run]
 
 setup(name="py3exe",
-##      version=__version__,
+      version="0.1.0",
       description="Build standalone executables for Windows",
       long_description=__doc__,
       author="Thomas Heller",
@@ -356,10 +359,11 @@ setup(name="py3exe",
 ##      classifiers=["Development Status :: 5 - Production/Stable"],
       distclass = Dist,
       cmdclass = {'build_interpreters': BuildInterpreters,
-                  'deinstall': deinstall,
-                  'install_data': smart_install_data,
+##                  'deinstall': deinstall,
+##                  'install_data': smart_install_data,
                  },
 
+      scripts = ["build_setup.py"],
       interpreters = interpreters,
       packages = find_packages(),
 ##       packages=['py3exe',
