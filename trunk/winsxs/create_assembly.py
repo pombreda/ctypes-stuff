@@ -2,10 +2,12 @@
 """Create a private sxs assembly containing a Python interpreter
 """
 from __future__ import division, with_statement, absolute_import, print_function
+
+import ctypes
 import os
 import shutil
-import wapi
 import sys
+import wapi
 import xml.etree.ElementTree as ET
 
 
@@ -15,7 +17,6 @@ def GetModuleFileName(hmod):
     return buf.value
 
 if __name__ == "__main__":
-    import sys
     dllpath = GetModuleFileName(sys.dllhandle)
 
     assembly = u"python%d%d.private" % sys.version_info[:2]
@@ -47,18 +48,18 @@ if __name__ == "__main__":
     shutil.copyfile(dllpath, os.path.join(assembly, os.path.basename(dllpath)))
     files = os.listdir(assembly)
 
-    # Retrieve the manifest resource (FT_MANIFEST, id=2)
+    # Retrieve the manifest resource (RT_MANIFEST, id=2)
     hr = wapi.FindResourceA(sys.dllhandle, b"#2", wapi.LPCSTR(wapi.RT_MANIFEST))
     hglobal = wapi.LoadResource(sys.dllhandle, hr)
     size = wapi.SizeofResource(sys.dllhandle, hr)
     ptr = wapi.LockResource(hglobal)
-    import ctypes
     lpstr = ctypes.cast(ptr, ctypes.POINTER(ctypes.c_char))
     m = lpstr[:size]
 
     e = ET.fromstring(m)
     for name in files:
-        e.insert(0, ET.Element("ns0:file", name=name))
+        if name.lower().endswith((".dll", ".pyd")):
+            e.insert(0, ET.Element("ns0:file", name=name))
     manifest64 = ET.tostring(e)
 
     # Retrieve the file version number
@@ -68,12 +69,12 @@ if __name__ == "__main__":
 
     pfi = wapi.POINTER(wapi.VS_FIXEDFILEINFO)()
 
-    wapi.VerQueryValueA(buf, b"\\", pfi, wapi.c_uint())
-    fi = pfi[0]
-    ver = divmod(fi.dwFileVersionMS, 0x10000) + divmod(fi.dwFileVersionLS, 0x10000)
-    print("Version %d.%d.%d.%d" % ver)
+##    wapi.VerQueryValueA(buf, b"\\", pfi, wapi.c_uint())
+##    fi = pfi[0]
+##    ver = divmod(fi.dwFileVersionMS, 0x10000) + divmod(fi.dwFileVersionLS, 0x10000)
+##    print("Version %d.%d.%d.%d" % ver)
 
-    # Remove the RT_MANIFEST resource from the private copy of pythonXY.dll
+    # Replace the RT_MANIFEST resource in the private copy of pythonXY.dll
     print("Replacing RT_MANIFEST in %s..." % os.path.basename(dllpath))
     h = wapi.BeginUpdateResource(os.path.join(assembly, os.path.basename(dllpath)), False)
     wapi.UpdateResource(h,
@@ -86,3 +87,7 @@ if __name__ == "__main__":
 
     print()
     print(manifest64.decode("ascii"))
+
+    ## manifest_file = os.path.join(assembly, os.path.basename(assembly) + ".manifest")
+    ## with open(manifest_file, "wb") as ofi:
+    ##     ofi.write(manifest64)
