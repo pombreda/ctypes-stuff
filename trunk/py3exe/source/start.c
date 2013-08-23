@@ -317,8 +317,8 @@ int wmain (int argc, wchar_t **argv)
 	wprintf(L"libfilename %s\n", libfilename);
 //	return 0;
 
-	printf("PYTHONDLL NOT YET LOADED: press any key...\n");
-	getch();
+//	printf("PYTHONDLL NOT YET LOADED: press any key...\n");
+//	getch();
 
 	unpack_python_dll(GetModuleHandle(NULL));
 
@@ -326,7 +326,7 @@ int wmain (int argc, wchar_t **argv)
 
 	Py_IsInitialized();
 	printf("Called Py_SetProgramName and Py_SetPath. Weiter...\n");
-	getch();
+//	getch();
 
 	set_vars();
 
@@ -351,7 +351,7 @@ int wmain (int argc, wchar_t **argv)
 		GetModuleFileName(hmod, pydll, sizeof(pydll));
 		free_lib(pydll);
 	}
-	printf("Please examine with PROCESS EXPLORER\n");
-	getch();
+//	printf("Please examine with PROCESS EXPLORER\n");
+//	getch();
 	return rc;
 }

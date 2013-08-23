@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 """resources for py3exe
 """
-
+import os
+import sys
 import _wapi
 
 # something like this is what we want
@@ -22,15 +23,18 @@ import _wapi
 
 
 def add_resources(filename, script_info):
+
+    pydll = "python%d%d.dll" % sys.version_info[:2]
+
     hrsrc = _wapi.BeginUpdateResourceW(filename, False)
 
-    print("Adding Resources")
-
-    with open("c:\\windows\\system32\\python33.dll", "rb") as ifi:
+    with open("c:\\windows\\system32\\%s" % pydll, "rb") as ifi:
         pydll_bytes = ifi.read()
 
+    print("Add Resource %s to %s" % (os.path.basename(pydll), filename))
+
     _wapi.UpdateResourceA(hrsrc,
-                          b"PYTHON33.DLL",
+                          pydll.encode("ascii"),
                           _wapi.LPCSTR(1),
                           0, # wLanguage
                           pydll_bytes,
