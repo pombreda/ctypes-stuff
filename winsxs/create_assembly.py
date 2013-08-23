@@ -1,10 +1,11 @@
 # -*- coding: latin-1 -*-
 """Create a private sxs assembly containing a Python interpreter
 """
-from __future__ import division, with_statement, absolute_import
+from __future__ import division, with_statement, absolute_import, print_function
 import os
 import shutil
 import wapi
+import sys
 import xml.etree.ElementTree as ET
 
 
@@ -26,6 +27,21 @@ if __name__ == "__main__":
     print("Copying Python installation into %s..." % assembly)
     import _socket; extpath = os.path.dirname(_socket.__file__)
     shutil.copytree(extpath, assembly)
+
+    if sys.version_info >= (3, 0):
+        # For Python 3, we must also copy these modules:
+        # codecs, io, abc, _weakrefset
+        # and these packages:
+        # encodings
+        # otherwise it won't initialize
+        for name in ("io", "abc", "codecs", "_weakrefset"):
+            __import__(name)
+            mod = sys.modules[name]
+            src = mod.__file__
+            dst = os.path.join(assembly, os.path.basename(src))
+            shutil.copyfile(src, dst)
+        import encodings
+        shutil.copytree(os.path.dirname(encodings.__file__), os.path.join(assembly, "encodings"))
 
     print("Copying %s" % os.path.basename(dllpath))
     shutil.copyfile(dllpath, os.path.join(assembly, os.path.basename(dllpath)))
