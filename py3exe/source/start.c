@@ -154,7 +154,7 @@ BOOL locate_script(HMODULE hmod)
 	// get full pathname of the 'library.zip' file
 	if(p_script_info->zippath[0]) {
 		_snwprintf(libfilename, sizeof(libfilename),
-			   L"%s\\%S", dirname, p_script_info->zippath);
+			   L"%s\\%s", dirname, p_script_info->zippath);
 	} else {
 		GetModuleFileNameW(hmod, libfilename, sizeof(libfilename));
 	}
@@ -210,7 +210,7 @@ BOOL unpack_python_dll(HMODULE hmod)
 	hrsrc = FindResource(hmod, MAKEINTRESOURCE(1), PYTHONDLL);
 	printf("FindResource %s %p\n", PYTHONDLL, hrsrc);
 	if (hrsrc) {
-		char pydll[260];
+		wchar_t pydll[260];
 		HGLOBAL hgbl;
 		DWORD size;
 		char *ptr;
@@ -218,9 +218,9 @@ BOOL unpack_python_dll(HMODULE hmod)
 		hgbl = LoadResource(hmod, hrsrc);
 		size = SizeofResource(hmod, hrsrc);
 		ptr = LockResource(hgbl);
-		snprintf(pydll, sizeof(pydll), "%S\\%s", dirname, PYTHONDLL);
-		printf("PYTHONDLL: %s\n", pydll);
-		f = fopen(pydll, "wb");
+		_snwprintf(pydll, sizeof(pydll), L"%s\\%S", dirname, PYTHONDLL);
+		printf("PYTHONDLL: %S\n", pydll);
+		f = _wfopen(pydll, L"wb");
 		fwrite(ptr, size, 1, f);
 		fclose(f);
 	}
@@ -236,22 +236,24 @@ void set_vars(void)
 	*pflag = 1;
 }
 
-void free_lib(char *name)
+void free_lib(wchar_t *name)
 {
-	HMODULE hmod = GetModuleHandleA(name);
+	HMODULE hmod = GetModuleHandleW(name);
 	int res;
 	do {
 		res = (int)FreeLibrary(hmod);
-		printf("Free %s -> %d\n", name, res);
+		printf("Free %S -> %d\n", name, res);
 	} while (res);
-	res = _unlink(name);
-	printf("unlinked %s -> %d\n", name, res);
+	res = _wunlink(name);
+	printf("unlinked %S -> %d\n", name, res);
 }
 
-/*****************************************************************/
+/****************************************************************
+ * the _p2e builtin helper module
+ */
 
 static struct DLL {
-	char *dllname;
+	wchar_t *dllname;
 	struct DLL *next;
 } *dll_pointer;
 
@@ -259,7 +261,7 @@ void free_dlls()
 {
 	struct DLL *ptr = dll_pointer;
 	while(ptr) {
-		printf("FOUND %s\n", ptr->dllname);
+		printf("FOUND %S\n", ptr->dllname);
 		free_lib(ptr->dllname);
 		ptr = ptr->next;
 	}
@@ -268,27 +270,27 @@ void free_dlls()
 static PyObject *
 _p2e_register_dll(PyObject *self, PyObject *args)
 {
-	char *dll;
+	wchar_t *dll;
 	struct DLL *ptr;
-	if (!PyArg_ParseTuple(args, "s", &dll))
+	if (!PyArg_ParseTuple(args, "u", &dll))
 		return NULL;
-	printf("REGISTERED %s\n", dll);
+	printf("REGISTERED %S\n", dll);
 	ptr = (struct DLL *)malloc(sizeof(struct DLL));
-	ptr->dllname = _strdup(dll);
+	ptr->dllname = _wcsdup(dll);
 	ptr->next = dll_pointer;
 	dll_pointer = ptr;
 	return PyLong_FromLong(42);
 }
 
 static PyMethodDef _p2eMethods[] = {
-	{"register_dll", _p2e_register_dll, METH_VARARGS, "something"},
+	{"register_dll", _p2e_register_dll, METH_VARARGS, "register a dll for cleanup"},
 	{NULL, NULL, 0, NULL},
 };
 
 static struct PyModuleDef _p2emodule = {
 	PyModuleDef_HEAD_INIT,
 	"_p2e",
-	"_p2e doc",
+	"py2exe runtime helper module",
 	-1,
 	_p2eMethods
 };
@@ -346,9 +348,9 @@ int wmain (int argc, wchar_t **argv)
 
         free_dlls();
 	{
-		char pydll[260];
+		wchar_t pydll[260];
 		HMODULE hmod = GetModuleHandle(PYTHONDLL);
-		GetModuleFileName(hmod, pydll, sizeof(pydll));
+		GetModuleFileNameW(hmod, pydll, sizeof(pydll));
 		free_lib(pydll);
 	}
 //	printf("Please examine with PROCESS EXPLORER\n");
