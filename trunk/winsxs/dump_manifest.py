@@ -11,9 +11,9 @@ import xml.dom.minidom
 
 def _dump_manifest(exe_path, resource_name):
     print()
-    handle = winapi.LoadLibraryEx(exe_path.encode("ascii"),
-                                  0,
-                                  winapi.LOAD_LIBRARY_AS_DATAFILE)
+    handle = winapi.LoadLibraryExA(exe_path.encode("ascii"),
+                                   0,
+                                   winapi.LOAD_LIBRARY_AS_DATAFILE)
     try:
         hr = winapi.FindResourceA(handle, resource_name, winapi.LPCSTR(winapi.RT_MANIFEST))
         hglobal = winapi.LoadResource(handle, hr)
