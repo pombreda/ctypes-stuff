@@ -15,6 +15,9 @@ import zipfile
 
 logger = logging.getLogger("runtime")
 
+from importlib.machinery import EXTENSION_SUFFIXES
+from importlib.machinery import DEBUG_BYTECODE_SUFFIXES, OPTIMIZED_BYTECODE_SUFFIXES
+
 class Runtime(object):
     """This class represents the Python runtime: all needed modules
     and packages.  The runtime will be written to a zip.file
@@ -32,9 +35,6 @@ class Runtime(object):
 
     def analyze(self):
         logger.info("Analyzing the code")
-        # XXX Use importlib!!! to get extensions...
-        global PYC
-        PYC = ".pyc" if not self.options.optimize else ".pyo"
 
         excludes = self.options.excludes if self.options.excludes else ()
         optimize = self.options.optimize if self.options.optimize else 0
@@ -61,6 +61,8 @@ class Runtime(object):
         missing, maybe = mf.missing_maybe()
         logger.info("Found %d modules, %d are missing, %d may be missing",
                     len(mf.modules), len(missing), len(maybe))
+        if missing:
+            mf.report_missing()
 
     def build_bat(self, filename, libname):
         logger.info("Building batch-file %r", filename)
@@ -134,6 +136,11 @@ class Runtime(object):
             libmode = "w"
         logger.info("Building the code archive %r", libpath)
 
+        if self.options.optimize:
+            bytecode_suffix = OPTIMIZED_BYTECODE_SUFFIXES[0]
+        else:
+            bytecode_suffix = DEBUG_BYTECODE_SUFFIXES[0]
+
         arc = zipfile.ZipFile(libpath, libmode,
                               compression=zipfile.ZIP_DEFLATED)
 
@@ -141,9 +148,9 @@ class Runtime(object):
             code = mod.__code__
             if code:
                 if hasattr(mod, "__path__"):
-                    path = mod.__name__.replace(".", "\\") + "\\__init__" + PYC
+                    path = mod.__name__.replace(".", "\\") + "\\__init__" + bytecode_suffix
                 else:
-                    path = mod.__name__.replace(".", "\\") + PYC
+                    path = mod.__name__.replace(".", "\\") + bytecode_suffix
                 stream = io.BytesIO()
                 stream.write(imp.get_magic())
                 stream.write(b"\0\0\0\0") # null timestamp
@@ -153,12 +160,12 @@ class Runtime(object):
 
             elif hasattr(mod, "__file__"):
                 # XXX use importlib to get extensions...
-                assert mod.__file__.endswith(".pyd")
+                assert mod.__file__.endswith(EXTENSION_SUFFIXES[0])
 
                 # bundle_files == 3: put .pyds in the same directory as the zip.archive
                 # bundle_files <= 2: put .pyds into the zip-archive, extract to TEMP dir when needed
 
-                pydfile = mod.__name__ + ".pyd"
+                pydfile = mod.__name__ + EXTENSION_SUFFIXES[0]
 
                 # Build the loader which is contained in the zip-archive
                 if self.options.bundle_files < 3:
@@ -168,9 +175,9 @@ class Runtime(object):
 
                 code = compile(src, "<string>", "exec")
                 if hasattr(mod, "__path__"):
-                    path = mod.__name__.replace(".", "\\") + "\\__init__" + PYC
+                    path = mod.__name__.replace(".", "\\") + "\\__init__" + bytecode_suffix
                 else:
-                    path = mod.__name__.replace(".", "\\") + PYC
+                    path = mod.__name__.replace(".", "\\") + bytecode_suffix
                 stream = io.BytesIO()
                 stream.write(imp.get_magic())
                 stream.write(b"\0\0\0\0") # null timestamp
