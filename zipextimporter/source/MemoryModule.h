@@ -29,8 +29,6 @@
 
 #include <windows.h>
 
-extern char *LastErrorString;
-
 typedef void *HMEMORYMODULE;
 
 typedef void *HMEMORYRSRC;

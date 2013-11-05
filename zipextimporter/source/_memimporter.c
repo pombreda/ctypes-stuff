@@ -18,8 +18,6 @@ static char module_doc[] =
 #include "MyLoadLibrary.h"
 #include "actctx.h"
 
-extern char *LastErrorString;
-
 static PyObject *
 import_module(PyObject *self, PyObject *args)
 {
@@ -49,18 +47,18 @@ import_module(PyObject *self, PyObject *args)
 	_My_DeactivateActCtx(cookie);
 
 	if (!hmem) {
-		char *msg;
+	        char *msg;
 		FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
 			       NULL,
 			       GetLastError(),
 			       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-			       msg,
+			       (void *)&msg,
 			       0,
 			       NULL);
 		msg[strlen(msg)-2] = '\0';
 		PyErr_Format(PyExc_ImportError,
-			     "MemoryLoadLibrary failed loading %s (%s: %s)",
-			     pathname, LastErrorString, msg);
+			     "MemoryLoadLibrary failed loading %s: %s (%d)",
+			     pathname, msg, GetLastError());
 		LocalFree(msg);
 		/* PyErr_Format(PyExc_ImportError, */
 		/* 	     "MemoryLoadLibrary failed loading %s (Error %d loading %s)", */
