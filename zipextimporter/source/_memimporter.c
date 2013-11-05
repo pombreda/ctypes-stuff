@@ -1,15 +1,4 @@
-/*
-  For the _memimporter compiled into py2exe exe-stubs we need "Python-dynload.h".
-  For the standalone .pyd we need <Python.h>
-*/
-
-#ifdef STANDALONE
-#  include <Python.h>
-#  include "Python-version.h"
-#else
-#  include "Python-dynload.h"
-#  include <stdio.h>
-#endif
+#include <Python.h>
 #include <windows.h>
 
 static char module_doc[] =
@@ -18,6 +7,137 @@ static char module_doc[] =
 #include "MyLoadLibrary.h"
 #include "actctx.h"
 
+#if (PY_VERSION_HEX >= 0x03030000)
+
+/* Magic for extension modules (built-in as well as dynamically
+   loaded).  To prevent initializing an extension module more than
+   once, we keep a static dictionary 'extensions' keyed by the tuple
+   (module name, module name)  (for built-in modules) or by
+   (filename, module name) (for dynamically loaded modules), containing these
+   modules.  A copy of the module's dictionary is stored by calling
+   _PyImport_FixupExtensionObject() immediately after the module initialization
+   function succeeds.  A copy can be retrieved from there by calling
+   _PyImport_FindExtensionObject().
+
+   Modules which do support multiple initialization set their m_size
+   field to a non-negative number (indicating the size of the
+   module-specific state). They are still recorded in the extensions
+   dictionary, to avoid loading shared libraries twice.
+*/
+
+
+/* c:/users/thomas/devel/code/cpython-3.4/Python/importdl.c 73 */
+
+int do_import(FARPROC init_func, char *modname)
+{
+	int res = -1;
+	PyObject* (*p)(void);
+	PyObject *m = NULL;
+	struct PyModuleDef *def;
+	char *oldcontext;
+	PyObject *name = PyUnicode_FromString(modname);
+
+	if (name == NULL)
+		return -1;
+
+	m = _PyImport_FindExtensionObject(name, name);
+	if (m != NULL) {
+		Py_DECREF(name);
+		return 0;
+	}
+
+	if (init_func == NULL) {
+		PyObject *msg = PyUnicode_FromFormat("dynamic module does not define "
+						     "init function (PyInit_%s)",
+						     modname);
+		if (msg == NULL)
+			return -1;
+		PyErr_SetImportError(msg, name, NULL);
+		Py_DECREF(msg);
+		Py_DECREF(name);
+		return -1;
+	}
+
+        oldcontext = _Py_PackageContext;
+	_Py_PackageContext = modname;
+	p = (PyObject*(*)(void))init_func;
+	m = (*p)();
+	_Py_PackageContext = oldcontext;
+
+	if (PyErr_Occurred()) {
+		Py_DECREF(name);
+		return -1;
+	}
+
+	/* Remember pointer to module init function. */
+	def = PyModule_GetDef(m);
+	if (def == NULL) {
+		PyErr_Format(PyExc_SystemError,
+			     "initialization of %s did not return an extension "
+			     "module", modname);
+		Py_DECREF(name);
+		return -1;
+	}
+	def->m_base.m_init = p;
+
+	res = _PyImport_FixupExtensionObject(m, name, name);
+	Py_DECREF(name);
+	return res;
+}
+
+#elif (PY_VERSION_HEX < 0x03000000)
+
+/* Magic for extension modules (built-in as well as dynamically
+   loaded).  To prevent initializing an extension module more than
+   once, we keep a static dictionary 'extensions' keyed by module name
+   (for built-in modules) or by filename (for dynamically loaded
+   modules), containing these modules.  A copy of the module's
+   dictionary is stored by calling _PyImport_FixupExtension()
+   immediately after the module initialization function succeeds.  A
+   copy can be retrieved from there by calling
+   _PyImport_FindExtension(). */
+
+/* c:/users/thomas/devel/code/Python-2.7.3/Python/importdl.c 73 */
+
+int do_import(FARPROC init_func, char *modname)
+{
+	PyObject *m;
+	char *oldcontext;
+
+	if ((m = _PyImport_FindExtension(modname, modname)) != NULL) {
+		return -1;
+	}
+
+	if (init_func == NULL) {
+		PyErr_Format(PyExc_ImportError,
+			     "dynamic module does not define init function (init%.200s)",
+			     modname);
+		return -1;
+	}
+
+	oldcontext = _Py_PackageContext;
+	_Py_PackageContext = modname;
+	(*init_func)();
+	_Py_PackageContext = oldcontext;
+	if (PyErr_Occurred()) {
+		return -1;
+	}
+
+	if (_PyImport_FixupExtension(modname, modname) == NULL)
+		return -1;
+	if (Py_VerboseFlag)
+		PySys_WriteStderr(
+			"import %s # dynamically loaded from zipfile\n",
+			modname);
+	return 0;
+}
+
+#else
+# error "Python 3.0, 3.1, and 3.2 are not supported"
+
+#endif
+
+
 static PyObject *
 import_module(PyObject *self, PyObject *args)
 {
@@ -25,15 +145,10 @@ import_module(PyObject *self, PyObject *args)
 	char *modname;
 	char *pathname;
 	HMODULE hmem;
-	FARPROC do_init;
+	FARPROC init_func;
 
-	char *oldcontext;
 	ULONG_PTR cookie = 0;
 	PyObject *findproc;
-	PyObject* (*p)(void);
-	PyObject *m = NULL;
-	struct PyModuleDef *def;
-	char *namestr/*, *lastdot, *shortname, *packagecontext*/;
 
 	/* code, initfuncname, fqmodulename, path */
 	if (!PyArg_ParseTuple(args, "sssO:import_module",
@@ -67,57 +182,13 @@ import_module(PyObject *self, PyObject *args)
 		/* 	     "MemoryLoadLibrary failed loading %s", pathname); */
 		return NULL;
 	}
-	do_init = MyGetProcAddress(hmem, initfuncname);
-	if (!do_init) {
+
+	init_func = MyGetProcAddress(hmem, initfuncname);
+	if (do_import(init_func, modname) < 0) {
 		MyFreeLibrary(hmem);
-		PyErr_Format(PyExc_ImportError,
-			     "Could not find function %s", initfuncname);
 		return NULL;
 	}
 
-/* c:/users/thomas/devel/code/cpython-3.4/Python/importdl.c 73 */
-
-        oldcontext = _Py_PackageContext;
-	_Py_PackageContext = modname;
-#if 0
-	do_init();
-#else
-	p = (PyObject*(*)(void))do_init;
-	m = (*p)();
-#endif
-	_Py_PackageContext = oldcontext;
-
-	if (PyErr_Occurred())
-		return NULL;
-#if 1
-	/* Remember pointer to module init function. */
-	def = PyModule_GetDef(m);
-	if (def == NULL) {
-		PyErr_Format(PyExc_SystemError,
-			     "initialization of %s did not return an extension "
-			     "module", modname);
-		return NULL;
-	}
-	def->m_base.m_init = p;
-
-#if 0
-	if (_PyImport_FixupExtensionObject(m,
-					   PyUnicode_FromString(modname),
-					   PyUnicode_FromString(pathname)) < 0)
-		return NULL;
-#else
-	{
-		PyObject *name = PyUnicode_FromString(modname);
-		PyObject *path = PyUnicode_FromString(pathname);
-		int res = _PyImport_FixupExtensionObject(m, name, path);
-		Py_XDECREF(name);
-		Py_XDECREF(path);
-		if (res < 0)
-			return NULL;
-	}
-#endif
-
-#endif
 	/* Retrieve from sys.modules */
 	return PyImport_ImportModule(modname);
 }

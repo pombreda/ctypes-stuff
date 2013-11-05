@@ -1,10 +1,4 @@
-#ifdef STANDALONE
-#  include <Python.h>
-#  include "Python-version.h"
-#else
-#  include "Python-dynload.h"
-#  include <stdio.h>
-#endif
+#include <Python.h>
 #include <windows.h>
 
 #include "MemoryModule.h"
