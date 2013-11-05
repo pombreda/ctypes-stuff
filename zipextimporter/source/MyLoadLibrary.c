@@ -148,8 +148,8 @@ static HCUSTOMMODULE _LoadLibrary(LPCSTR filename, void *userdata)
 	if (userdata) {
 		PyObject *findproc = (PyObject *)userdata;
 		PyObject *res = PyObject_CallFunction(findproc, "s", filename);
-		if (res && PyString_AsString(res)) {
-			result = MemoryLoadLibraryEx(PyString_AsString(res),
+		if (res && PyBytes_AsString(res)) {
+			result = MemoryLoadLibraryEx(PyBytes_AsString(res),
 						     _LoadLibrary, _GetProcAddress, _FreeLibrary,
 						     userdata);
 			Py_DECREF(res);
