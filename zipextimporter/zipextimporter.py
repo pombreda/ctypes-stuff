@@ -28,7 +28,7 @@ your Python's _socket.pyd for this example to work.
 >>> import sys
 >>> sys.path.insert(0, "lib.zip")
 >>> import _socket
->>> print _socket
+>>> print(_socket)
 <module '_socket' from 'lib.zip\_socket.pyd'>
 >>> _socket.__file__
 'lib.zip\\_socket.pyd'
@@ -40,6 +40,8 @@ True
 >>>
 
 """
+from __future__ import division, with_statement, absolute_import, print_function
+
 import imp, sys
 import zipimport
 import _memimporter
@@ -65,7 +67,7 @@ class ZipExtensionImporter(zipimport.zipimporter):
 
     def load_module(self, fullname):
         verbose = _memimporter.get_verbose_flag()
-        if sys.modules.has_key(fullname):
+        if fullname in sys.modules:
             mod = sys.modules[fullname]
             if verbose:
                 sys.stderr.write("import %s # previously loaded from zipfile %s\n" % (fullname, self.archive))
@@ -74,7 +76,10 @@ class ZipExtensionImporter(zipimport.zipimporter):
             return zipimport.zipimporter.load_module(self, fullname)
         except zipimport.ZipImportError:
             pass
-        initname = "init" + fullname.split(".")[-1] # name of initfunction
+        if sys.version_info >= (3, 0):
+            initname = "PyInit_" + fullname.split(".")[-1] # name of initfunction
+        else:
+            initname = "init" + fullname.split(".")[-1] # name of initfunction
         filename = fullname.replace(".", "\\")
         if filename in ("pywintypes", "pythoncom"):
             filename = filename + "%d%d" % sys.version_info[:2]
@@ -84,7 +89,7 @@ class ZipExtensionImporter(zipimport.zipimporter):
         for s in suffixes:
             path = filename + s
             if path in self._files:
-                if verbose:
+                if verbose > 1:
                     sys.stderr.write("# found %s in zipfile %s\n" % (path, self.archive))
                 mod = _memimporter.import_module(fullname, path, initname, self.get_data)
                 mod.__file__ = "%s\\%s" % (self.archive, path)
@@ -92,36 +97,90 @@ class ZipExtensionImporter(zipimport.zipimporter):
                 if verbose:
                     sys.stderr.write("import %s # loaded from zipfile %s\n" % (fullname, mod.__file__))
                 return mod
-        raise zipimport.ZipImportError, "can't find module %s" % fullname
+        raise zipimport.ZipImportError("can't find module %s" % fullname)
 
     def __repr__(self):
         return "<%s object %r>" % (self.__class__.__name__, self.archive)
 
 def install():
     "Install the zipextimporter"
-    sys.path_hooks.insert(0, ZipExtensionImporter)
-    sys.path_importer_cache.clear()
-
-## if __name__ == "__main__":
-##    import doctest
-##    doctest.testmod()
+##    sys.path_hooks.insert(0, ZipExtensionImporter)
+##    sys.path_importer_cache.clear()
+    sys.meta_path.insert(0, ZipExtensionImporter())
+    print("installed")
 
 if __name__ == "__main__":
-    import sys
+    import glob
+    import os
     import struct
+    import sys
     import zipextimporter
-    zipextimporter.install()
-    if struct.calcsize("P") == 4:
-        sys.path.insert(0, "lib-32.zip")
+    import zipfile
+
+    try:
+        reload
+    except NameError:
+        from imp import reload
+    
+
+
+
+    print(sys.version)
+
+##    input("Attach debugger...")
+
+    if hasattr(sys, "gettotalrefcount"):
+        suffix = "_d"
     else:
-        sys.path.insert(0, "lib-64.zip")
-##     print sys.path
-##     import bz2, socket, select, sqlite3
-##     print
-##     for name, mod in sys.modules.items():
-##         if hasattr(mod, "__file__"):
-##             if mod.__file__.endswith(".pyd"):
-##                 print name, mod.__file__
-## ##    import pprint
-## ##    pprint.pprint(sys.modules)
-##     raw_input("Done...")
+        suffix = ""
+    if struct.calcsize("P") == 4:
+        zippath = "lib-%d.%d-32%s.zip" % (sys.version_info[0], sys.version_info[1], suffix)
+    else:
+        zippath = "lib-%d.%d-64%s.zip" % (sys.version_info[0], sys.version_info[1], suffix)
+    if not os.path.isfile(zippath):
+        print("Creating zip-archive containing extension modules...")
+        z = zipfile.ZipFile(zippath, "w")
+        for subdir in ("pcbuild", "DLLs"):
+            for path in glob.glob(os.path.join(sys.prefix, subdir, "*%s.pyd" % suffix)):
+                print(path)
+                z.write(path, os.path.basename(path))
+        z.close()
+
+    z = zipfile.ZipFile(zippath)
+
+    extensions = [os.path.splitext(name)[0]
+                  for name in z.namelist()]
+
+##    extensions = [os.path.splitext(os.path.basename(path))[0]
+##                  for path in glob.glob(os.path.join(sys.prefix, "DLLs", "*.pyd"))]
+##    extensions = [os.path.splitext(os.path.basename(path))[0]
+##                  for path in glob.glob(os.path.join(sys.prefix, "pcbuild", "*_d.pyd"))]
+
+    print(extensions)
+    extensions = [name[:len(name) - len(suffix)] for name in extensions
+                  if name not in sys.modules]
+
+    ## print(sys.meta_path)
+    ## zipextimporter.install()
+    ## print(sys.meta_path)
+    ## sys.path.insert(0, zippath)
+    sys.meta_path.insert(0, ZipExtensionImporter(zippath))
+
+    for i in range(4):
+        print()
+
+    for ext in extensions:
+        if ext not in ("_sqlite3", "_tkinter"):
+            print(ext, end=": ")
+            try:
+                x = __import__(ext)
+            except Exception as details:
+                import traceback; traceback.print_exc()
+                print("\n\tError:", repr(details))
+            else:
+                print(x)
+
+    import _socket
+##    print(_socket)
+    reload(_socket)
+##    print(_socket)
