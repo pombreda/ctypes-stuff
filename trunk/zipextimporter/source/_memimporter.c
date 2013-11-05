@@ -32,6 +32,11 @@ import_module(PyObject *self, PyObject *args)
 	char *oldcontext;
 	ULONG_PTR cookie = 0;
 	PyObject *findproc;
+	PyObject* (*p)(void);
+	PyObject *m = NULL;
+	struct PyModuleDef *def;
+	char *namestr/*, *lastdot, *shortname, *packagecontext*/;
+
 	/* code, initfuncname, fqmodulename, path */
 	if (!PyArg_ParseTuple(args, "sssO:import_module",
 			      &modname, &pathname,
@@ -45,12 +50,13 @@ import_module(PyObject *self, PyObject *args)
 
 	if (!hmem) {
 		char *msg;
-		FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-			      NULL,
-			      GetLastError(),
-			      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-			      &msg,
-			      0, NULL);
+		FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+			       NULL,
+			       GetLastError(),
+			       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			       msg,
+			       0,
+			       NULL);
 		msg[strlen(msg)-2] = '\0';
 		PyErr_Format(PyExc_ImportError,
 			     "MemoryLoadLibrary failed loading %s (%s: %s)",
@@ -71,12 +77,49 @@ import_module(PyObject *self, PyObject *args)
 		return NULL;
 	}
 
+/* c:/users/thomas/devel/code/cpython-3.4/Python/importdl.c 73 */
+
         oldcontext = _Py_PackageContext;
 	_Py_PackageContext = modname;
+#if 0
 	do_init();
+#else
+	p = (PyObject*(*)(void))do_init;
+	m = (*p)();
+#endif
 	_Py_PackageContext = oldcontext;
+
 	if (PyErr_Occurred())
 		return NULL;
+#if 1
+	/* Remember pointer to module init function. */
+	def = PyModule_GetDef(m);
+	if (def == NULL) {
+		PyErr_Format(PyExc_SystemError,
+			     "initialization of %s did not return an extension "
+			     "module", modname);
+		return NULL;
+	}
+	def->m_base.m_init = p;
+
+#if 0
+	if (_PyImport_FixupExtensionObject(m,
+					   PyUnicode_FromString(modname),
+					   PyUnicode_FromString(pathname)) < 0)
+		return NULL;
+#else
+	{
+		PyObject *name = PyUnicode_FromString(modname);
+		PyObject *path = PyUnicode_FromString(pathname);
+		int res = _PyImport_FixupExtensionObject(m, name, path);
+		Py_XDECREF(name);
+		Py_XDECREF(path);
+		if (res < 0)
+			return NULL;
+	}
+#endif
+
+#endif
 	/* Retrieve from sys.modules */
 	return PyImport_ImportModule(modname);
 }
@@ -84,7 +127,7 @@ import_module(PyObject *self, PyObject *args)
 static PyObject *
 get_verbose_flag(PyObject *self, PyObject *args)
 {
-	return PyInt_FromLong(Py_VerboseFlag);
+	return PyLong_FromLong(Py_VerboseFlag);
 }
 
 static PyMethodDef methods[] = {
@@ -92,12 +135,35 @@ static PyMethodDef methods[] = {
 	  "import_module(modname, pathname, initfuncname, finder) -> module" },
 	{ "get_verbose_flag", get_verbose_flag, METH_NOARGS,
 	  "Return the Py_Verbose flag" },
-//	{ "set_find_proc", set_find_proc, METH_VARARGS },
 	{ NULL, NULL },		/* Sentinel */
 };
+
+#if PY_MAJOR_VERSION >= 3
+
+static struct PyModuleDef moduledef = {
+	PyModuleDef_HEAD_INIT,
+	"_memimporter", /* m_name */
+	module_doc, /* m_doc */
+	-1, /* m_size */
+	methods, /* m_methods */
+	NULL, /* m_reload */
+	NULL, /* m_traverse */
+	NULL, /* m_clear */
+	NULL, /* m_free */
+};
+
+
+PyMODINIT_FUNC PyInit__memimporter(void)
+{
+	return PyModule_Create(&moduledef);
+}
+
+#else
 
 DL_EXPORT(void)
 init_memimporter(void)
 {
 	Py_InitModule3("_memimporter", methods, module_doc);
 }
+
+#endif
