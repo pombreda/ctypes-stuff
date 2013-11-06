@@ -22,7 +22,7 @@ _memimporter = Extension("_memimporter",
 
 setup(name="zipextimporter",
       description="import extension modules from zipfiles without unpacking them to disk",
-      version="0.2",
+      version="0.3",
       author="Thomas Heller",
       author_email="theller@ctypes.org",
       license="MIT/X11, MPL 2.0",
