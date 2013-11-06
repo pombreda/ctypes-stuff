@@ -154,11 +154,11 @@ BOOL locate_script(HMODULE hmod)
 	// get full pathname of the 'library.zip' file
 	if(p_script_info->zippath[0]) {
 		_snwprintf(libfilename, sizeof(libfilename),
-			   L"%s\\%s", dirname, p_script_info->zippath);
+			   L"%s\\%S", dirname, p_script_info->zippath);
 	} else {
 		GetModuleFileNameW(hmod, libfilename, sizeof(libfilename));
 	}
-	printf("LIBFILENAME %S\n", libfilename);
+	printf("LIBFILENAME '%S'\n", libfilename);
 	return TRUE; // success
 }
 
@@ -189,7 +189,7 @@ int run_script(void)
 			PyObject *sub = PySequence_GetItem(seq, i);
 			if (sub /*&& PyCode_Check(sub) */) {
 				PyObject *discard = PyEval_EvalCode((PyObject *)sub,
-									d, d);
+								    d, d);
 				if (!discard) {
 					PyErr_Print();
 					rc = 255;
@@ -251,7 +251,7 @@ void free_lib(wchar_t *name)
 /****************************************************************
  * the _p2e builtin helper module
  */
-
+/*
 static struct DLL {
 	wchar_t *dllname;
 	struct DLL *next;
@@ -300,6 +300,7 @@ PyInit__p2e(void)
 {
 	return PyModule_Create(&_p2emodule);
 }
+*/
 
 /*****************************************************************/
 
@@ -311,49 +312,39 @@ int wmain (int argc, wchar_t **argv)
 /*	Py_InspectFlag = 1; /* Needed to determine whether to exit at SystemExit */
 
 	calc_dirname(NULL);
-	wprintf(L"modulename %s\n", modulename);
-	wprintf(L"dirname %s\n", dirname);
-	_snwprintf(libfilename, sizeof(libfilename), L"%s\\library.zip", dirname);
-//	_snwprintf(libfilename, sizeof(libfilename), modulename);
+//	wprintf(L"modulename %s\n", modulename);
+//	wprintf(L"dirname %s\n", dirname);
 
-	wprintf(L"libfilename %s\n", libfilename);
-//	return 0;
+//	unpack_python_dll(GetModuleHandle(NULL));
 
-//	printf("PYTHONDLL NOT YET LOADED: press any key...\n");
-//	getch();
+	if (!locate_script(GetModuleHandle(NULL))) {
+		printf("FATAL ERROR locating script\n");
+		return -1;
+	}
 
-	unpack_python_dll(GetModuleHandle(NULL));
 
-	locate_script(GetModuleHandle(NULL));
-
-	Py_IsInitialized();
-	printf("Called Py_SetProgramName and Py_SetPath. Weiter...\n");
-//	getch();
+//	Py_IsInitialized();
 
 	set_vars();
-
+/*
+	// provide builtin modules:
 	PyImport_AppendInittab("_p2e", PyInit__p2e);
-	
-	printf("WEITER...\n");
+*/	
+
 	Py_SetProgramName(modulename);
 	Py_SetPath(libfilename);
 	Py_Initialize();
 	PySys_SetArgvEx(argc, argv, 0);
+
+//	PyRun_SimpleString("import sys; print(sys.path)");
+
 /*
 	rc = run_script();
 */
 	PyRun_SimpleString("import __SCRIPT__; __SCRIPT__.main()");
+//	PyRun_SimpleString("import __main__; print(dir(__main__))");
 
 	fini();
 
-        free_dlls();
-	{
-		wchar_t pydll[260];
-		HMODULE hmod = GetModuleHandle(PYTHONDLL);
-		GetModuleFileNameW(hmod, pydll, sizeof(pydll));
-		free_lib(pydll);
-	}
-//	printf("Please examine with PROCESS EXPLORER\n");
-//	getch();
 	return rc;
 }
