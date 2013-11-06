@@ -128,8 +128,9 @@ class Runtime(object):
         add_resources(exe_path, pydll, script_info)
 
     def _create_script_data(self):
-        # We create a list of code objects, and write it as a marshaled
-        # stream.  The framework code then just exec's these in order.
+        # We create a list of code objects, and return it as a
+        # marshaled stream.  The framework code then just exec's these
+        # in order.
         code_objects = []
 
         ## # First is our common boot script.
@@ -172,7 +173,6 @@ class Runtime(object):
                 compile(script_file.read() + "\n",
                         os.path.basename(self.options.script), "exec"))
 
-        print("code_objects", code_objects)
         return marshal.dumps(code_objects)
 
     def build_library(self, exe_path, libname):
@@ -263,10 +263,11 @@ class Runtime(object):
             if src.lower() == pydll:
                 # XXX Python dll is special, will be added as resource to the library archive...
 ## ##                print("Skipping %s" % pydll)
-                print("Copy DLL %s to %s" % (src, dlldir))
-                shutil.copy2(os.path.basename(src), dlldir)
+                print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
+                shutil.copy2(src, dlldir)
                 # XXX Why is the python33.dll in the dist dir
                 # a lot larger than in the system directory???
+                # Or do I look into the wrong system directory???
             elif self.options.bundle_files < 3:
                 ## dst = os.path.join("--DLLS--", os.path.basename(src))
                 ## print("Add DLL %s to %s" % (os.path.basename(dst), libpath))
