@@ -159,7 +159,6 @@ class Runtime(object):
                 arc.writestr(path, stream.getvalue())
 
             elif hasattr(mod, "__file__"):
-                # XXX use importlib to get extensions...
                 assert mod.__file__.endswith(EXTENSION_SUFFIXES[0])
 
                 # bundle_files == 3: put .pyds in the same directory as the zip.archive
