@@ -64,38 +64,40 @@ class Runtime(object):
         if missing:
             mf.report_missing()
 
-    def build_bat(self, filename, libname):
-        logger.info("Building batch-file %r", filename)
-        if not self.options.optimize:
-            options = ""
-        elif self.options.optimize == 1:
-            options = " -O "
-        else:
-            options = " -OO "
-        ## if self.options.destdir:
-        ##     path = os.path.join(self.options.destdir, filename)
-        ## else:
-        ##     path = filename
-        path = filename
+##     def build_bat(self, filename, libname):
+##         logger.info("Building batch-file %r", filename)
+##         if not self.options.optimize:
+##             options = ""
+##         elif self.options.optimize == 1:
+##             options = " -O "
+##         else:
+##             options = " -OO "
+##         ## if self.options.destdir:
+##         ##     path = os.path.join(self.options.destdir, filename)
+##         ## else:
+##         ##     path = filename
+##         path = filename
 
-        with open(path, "wt") as ofi:
-            ofi.write('@echo off\n')
-            ofi.write('setlocal\n')
-            if self.options.bundle_files < 3:
-                ofi.write('set PY2EXE_DLLDIR=%TMP%\\~py2exe-%RANDOM%-%TIME:~6,5%\n')
-                ofi.write('mkdir "%PY2EXE_DLLDIR%"\n')
-            ofi.write('for /f %%i in ("%0") do set PYTHONHOME=%%~dpi\n')
-            ofi.write('for /f %%i in ("%0") do set PYTHONPATH=%%~dpi\\{0}\n'.format(libname))
-            ofi.write('%PYTHONHOME%\\{0} -S {1} -m __SCRIPT__\n'.format(libname, options))
-            if self.options.bundle_files < 3:
-                ofi.write('rmdir /s/q "%PY2EXE_DLLDIR%"\n')
+##         with open(path, "wt") as ofi:
+##             ofi.write('@echo off\n')
+##             ofi.write('setlocal\n')
+##             if self.options.bundle_files < 3:
+##                 ofi.write('set PY2EXE_DLLDIR=%TMP%\\~py2exe-%RANDOM%-%TIME:~6,5%\n')
+##                 ofi.write('mkdir "%PY2EXE_DLLDIR%"\n')
+##             ofi.write('for /f %%i in ("%0") do set PYTHONHOME=%%~dpi\n')
+##             ofi.write('for /f %%i in ("%0") do set PYTHONPATH=%%~dpi\\{0}\n'.format(libname))
+##             ofi.write('%PYTHONHOME%\\{0} -S {1} -m __SCRIPT__\n'.format(libname, options))
+##             if self.options.bundle_files < 3:
+##                 ofi.write('rmdir /s/q "%PY2EXE_DLLDIR%"\n')
 
     def build_exe(self, exe_path, libname):
+        """Build the exe-file."""
         logger.info("Building exe '%s'", exe_path)
         run_stub = '%s-py%s.%s-%s.exe' % ("run",
                                           sys.version_info[0],
                                           sys.version_info[1],
                                           distutils.util.get_platform())
+        print("Using exe-stub %r" % run_stub)
         exe_bytes = pkgutil.get_data("py3exe", run_stub)
         with open(exe_path, "wb") as ofi:
             ofi.write(exe_bytes)
@@ -119,9 +121,10 @@ class Runtime(object):
                                   unbuffered,
                                   data_bytes) + zippath + b"\0"
 
-        add_resources(exe_path, script_info)
+        add_resources(exe_path, pydll, script_info)
 
-    def build(self, exe_path, libname):
+    def build_library(self, exe_path, libname):
+        """Build the archive containing the Python library."""
         if self.options.report:
             self.mf.report()
         if self.options.summary:
@@ -143,6 +146,9 @@ class Runtime(object):
 
         arc = zipfile.ZipFile(libpath, libmode,
                               compression=zipfile.ZIP_DEFLATED)
+
+        with open(self.options.script, "r") as scriptfile:
+            arc.writestr("__SCRIPT__.py", scriptfile.read())
 
         for mod in self.mf.modules.values():
             code = mod.__code__
@@ -166,29 +172,35 @@ class Runtime(object):
 
                 pydfile = mod.__name__ + EXTENSION_SUFFIXES[0]
 
-                # Build the loader which is contained in the zip-archive
                 if self.options.bundle_files < 3:
-                    src = EXTRACT_THEN_LOAD.format(pydfile)
+                    if mod.__name__ == "_memimporter":
+                        # XXX _memimporter is special - must be bootstrapped
+                        # from the file system.
+                        #
+                        # Later, it will live inside the exe-stub...
+                        print("Copy PYD %s to %s" % (os.path.basename(mod.__file__),
+                                                     os.path.dirname(libpath)))
+                        shutil.copyfile(mod.__file__,
+                                        os.path.join(os.path.dirname(libpath), pydfile))
+                    else:
+                        print("Add PYD %s to %s" % (os.path.basename(mod.__file__), libpath))
+                        arc.write(mod.__file__, pydfile)
                 else:
                     src = LOAD_FROM_DIR.format(pydfile)
 
-                code = compile(src, "<string>", "exec")
-                if hasattr(mod, "__path__"):
-                    path = mod.__name__.replace(".", "\\") + "\\__init__" + bytecode_suffix
-                else:
-                    path = mod.__name__.replace(".", "\\") + bytecode_suffix
-                stream = io.BytesIO()
-                stream.write(imp.get_magic())
-                stream.write(b"\0\0\0\0") # null timestamp
-                stream.write(b"\0\0\0\0") # null size
-                marshal.dump(code, stream)
-                arc.writestr(path, stream.getvalue())
+                    code = compile(src, "<string>", "exec")
+                    if hasattr(mod, "__path__"):
+                        path = mod.__name__.replace(".", "\\") + "\\__init__" + bytecode_suffix
+                    else:
+                        path = mod.__name__.replace(".", "\\") + bytecode_suffix
+                    stream = io.BytesIO()
+                    stream.write(imp.get_magic())
+                    stream.write(b"\0\0\0\0") # null timestamp
+                    stream.write(b"\0\0\0\0") # null size
+                    marshal.dump(code, stream)
+                    arc.writestr(path, stream.getvalue())
 
-                if self.options.bundle_files < 3:
-                    print("Add %s to %s" % (os.path.basename(mod.__file__), libpath))
-                    arc.write(mod.__file__, os.path.join("--EXTENSIONS--", pydfile))
-                else:
-                    print("Copy %s to %s" % (os.path.basename(mod.__file__),
+                    print("Copy PYD %s to %s" % (os.path.basename(mod.__file__),
                                              os.path.dirname(libpath)))
                     shutil.copyfile(mod.__file__,
                                     os.path.join(os.path.dirname(libpath), pydfile))
@@ -196,14 +208,22 @@ class Runtime(object):
         dlldir = os.path.dirname(libpath)
         for src in self.mf.required_dlls():
             if src.lower() == pydll:
-##                print("Skipping %s" % pydll)
+                # Python dll is special, will be added as resource to the exe file...
+## ##                print("Skipping %s" % pydll)
+                dst = os.path.join(dlldir, os.path.basename(src))
+                print("Copy DLL %s to %s" % (os.path.basename(src),
+                                             os.path.dirname(libpath)))
+                shutil.copyfile(src, dst)
                 continue
             if self.options.bundle_files < 3:
-                dst = os.path.join("--DLLS--", os.path.basename(src))
-                print("Adding %s to %s" % (os.path.basename(dst), libpath))
-                arc.write(src, dst)
+                ## dst = os.path.join("--DLLS--", os.path.basename(src))
+                ## print("Add DLL %s to %s" % (os.path.basename(dst), libpath))
+                ## arc.write(src, dst)
+                print("SKIP DLL", os.path.basename(src))
             else:
                 dst = os.path.join(dlldir, os.path.basename(src))
+                print("Copy DLL %s to %s" % (os.path.basename(src),
+                                             os.path.dirname(libpath)))
                 shutil.copyfile(src, dst)
 
         arc.close()

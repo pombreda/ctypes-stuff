@@ -22,23 +22,21 @@ import _wapi
 ##         add(b"PYTHONSCRIPT", 1, script_info)
 
 
-def add_resources(filename, script_info):
-
-    pydll = "python%d%d.dll" % sys.version_info[:2]
+def add_resources(filename, pydll, script_info):
 
     hrsrc = _wapi.BeginUpdateResourceW(filename, False)
 
-    with open("c:\\windows\\system32\\%s" % pydll, "rb") as ifi:
+    with open(pydll, "rb") as ifi:
         pydll_bytes = ifi.read()
 
-    print("Add Resource %s to %s" % (os.path.basename(pydll), filename))
+    ## print("Add RSC %s to %s" % (os.path.basename(pydll), filename))
 
-    _wapi.UpdateResourceA(hrsrc,
-                          pydll.encode("ascii"),
-                          _wapi.LPCSTR(1),
-                          0, # wLanguage
-                          pydll_bytes,
-                          len(pydll_bytes));
+    ## _wapi.UpdateResourceA(hrsrc,
+    ##                       pydll.encode("ascii"),
+    ##                       _wapi.LPCSTR(1),
+    ##                       0, # wLanguage
+    ##                       pydll_bytes,
+    ##                       len(pydll_bytes));
 
     _wapi.UpdateResourceA(hrsrc,
                           b"PYTHONSCRIPT",
