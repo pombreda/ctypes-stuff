@@ -148,8 +148,9 @@ BOOL locate_script(HMODULE hmod)
 		SystemError (0, "Bug: Invalid script resource");
 		return FALSE;
 	}
+
 	// let pScript point to the start of the python script resource
-	pScript += strlen(p_script_info->zippath) + 1;
+	pScript = p_script_info->zippath + strlen(p_script_info->zippath) + 1;
 
 	// get full pathname of the 'library.zip' file
 	if(p_script_info->zippath[0]) {
@@ -158,7 +159,8 @@ BOOL locate_script(HMODULE hmod)
 	} else {
 		GetModuleFileNameW(hmod, libfilename, sizeof(libfilename));
 	}
-	printf("LIBFILENAME '%S'\n", libfilename);
+//	printf("LIBFILENAME '%S'\n", libfilename);
+	
 	return TRUE; // success
 }
 
@@ -181,15 +183,19 @@ int run_script(void)
 	PyObject *m=NULL, *d=NULL, *seq=NULL;
 	/* We execute then in the context of '__main__' */
 	m = PyImport_AddModule("__main__");
+//	printf("m %p\n", m);
 	if (m) d = PyModule_GetDict(m);
+//	printf("d %p\n", d);
 	if (d) seq = PyMarshal_ReadObjectFromString(pScript, numScriptBytes);
+//	printf("seq %p\n", seq);
 	if (seq) {
 		Py_ssize_t i, max = PySequence_Length(seq);
-		for (i=0;i<max;i++) {
+//		printf("len(seq) %d\n", max);
+		for (i=0; i<max; i++) {
 			PyObject *sub = PySequence_GetItem(seq, i);
+//			printf("seq[%d] %p\n", i, seq);
 			if (sub /*&& PyCode_Check(sub) */) {
-				PyObject *discard = PyEval_EvalCode((PyObject *)sub,
-								    d, d);
+				PyObject *discard = PyEval_EvalCode(sub, d, d);
 				if (!discard) {
 					PyErr_Print();
 					rc = 255;
@@ -203,6 +209,7 @@ int run_script(void)
 	return rc;
 }
 
+/*
 BOOL unpack_python_dll(HMODULE hmod)
 {
 	HANDLE hrsrc;
@@ -226,7 +233,7 @@ BOOL unpack_python_dll(HMODULE hmod)
 	}
 	return TRUE;
 }
-
+*/
 
 void set_vars(void)
 {
@@ -234,8 +241,17 @@ void set_vars(void)
 	int *pflag = (int *)GetProcAddress(py, "Py_NoSiteFlag");
 	printf("GetProcAddress(%p, 'Py_NoSiteFlag') -> %p\n", py, pflag);
 	*pflag = 1;
+
+	pflag = (int *)GetProcAddress(py, "Py_OptimizeFlag");
+	printf("GetProcAddress(%p, 'Py_OptimizeFlag') -> %p\n", py, pflag);
+	if (pflag)
+		*pflag = p_script_info->optimize;
 }
 
+/****************************************************************
+ * the _p2e builtin helper module
+ */
+/*
 void free_lib(wchar_t *name)
 {
 	HMODULE hmod = GetModuleHandleW(name);
@@ -248,10 +264,6 @@ void free_lib(wchar_t *name)
 	printf("unlinked %S -> %d\n", name, res);
 }
 
-/****************************************************************
- * the _p2e builtin helper module
- */
-/*
 static struct DLL {
 	wchar_t *dllname;
 	struct DLL *next;
@@ -338,10 +350,9 @@ int wmain (int argc, wchar_t **argv)
 
 //	PyRun_SimpleString("import sys; print(sys.path)");
 
-/*
 	rc = run_script();
-*/
-	PyRun_SimpleString("import __SCRIPT__; __SCRIPT__.main()");
+
+//	PyRun_SimpleString("import __SCRIPT__; __SCRIPT__.main()");
 //	PyRun_SimpleString("import __main__; print(dir(__main__))");
 
 	fini();
