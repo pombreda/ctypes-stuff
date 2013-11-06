@@ -1,5 +1,7 @@
-# This file imports the _memimporter.pyd extension from the distutils
-# build directory.
+# Helper module: imports the extension module with the same namefrom
+# the distutils build directory.
+
+# This avoids the need to use: 'python setup.py build_ext --inplace'.
 
 def __load():
     import imp, os, sys, struct
@@ -13,8 +15,8 @@ def __load():
         dirname = "build\\lib.win-amd64-%d.%d%s" % (sys.version_info[0], sys.version_info[1], suffix)
     else:
         dirname = "build\\lib.win32-%d.%d%s" % (sys.version_info[0], sys.version_info[1], suffix)
-    path = os.path.abspath(os.path.join(dirname, '_memimporter' + pyd))
-    imp.load_dynamic("_memimporter", path)
+    path = os.path.abspath(os.path.join(dirname, __name__ + pyd))
+    imp.load_dynamic(__name__, path)
 
 __load()
 del __load
