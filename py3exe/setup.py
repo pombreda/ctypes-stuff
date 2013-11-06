@@ -317,7 +317,8 @@ else:
               ("_CRT_SECURE_NO_WARNINGS", '1')]
 
 extra_compile_args = []
-extra_link_args = ["/DELAYLOAD:python%d%d.dll" % sys.version_info[:2], "delayimp.lib"]
+##extra_link_args = ["/DELAYLOAD:python%d%d.dll" % sys.version_info[:2], "delayimp.lib"]
+extra_link_args = []
 
 if 0:
     # enable this to debug a release build
@@ -342,7 +343,30 @@ run = Interpreter("py3exe.run",
                   extra_link_args=extra_link_args,
                   )
 
-interpreters = [run]
+## run_dll = Interpreter("py2exe.run_dll",
+##                       ["source/run_dll.c",
+##                        "source/start.c",
+##                        "source/icon.rc",
+##                        "source/Python-dynload.c",
+##                        "source/MemoryModule.c",
+##                        "source/MyLoadLibrary.c",
+##                        "source/_memimporter.c",
+##                        "source/actctx.c",
+##                        ],
+##                       libraries=["user32"],
+##                       export_symbols=["DllCanUnloadNow,PRIVATE",
+##                                       "DllGetClassObject,PRIVATE",
+##                                       "DllRegisterServer,PRIVATE",
+##                                       "DllUnregisterServer,PRIVATE",
+##                                       ],
+##                       target_desc = "shared_library",
+## ##                      depends=depends,
+##                       define_macros=macros,
+##                       extra_compile_args=extra_compile_args,
+##                       extra_link_args=extra_link_args,
+##                       )
+
+interpreters = [run] #, run_dll]
 
 setup(name="py3exe",
       version="0.1.0",
