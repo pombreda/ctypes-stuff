@@ -141,10 +141,32 @@ class DllFinder:
 from  mf4 import ModuleFinder
 from importlib.machinery import EXTENSION_SUFFIXES
 
+# Exclude modules that the standard library imports (conditionally),
+# but which are not present on windows.
+windows_excludes = """
+_dummy_threading
+_emx_link
+_gestalt
+_posixsubprocess
+ce
+clr
+console
+fcntl
+grp
+java
+org
+os2
+posix
+pwd
+termios
+vms_lib
+""".split()
+
 class Scanner(ModuleFinder):
 
-    def __init__(self, *args, **kw):
-        super().__init__(*args, **kw)
+    def __init__(self, path=None, verbose=0, excludes=[], optimize=0):
+        excludes = list(excludes) + windows_excludes
+        super().__init__(path, verbose, excludes, optimize)
         self.dllfinder = DllFinder()
 
     def _add_module(self, name, mod):
