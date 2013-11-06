@@ -71,11 +71,14 @@ class ModuleFinder:
     def run_script(self, path):
         """Run a script.
 
+        Will be added as __main__ module into the library (for now).
         """
         assert "__SCRIPT__" not in sys.modules
-        ldr = importlib.machinery.SourceFileLoader("__SCRIPT__", path)
-        mod = Module(ldr, "__SCRIPT__", self._optimize)
-        self._add_module("__SCRIPT__", mod)
+        ## ldr = importlib.machinery.SourceFileLoader("__SCRIPT__", path)
+        ## mod = Module(ldr, "__SCRIPT__", self._optimize)
+        ldr = importlib.machinery.SourceFileLoader("__main__", path)
+        mod = Module(ldr, "__main__", self._optimize)
+        self._add_module("__main__", mod)
         self._scan_code(mod.__code__, mod)
 
 

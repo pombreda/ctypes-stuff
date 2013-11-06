@@ -113,7 +113,7 @@ def main():
     builder = runtime.Runtime(options)
     builder.analyze()
     builder.build_exe(exe_path, options.libname)
-    builder.build(exe_path, options.libname)
+    builder.build_library(exe_path, options.libname)
 
 if __name__ == "__main__":
     main()
