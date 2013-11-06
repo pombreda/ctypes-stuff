@@ -69,18 +69,15 @@ class ModuleFinder:
 
 
     def run_script(self, path):
-        """Run a script.
-
-        Will be added as __main__ module into the library (for now).
+        """Run a script: scan it for dependencies, but do NOT
+        add it the self.modules.
         """
         assert "__SCRIPT__" not in sys.modules
-        ## ldr = importlib.machinery.SourceFileLoader("__SCRIPT__", path)
-        ## mod = Module(ldr, "__SCRIPT__", self._optimize)
-        ldr = importlib.machinery.SourceFileLoader("__main__", path)
-        mod = Module(ldr, "__main__", self._optimize)
-        self._add_module("__main__", mod)
+        ldr = importlib.machinery.SourceFileLoader("__SCRIPT__", path)
+        mod = Module(ldr, "__SCRIPT__", self._optimize)
+        # Do NOT add it...
+        # self._add_module("__SCRIPT__", mod)
         self._scan_code(mod.__code__, mod)
-
 
     def import_package(self, name):
         """Import a complete package.
