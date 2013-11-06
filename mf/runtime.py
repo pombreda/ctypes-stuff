@@ -10,8 +10,11 @@ import marshal
 import os
 import pkgutil
 import shutil
+import struct
 import sys
 import zipfile
+
+from resources import add_resources
 
 logger = logging.getLogger("runtime")
 
@@ -102,12 +105,12 @@ class Runtime(object):
         with open(exe_path, "wb") as ofi:
             ofi.write(exe_bytes)
 
-        from resources import add_resources
-        import struct
+        optimize = self.options.optimize
+        unbuffered = False # XXX
 
-        optimize=True
-        unbuffered = False
-        data_bytes=0
+        script_data = self._create_script_data()
+
+        print("script_data: %s" % repr(script_data))
 
         if libname is None:
             zippath = b""
@@ -117,11 +120,60 @@ class Runtime(object):
 
         script_info = struct.pack("IIII",
                                   0x78563412,
-                                  optimize,
+                                  optimize if optimize is not None else 0,
                                   unbuffered,
-                                  data_bytes) + zippath + b"\0"
+                                  len(script_data))
+        script_info += zippath + b"\0" + script_data + b"\0"
 
         add_resources(exe_path, pydll, script_info)
+
+    def _create_script_data(self):
+        # We create a list of code objects, and write it as a marshaled
+        # stream.  The framework code then just exec's these in order.
+        code_objects = []
+
+        ## # First is our common boot script.
+        ## boot = self.get_boot_script("common")
+        ## boot_code = compile(file(boot, "U").read(),
+        ##                     os.path.abspath(boot), "exec")
+        ## code_objects = [boot_code]
+        ## if self.bundle_files < 3:
+        ##     code_objects.append(
+        ##         compile("import zipextimporter; zipextimporter.install()",
+        ##                 "<install zipextimporter>", "exec"))
+        ## for var_name, var_val in vars.iteritems():
+        ##     code_objects.append(
+        ##             compile("%s=%r\n" % (var_name, var_val), var_name, "exec")
+        ##     )
+        ## if self.custom_boot_script:
+        ##     code_object = compile(file(self.custom_boot_script, "U").read() + "\n",
+        ##                           os.path.abspath(self.custom_boot_script), "exec")
+        ##     code_objects.append(code_object)
+        ## if script:
+        ##     code_object = compile(open(script, "U").read() + "\n",
+        ##                           os.path.basename(script), "exec")
+        ##     code_objects.append(code_object)
+        ## code_bytes = marshal.dumps(code_objects)
+
+        code_objects = []
+        if self.options.bundle_files < 3:
+            obj = compile("import sys, os; sys.path.append(os.path.dirname(sys.path[0])); del sys, os",
+                          "<bootstrap>", "exec")
+            code_objects.append(obj)
+            obj = compile("import zipextimporter; zipextimporter.install(); del zipextimporter",
+                          "<install zipextimporter>", "exec")
+            code_objects.append(obj)
+
+        ## code_objects.append(
+        ##     compile("print(__name__); print(dir())",
+        ##             "<testing>", "exec"))
+        with open(self.options.script, "U") as script_file:
+            code_objects.append(
+                compile(script_file.read() + "\n",
+                        os.path.basename(self.options.script), "exec"))
+
+        print("code_objects", code_objects)
+        return marshal.dumps(code_objects)
 
     def build_library(self, exe_path, libname):
         """Build the archive containing the Python library."""
@@ -147,8 +199,9 @@ class Runtime(object):
         arc = zipfile.ZipFile(libpath, libmode,
                               compression=zipfile.ZIP_DEFLATED)
 
-        with open(self.options.script, "r") as scriptfile:
-            arc.writestr("__SCRIPT__.py", scriptfile.read())
+        ## with open(self.options.script, "r") as scriptfile:
+        ##     arc.writestr("__SCRIPT__.py", scriptfile.read())
+        dlldir = os.path.dirname(libpath)
 
         for mod in self.mf.modules.values():
             code = mod.__code__
@@ -179,13 +232,16 @@ class Runtime(object):
                         #
                         # Later, it will live inside the exe-stub...
                         print("Copy PYD %s to %s" % (os.path.basename(mod.__file__),
-                                                     os.path.dirname(libpath)))
-                        shutil.copyfile(mod.__file__,
-                                        os.path.join(os.path.dirname(libpath), pydfile))
+                                                     dlldir))
+                        shutil.copy2(mod.__file__, dlldir)
                     else:
                         print("Add PYD %s to %s" % (os.path.basename(mod.__file__), libpath))
                         arc.write(mod.__file__, pydfile)
                 else:
+                    # Copy the extension into dlldir. To be able to
+                    # load it without putting dlldir into sys.path, we
+                    # create a loader module and put that into the
+                    # archive.
                     src = LOAD_FROM_DIR.format(pydfile)
 
                     code = compile(src, "<string>", "exec")
@@ -200,51 +256,30 @@ class Runtime(object):
                     marshal.dump(code, stream)
                     arc.writestr(path, stream.getvalue())
 
-                    print("Copy PYD %s to %s" % (os.path.basename(mod.__file__),
-                                             os.path.dirname(libpath)))
-                    shutil.copyfile(mod.__file__,
-                                    os.path.join(os.path.dirname(libpath), pydfile))
+                    print("Copy PYD %s to %s" % (os.path.basename(mod.__file__), dlldir))
+                    shutil.copy2(mod.__file__, dlldir)
 
-        dlldir = os.path.dirname(libpath)
         for src in self.mf.required_dlls():
             if src.lower() == pydll:
-                # Python dll is special, will be added as resource to the exe file...
+                # XXX Python dll is special, will be added as resource to the library archive...
 ## ##                print("Skipping %s" % pydll)
-                dst = os.path.join(dlldir, os.path.basename(src))
-                print("Copy DLL %s to %s" % (os.path.basename(src),
-                                             os.path.dirname(libpath)))
-                shutil.copyfile(src, dst)
-                continue
-            if self.options.bundle_files < 3:
+                print("Copy DLL %s to %s" % (src, dlldir))
+                shutil.copy2(os.path.basename(src), dlldir)
+                # XXX Why is the python33.dll in the dist dir
+                # a lot larger than in the system directory???
+            elif self.options.bundle_files < 3:
                 ## dst = os.path.join("--DLLS--", os.path.basename(src))
                 ## print("Add DLL %s to %s" % (os.path.basename(dst), libpath))
                 ## arc.write(src, dst)
                 print("SKIP DLL", os.path.basename(src))
             else:
                 dst = os.path.join(dlldir, os.path.basename(src))
-                print("Copy DLL %s to %s" % (os.path.basename(src),
-                                             os.path.dirname(libpath)))
-                shutil.copyfile(src, dst)
+                print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
+                shutil.copy2(src, dlldir)
 
         arc.close()
 
 ################################################################
-
-EXTRACT_THEN_LOAD = r"""\
-def __load():
-    import imp, os, _p2e
-    path = os.path.join(__loader__.archive, "--EXTENSIONS--", '{0}')
-    py2exe_dlldir = os.path.dirname(__loader__.archive)
-    data = __loader__.get_data(path)
-    dstpath = os.path.join(py2exe_dlldir, '{0}')
-    with open(dstpath, "wb") as dll:
-        dll.write(data)
-    _p2e.register_dll(dstpath) # register before importing; just in case.
-    mod = imp.load_dynamic(__name__, dstpath)
-    mod.frozen = 1
-__load()
-del __load
-"""
 
 LOAD_FROM_DIR = r"""\
 def __load():
