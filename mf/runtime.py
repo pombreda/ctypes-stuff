@@ -28,12 +28,18 @@ class Runtime(object):
     """
 
     # modules which are always needed
-    bootstrap_modules = ("codecs",
-                         "io",
-                         "encodings.*")
+    bootstrap_modules = {
+        # Needed for Python itself:
+        "codecs",
+        "io",
+        "encodings.*",
+        }
 
     def __init__(self, options):
         self.options = options
+
+        if self.options.bundle_files < 3:
+            self.bootstrap_modules.add("zipextimporter")
 
 
     def analyze(self):
@@ -109,8 +115,6 @@ class Runtime(object):
         unbuffered = False # XXX
 
         script_data = self._create_script_data()
-
-        print("script_data: %s" % repr(script_data))
 
         if libname is None:
             zippath = b""
