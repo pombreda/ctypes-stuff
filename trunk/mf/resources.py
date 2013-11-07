@@ -2,47 +2,27 @@
 # -*- coding: utf-8 -*-
 """resources for py3exe
 """
-import os
-import sys
 import _wapi
 
 # something like this is what we want
-## import contextlib
+import contextlib
 
-## @contextlib.contextmanager
-## def UpdateResources(filename, delete_existing=False):
-##     hrscr = _wapi.BeginUpdateResourceW(filename, delete_existing)
-##     yield _wapi.UpdateResourceA
-##     _wapi.EndUpdateResourceW(hrsrc, False)
-    
+@contextlib.contextmanager
+def UpdateResources(filename, delete_existing=False):
+    hrscr = _wapi.BeginUpdateResourceW(filename, delete_existing)
+    yield ResourceWriter(hrscr, filename)
+    _wapi.EndUpdateResourceW(hrscr, False)
 
-## def add_resources(filename, script_info):
-##     with UpdateResources(filename) as add:
-##         add(b"PYTHON33.DLL", 1, pydll_bytes)
-##         add(b"PYTHONSCRIPT", 1, script_info)
-
-
-def add_resources(filename, pydll, script_info):
-
-    hrsrc = _wapi.BeginUpdateResourceW(filename, False)
-
-    with open(pydll, "rb") as ifi:
-        pydll_bytes = ifi.read()
-
-    ## print("Add RSC %s to %s" % (os.path.basename(pydll), filename))
-
-    ## _wapi.UpdateResourceA(hrsrc,
-    ##                       pydll.encode("ascii"),
-    ##                       _wapi.LPCSTR(1),
-    ##                       0, # wLanguage
-    ##                       pydll_bytes,
-    ##                       len(pydll_bytes));
-
-    _wapi.UpdateResourceA(hrsrc,
-                          b"PYTHONSCRIPT",
-                          _wapi.LPCSTR(1),
-                          0, # wLanguage
-                          script_info,
-                          len(script_info))
-
-    _wapi.EndUpdateResourceW(hrsrc, False)
+class ResourceWriter(object):
+    def __init__(self, hrscr, filename):
+        self._hrscr = hrscr
+        self._filename = filename
+        
+    def add(self, res_type, res_name, res_data):
+        print("Add RSC %s/%s %d bytes to %s" % (res_type, res_name, len(res_data), self._filename))
+        _wapi.UpdateResourceW(self._hrscr,
+                              _wapi.LPCWSTR(res_type),
+                              _wapi.LPCWSTR(res_name),
+                              0, # wLanguage
+                              res_data,
+                              len(res_data))
