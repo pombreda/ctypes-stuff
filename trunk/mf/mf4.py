@@ -48,6 +48,26 @@ del __patch_py33
 class ModuleFinder:
     def __init__(self, path=None, verbose=0, excludes=[], optimize=0):
         self.excludes = excludes
+        # Maybe a good idea, but doesn't work.
+        # Try with 'include numpy' for an example.
+        self.conditional_excludes = {
+            ## "_dummy_threading": {"dummy_threading"},
+            ## "_emx_link": {"os"},
+            ## "_gestalt": {"platform"},
+            ## "_posixsubprocess": {"subprocess"},
+            ## "ce": {"os"},
+            ## "fcntl": {"tempfile"},
+            ## "grp": {"shutil", "tarfile"},
+            ## "java": {"platform"},
+            ## "os2": {"os"},
+            ## "org": {"copy", "pickle", "cPickle"},
+            ## "posix": {"os"},
+            ## "pwd": {"http.server", "posixpath", "shutil", "tarfile", "webbrowser"},
+            ## "termios": {"tty"},
+            ## "vms_lib": {"platform"},
+
+            ## "setuptools": {"numpy"},
+            }
         self.path = path
         self._optimize = optimize
         self._verbose = verbose
@@ -250,10 +270,16 @@ class ModuleFinder:
             name = self._resolve_name(name, package, level)
         # 'name' is now the fully qualified, absolute name of the module we want to import.
 
-        self._depgraph[name].add(self.__last_caller.__name__ if self.__last_caller else "-")
+        caller = self.__last_caller.__name__ if self.__last_caller else "-"
+
+        self._depgraph[name].add(caller)
+
+        if caller in self.conditional_excludes.get(name, ()):
+            raise ImportError('No module named {!r}'.format(name), name=name)
 
         if name in self.excludes:
             raise ImportError('No module named {!r}'.format(name), name=name)
+
         if name in self.modules:
             return self.modules[name]
         return self._find_and_load(name)

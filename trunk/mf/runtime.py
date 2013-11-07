@@ -41,7 +41,6 @@ class Runtime(object):
         if self.options.bundle_files < 3:
             self.bootstrap_modules.add("zipextimporter")
 
-
     def analyze(self):
         logger.info("Analyzing the code")
 
@@ -230,17 +229,8 @@ class Runtime(object):
                 pydfile = mod.__name__ + EXTENSION_SUFFIXES[0]
 
                 if self.options.bundle_files < 3:
-                    if mod.__name__ == "_memimporter":
-                        # XXX _memimporter is special - must be bootstrapped
-                        # from the file system.
-                        #
-                        # Later, it will live inside the exe-stub...
-                        print("Copy PYD %s to %s" % (os.path.basename(mod.__file__),
-                                                     dlldir))
-                        shutil.copy2(mod.__file__, dlldir)
-                    else:
-                        print("Add PYD %s to %s" % (os.path.basename(mod.__file__), libpath))
-                        arc.write(mod.__file__, pydfile)
+                    print("Add PYD %s to %s" % (os.path.basename(mod.__file__), libpath))
+                    arc.write(mod.__file__, pydfile)
                 else:
                     # Copy the extension into dlldir. To be able to
                     # load it without putting dlldir into sys.path, we
