@@ -143,6 +143,8 @@ from importlib.machinery import EXTENSION_SUFFIXES
 
 # Exclude modules that the standard library imports (conditionally),
 # but which are not present on windows.
+#
+# _memimporter can be excluded because it is built into the run-stub.
 windows_excludes = """
 _dummy_threading
 _emx_link
@@ -160,6 +162,7 @@ posix
 pwd
 termios
 vms_lib
+_memimporter
 """.split()
 
 class Scanner(ModuleFinder):
