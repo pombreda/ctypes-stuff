@@ -45,6 +45,7 @@ struct scriptinfo {
 	char zippath[0];
 };
 
+PyMODINIT_FUNC PyInit__memimporter(void);
 extern void SystemError(int error, char *msg);
 int run_script(void);
 void fini(void);
@@ -248,72 +249,6 @@ void set_vars(void)
 		*pflag = p_script_info->optimize;
 }
 
-/****************************************************************
- * the _p2e builtin helper module
- */
-/*
-void free_lib(wchar_t *name)
-{
-	HMODULE hmod = GetModuleHandleW(name);
-	int res;
-	do {
-		res = (int)FreeLibrary(hmod);
-		printf("Free %S -> %d\n", name, res);
-	} while (res);
-	res = _wunlink(name);
-	printf("unlinked %S -> %d\n", name, res);
-}
-
-static struct DLL {
-	wchar_t *dllname;
-	struct DLL *next;
-} *dll_pointer;
-
-void free_dlls()
-{
-	struct DLL *ptr = dll_pointer;
-	while(ptr) {
-		printf("FOUND %S\n", ptr->dllname);
-		free_lib(ptr->dllname);
-		ptr = ptr->next;
-	}
-}
-
-static PyObject *
-_p2e_register_dll(PyObject *self, PyObject *args)
-{
-	wchar_t *dll;
-	struct DLL *ptr;
-	if (!PyArg_ParseTuple(args, "u", &dll))
-		return NULL;
-	printf("REGISTERED %S\n", dll);
-	ptr = (struct DLL *)malloc(sizeof(struct DLL));
-	ptr->dllname = _wcsdup(dll);
-	ptr->next = dll_pointer;
-	dll_pointer = ptr;
-	return PyLong_FromLong(42);
-}
-
-static PyMethodDef _p2eMethods[] = {
-	{"register_dll", _p2e_register_dll, METH_VARARGS, "register a dll for cleanup"},
-	{NULL, NULL, 0, NULL},
-};
-
-static struct PyModuleDef _p2emodule = {
-	PyModuleDef_HEAD_INIT,
-	"_p2e",
-	"py2exe runtime helper module",
-	-1,
-	_p2eMethods
-};
-
-PyMODINIT_FUNC
-PyInit__p2e(void)
-{
-	return PyModule_Create(&_p2emodule);
-}
-*/
-
 /*****************************************************************/
 
 int wmain (int argc, wchar_t **argv)
@@ -338,22 +273,16 @@ int wmain (int argc, wchar_t **argv)
 //	Py_IsInitialized();
 
 	set_vars();
-/*
+
 	// provide builtin modules:
-	PyImport_AppendInittab("_p2e", PyInit__p2e);
-*/	
+	PyImport_AppendInittab("_memimporter", PyInit__memimporter);
 
 	Py_SetProgramName(modulename);
 	Py_SetPath(libfilename);
 	Py_Initialize();
 	PySys_SetArgvEx(argc, argv, 0);
 
-//	PyRun_SimpleString("import sys; print(sys.path)");
-
 	rc = run_script();
-
-//	PyRun_SimpleString("import __SCRIPT__; __SCRIPT__.main()");
-//	PyRun_SimpleString("import __main__; print(dir(__main__))");
 
 	fini();
 
