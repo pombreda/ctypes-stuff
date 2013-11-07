@@ -215,32 +215,6 @@ int run_script(void)
 	return rc;
 }
 
-/*
-BOOL unpack_python_dll(HMODULE hmod)
-{
-	HANDLE hrsrc;
-	// Try to locate pythonxy.dll as resource in the exe
-	hrsrc = FindResource(hmod, MAKEINTRESOURCE(1), PYTHONDLL);
-	printf("FindResource %s %p\n", PYTHONDLL, hrsrc);
-	if (hrsrc) {
-		wchar_t pydll[260];
-		HGLOBAL hgbl;
-		DWORD size;
-		char *ptr;
-		FILE *f;
-		hgbl = LoadResource(hmod, hrsrc);
-		size = SizeofResource(hmod, hrsrc);
-		ptr = LockResource(hgbl);
-		_snwprintf(pydll, sizeof(pydll), L"%s\\%S", dirname, PYTHONDLL);
-		printf("PYTHONDLL: %S\n", pydll);
-		f = _wfopen(pydll, L"wb");
-		fwrite(ptr, size, 1, f);
-		fclose(f);
-	}
-	return TRUE;
-}
-*/
-
 void set_vars(void)
 {
 	HMODULE py = MyGetModuleHandle(PYTHONDLL);
@@ -256,13 +230,17 @@ void set_vars(void)
 
 /*****************************************************************/
 
-int load_pythondll(HMODULE hmod)
+int load_pythondll(void)
 {
 	HANDLE hrsrc;
+	HMODULE hmod = LoadLibraryExW(libfilename, NULL, LOAD_LIBRARY_AS_DATAFILE);
 	hPYDLL = NULL;
+	
+	wprintf(L"libfilename %s, hmod %p\n", libfilename, hmod);
+
 	// Try to locate pythonxy.dll as resource in the exe
 	hrsrc = FindResource(hmod, MAKEINTRESOURCE(1), PYTHONDLL);
-	printf("FindResource %s %p\n", PYTHONDLL, hrsrc);
+	printf("FindResource(%p) %s %p\n", hmod, PYTHONDLL, hrsrc);
 	if (hrsrc) {
 		HGLOBAL hgbl;
 		DWORD size;
@@ -273,6 +251,7 @@ int load_pythondll(HMODULE hmod)
 		hPYDLL = MyLoadLibrary(PYTHONDLL, ptr, NULL);
 	} else
 		hPYDLL = LoadLibrary(PYTHONDLL);
+	FreeLibrary(hmod);
 	printf("load_pythondll: %p\n", hPYDLL);
 	return hPYDLL ? 0 : -1;
 }
@@ -291,18 +270,17 @@ int wmain (int argc, wchar_t **argv)
 /*	Py_InspectFlag = 1; /* Needed to determine whether to exit at SystemExit */
 
 	calc_dirname(NULL);
-//	wprintf(L"modulename %s\n", modulename);
-//	wprintf(L"dirname %s\n", dirname);
-
-//	hPYDLL = LoadLibrary(PYTHONDLL);
-
-	rc = load_pythondll(GetModuleHandle(NULL));
-	if (rc < 0) {
-		printf("FATAL Error: could not load python library\n");
-	}
+	wprintf(L"modulename %s\n", modulename);
+	wprintf(L"dirname %s\n", dirname);
 
 	if (!locate_script(GetModuleHandle(NULL))) {
 		printf("FATAL ERROR locating script\n");
+		return -1;
+	}
+
+	rc = load_pythondll();
+	if (rc < 0) {
+		printf("FATAL Error: could not load python library\n");
 		return -1;
 	}
 
