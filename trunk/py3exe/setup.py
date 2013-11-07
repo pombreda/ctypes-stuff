@@ -316,12 +316,16 @@ else:
               ("PYTHONCOM", '\\"pythoncom%d%d.dll\\"' % sys.version_info[:2]),
               ("_CRT_SECURE_NO_WARNINGS", '1')]
 
+##macros.append(("Py_LIMITED_API", '1'))
+macros.append(("Py_BUILD_CORE", '1'))
+
 extra_compile_args = []
-##extra_link_args = ["/DELAYLOAD:python%d%d.dll" % sys.version_info[:2], "delayimp.lib"]
+##extra_link_args = ["/DELAYLOAD:python3.dll", "delayimp.lib"]
 extra_link_args = []
 
 if 0:
     # enable this to debug a release build
+    extra_compile_args.append("/Od")
     extra_compile_args.append("/Z7")
     extra_link_args.append("/DEBUG")
     macros.append(("VERBOSE", "1"))
@@ -335,6 +339,8 @@ run = Interpreter("py3exe.run",
                    "source/MyLoadLibrary.c",
                    "source/_memimporter.c",
                    "source/actctx.c",
+
+                   "source/python3.c",
 
                    ## "source/Python-dynload.c",
                    ## "source/MemoryModule.c",
