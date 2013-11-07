@@ -14,7 +14,7 @@ import struct
 import sys
 import zipfile
 
-from resources import add_resources
+from resources import UpdateResources
 
 logger = logging.getLogger("runtime")
 
@@ -128,7 +128,13 @@ class Runtime(object):
                                   len(script_data))
         script_info += zippath + b"\0" + script_data + b"\0"
 
-        add_resources(exe_path, pydll, script_info)
+        with UpdateResources(exe_path) as resource:
+            if self.options.bundle_files < 3:
+                with open(pydll, "rb") as ifi:
+                    pydll_bytes = ifi.read()
+                resource.add("PYTHON33.DLL", 1, pydll_bytes)
+
+            resource.add("PYTHONSCRIPT", 1, script_info)
 
     def _create_script_data(self):
         # We create a list of code objects, and return it as a
@@ -255,18 +261,25 @@ class Runtime(object):
 
         for src in self.mf.required_dlls():
             if src.lower() == pydll:
-                # XXX Python dll is special, will be added as resource to the library archive...
-## ##                print("Skipping %s" % pydll)
-                print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
-                shutil.copy2(src, dlldir)
-                # XXX Why is the python33.dll in the dist dir
-                # a lot larger than in the system directory???
-                # Or do I look into the wrong system directory???
+                if self.options.bundle_files < 3:
+                    # Python dll is special, will be added as resource to the library archive...
+                    # print("Skipping %s" % pydll)
+                    pass
+                else:
+                    print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
+                    shutil.copy2(src, dlldir)
             elif self.options.bundle_files < 3:
                 ## dst = os.path.join("--DLLS--", os.path.basename(src))
                 ## print("Add DLL %s to %s" % (os.path.basename(dst), libpath))
                 ## arc.write(src, dst)
-                print("SKIP DLL", os.path.basename(src))
+
+                ## XXX We should refuse to do this with pywintypesXY.dll
+                ## or pythoncomXY.dll...  Or write a special loader for them...
+                ## Or submit the loader to the PyWin32 project...
+                dst = os.path.basename(src)
+                print("Add DLL %s to %s" % (dst, libpath))
+                arc.write(src, dst)
+##                print("SKIP DLL", os.path.basename(src))
             else:
                 dst = os.path.join(dlldir, os.path.basename(src))
                 print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
