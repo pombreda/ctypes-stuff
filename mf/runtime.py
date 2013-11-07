@@ -129,11 +129,6 @@ class Runtime(object):
         script_info += zippath + b"\0" + script_data + b"\0"
 
         with UpdateResources(exe_path) as resource:
-            if self.options.bundle_files < 3:
-                with open(pydll, "rb") as ifi:
-                    pydll_bytes = ifi.read()
-                resource.add("PYTHON33.DLL", 1, pydll_bytes)
-
             resource.add("PYTHONSCRIPT", 1, script_info)
 
     def _create_script_data(self):
@@ -197,8 +192,16 @@ class Runtime(object):
             libmode = "a"
         else:
             libpath = os.path.join(os.path.dirname(exe_path), libname)
-            libmode = "w"
+            shutil.copy2("dll.dll", libpath)
+            libmode = "a"
         logger.info("Building the code archive %r", libpath)
+
+        # Add pythonXY.dll as resource into the library file
+        if self.options.bundle_files < 3:
+            with UpdateResources(libpath) as resource:
+                with open(pydll, "rb") as ifi:
+                    pydll_bytes = ifi.read()
+                resource.add(os.path.basename(pydll), 1, pydll_bytes)
 
         if self.options.optimize:
             bytecode_suffix = OPTIMIZED_BYTECODE_SUFFIXES[0]
