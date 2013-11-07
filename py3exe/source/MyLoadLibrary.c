@@ -125,6 +125,19 @@ static void _FreeLibrary(HCUSTOMMODULE module, void *userdata)
 	MyFreeLibrary(module);
 }
 
+PyObject *CallFindproc(PyObject *findproc, LPCSTR filename)
+{
+	PyObject *res = NULL;
+	PyObject *args = PyTuple_New(1);
+	if (args == NULL)
+		return NULL;
+	if (-1 == PyTuple_SetItem(args, 0, PyUnicode_FromString(filename)))
+		return NULL;
+	res = PyObject_CallObject(findproc, args);
+	Py_DECREF(args);
+	return res;
+}
+
 static HCUSTOMMODULE _LoadLibrary(LPCSTR filename, void *userdata)
 {
 	HCUSTOMMODULE result;
@@ -141,7 +154,14 @@ static HCUSTOMMODULE _LoadLibrary(LPCSTR filename, void *userdata)
 	}
 	if (userdata) {
 		PyObject *findproc = (PyObject *)userdata;
-		PyObject *res = PyObject_CallFunction(findproc, "s", filename);
+		// Since we are using the Py_LIMITED_API with dynamic loading
+		// we would have to implement PyObject_CallFunction() ourselves,
+		// which would be a paint since there is no PyObject_VaCallFunction.
+		//
+		// So we implement a special CallFindproc function
+		// which encapsulates the dance we have to do.
+//		PyObject *res = PyObject_CallFunction(findproc, "s", filename);
+		PyObject *res = CallFindproc(findproc, filename);
 		if (res && PyBytes_AsString(res)) {
 			result = MemoryLoadLibraryEx(PyBytes_AsString(res),
 						     _LoadLibrary, _GetProcAddress, _FreeLibrary,

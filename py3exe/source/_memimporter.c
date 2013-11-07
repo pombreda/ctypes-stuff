@@ -34,7 +34,7 @@ int do_import(FARPROC init_func, char *modname)
 	PyObject* (*p)(void);
 	PyObject *m = NULL;
 	struct PyModuleDef *def;
-	char *oldcontext;
+//	char *oldcontext;
 	PyObject *name = PyUnicode_FromString(modname);
 
 	if (name == NULL)
@@ -57,12 +57,15 @@ int do_import(FARPROC init_func, char *modname)
 		Py_DECREF(name);
 		return -1;
 	}
-
+/*
         oldcontext = _Py_PackageContext;
 	_Py_PackageContext = modname;
+*/
 	p = (PyObject*(*)(void))init_func;
 	m = (*p)();
+/*
 	_Py_PackageContext = oldcontext;
+*/
 
 	if (PyErr_Occurred()) {
 		Py_DECREF(name);
@@ -85,53 +88,6 @@ int do_import(FARPROC init_func, char *modname)
 	return res;
 }
 
-#elif (PY_VERSION_HEX < 0x03000000)
-
-/* Magic for extension modules (built-in as well as dynamically
-   loaded).  To prevent initializing an extension module more than
-   once, we keep a static dictionary 'extensions' keyed by module name
-   (for built-in modules) or by filename (for dynamically loaded
-   modules), containing these modules.  A copy of the module's
-   dictionary is stored by calling _PyImport_FixupExtension()
-   immediately after the module initialization function succeeds.  A
-   copy can be retrieved from there by calling
-   _PyImport_FindExtension(). */
-
-/* c:/users/thomas/devel/code/Python-2.7.3/Python/importdl.c 73 */
-
-int do_import(FARPROC init_func, char *modname)
-{
-	PyObject *m;
-	char *oldcontext;
-
-	if ((m = _PyImport_FindExtension(modname, modname)) != NULL) {
-		return -1;
-	}
-
-	if (init_func == NULL) {
-		PyErr_Format(PyExc_ImportError,
-			     "dynamic module does not define init function (init%.200s)",
-			     modname);
-		return -1;
-	}
-
-	oldcontext = _Py_PackageContext;
-	_Py_PackageContext = modname;
-	(*init_func)();
-	_Py_PackageContext = oldcontext;
-	if (PyErr_Occurred()) {
-		return -1;
-	}
-
-	if (_PyImport_FixupExtension(modname, modname) == NULL)
-		return -1;
-	if (Py_VerboseFlag)
-		PySys_WriteStderr(
-			"import %s # dynamically loaded from zipfile\n",
-			modname);
-	return 0;
-}
-
 #else
 # error "Python 3.0, 3.1, and 3.2 are not supported"
 
@@ -149,6 +105,9 @@ import_module(PyObject *self, PyObject *args)
 
 	ULONG_PTR cookie = 0;
 	PyObject *findproc;
+
+	//	MessageBox(NULL, "ATTACH", "NOW", MB_OK);
+	//	DebugBreak();
 
 	/* code, initfuncname, fqmodulename, path */
 	if (!PyArg_ParseTuple(args, "sssO:import_module",
@@ -196,7 +155,8 @@ import_module(PyObject *self, PyObject *args)
 static PyObject *
 get_verbose_flag(PyObject *self, PyObject *args)
 {
-	return PyLong_FromLong(Py_VerboseFlag);
+//	return PyLong_FromLong(Py_VerboseFlag);
+	return PyLong_FromLong(0);
 }
 
 static PyMethodDef methods[] = {

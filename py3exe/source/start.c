@@ -32,6 +32,11 @@
 #include <compile.h>
 #include <eval.h>
 
+#include "MyLoadLibrary.h"
+
+extern HMODULE hPYDLL;
+
+
 #if defined(MS_WINDOWS) || defined(__CYGWIN__)
 #include <fcntl.h>
 #endif
@@ -238,12 +243,12 @@ BOOL unpack_python_dll(HMODULE hmod)
 
 void set_vars(void)
 {
-	HMODULE py = GetModuleHandle(PYTHONDLL);
-	int *pflag = (int *)GetProcAddress(py, "Py_NoSiteFlag");
+	HMODULE py = MyGetModuleHandle(PYTHONDLL);
+	int *pflag = (int *)MyGetProcAddress(py, "Py_NoSiteFlag");
 	printf("GetProcAddress(%p, 'Py_NoSiteFlag') -> %p\n", py, pflag);
 	*pflag = 1;
 
-	pflag = (int *)GetProcAddress(py, "Py_OptimizeFlag");
+	pflag = (int *)MyGetProcAddress(py, "Py_OptimizeFlag");
 	printf("GetProcAddress(%p, 'Py_OptimizeFlag') -> %p\n", py, pflag);
 	if (pflag)
 		*pflag = p_script_info->optimize;
@@ -251,9 +256,36 @@ void set_vars(void)
 
 /*****************************************************************/
 
+int load_pythondll(HMODULE hmod)
+{
+	HANDLE hrsrc;
+	hPYDLL = NULL;
+	// Try to locate pythonxy.dll as resource in the exe
+	hrsrc = FindResource(hmod, MAKEINTRESOURCE(1), PYTHONDLL);
+	printf("FindResource %s %p\n", PYTHONDLL, hrsrc);
+	if (hrsrc) {
+		HGLOBAL hgbl;
+		DWORD size;
+		char *ptr;
+		hgbl = LoadResource(hmod, hrsrc);
+		size = SizeofResource(hmod, hrsrc);
+		ptr = LockResource(hgbl);
+		hPYDLL = MyLoadLibrary(PYTHONDLL, ptr, NULL);
+	} else
+		hPYDLL = LoadLibrary(PYTHONDLL);
+	printf("load_pythondll: %p\n", hPYDLL);
+	return hPYDLL ? 0 : -1;
+}
+
 int wmain (int argc, wchar_t **argv)
 {
 	int rc = 0;
+	wchar_t *path = NULL;
+
+/*
+	MessageBox(NULL, "Attach Debugger", "", MB_OK);
+	DebugBreak();
+*/
 
 /*	Py_NoSiteFlag = 1; /* Suppress 'import site' */
 /*	Py_InspectFlag = 1; /* Needed to determine whether to exit at SystemExit */
@@ -262,7 +294,12 @@ int wmain (int argc, wchar_t **argv)
 //	wprintf(L"modulename %s\n", modulename);
 //	wprintf(L"dirname %s\n", dirname);
 
-//	unpack_python_dll(GetModuleHandle(NULL));
+//	hPYDLL = LoadLibrary(PYTHONDLL);
+
+	rc = load_pythondll(GetModuleHandle(NULL));
+	if (rc < 0) {
+		printf("FATAL Error: could not load python library\n");
+	}
 
 	if (!locate_script(GetModuleHandle(NULL))) {
 		printf("FATAL ERROR locating script\n");
@@ -278,8 +315,11 @@ int wmain (int argc, wchar_t **argv)
 	PyImport_AppendInittab("_memimporter", PyInit__memimporter);
 
 	Py_SetProgramName(modulename);
+	path = Py_GetPath();
 	Py_SetPath(libfilename);
 	Py_Initialize();
+	// We don't care for the additional refcount here...
+	PySys_SetObject("frozen", PyUnicode_FromString("exe"));
 	PySys_SetArgvEx(argc, argv, 0);
 
 	rc = run_script();
