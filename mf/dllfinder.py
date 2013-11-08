@@ -166,7 +166,9 @@ _memimporter
 """.split()
 
 class Scanner(ModuleFinder):
-
+    """A ModuleFinder subclass which allows to find binary
+    dependencies.
+    """
     def __init__(self, path=None, verbose=0, excludes=[], optimize=0):
         excludes = list(excludes) + windows_excludes
         super().__init__(path, verbose, excludes, optimize)
