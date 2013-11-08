@@ -31,6 +31,21 @@ static HMODULE hmod_pydll;
 
 ////////////////////////////////////////////////////////////////
 
+#define Py_OptimizeFlag *(_PyOptimze_Flag_PTR())
+
+int *_Py_OptimizeFlag_PTR()
+{
+  return (int *)MyGetProcAddress(hmod_pydll, "Py_OptimizeFlag");
+}
+
+#define Py_NoSiteFlag *(_Py_NoSiteFlag_PTR())
+
+int *_Py_NoSiteFlag_PTR()
+{
+  return (int *)MyGetProcAddress(hmod_pydll, "Py_NoSiteFlag");
+}
+
+
 PyObject *PyErr_SetImportError(PyObject *msg, PyObject *name, PyObject *path)
 {
   FUNC(PyObject *, PyErr_SetImportError, (PyObject *, PyObject *, PyObject *));
