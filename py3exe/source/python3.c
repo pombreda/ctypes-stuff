@@ -21,13 +21,13 @@
     from function prototypes automatically?
 */
 
-HMODULE hPYDLL;
+static HMODULE hmod_pydll;
 
 #define NYI(x) MessageBox(NULL, x, "not yet implemented", MB_OK)
 
 #define FUNC(res, name, args) \
   static res(*proc)args; \
-  if (!proc) (FARPROC)proc = MyGetProcAddress(hPYDLL, #name)
+  if (!proc) (FARPROC)proc = MyGetProcAddress(hmod_pydll, #name)
 
 ////////////////////////////////////////////////////////////////
 
@@ -168,6 +168,19 @@ int PyArg_ParseTuple(PyObject *args, const char *format, ...)
   return -1;
 }
 
+PyObject *PyUnicode_FromFormat(const char *format, ...)
+{
+  PyObject *result;
+  va_list marker;
+  FUNC(PyObject *, PyUnicode_FromFormatV, (const char *, va_list));
+  va_start(marker, format);
+  result = proc(format, marker);
+  va_end(marker);
+  return result;
+}
+
+
+
 PyObject *PyObject_CallObject(PyObject *callable, PyObject *args)
 {
   FUNC(PyObject *, PyObject_CallObject, (PyObject *, PyObject *));
@@ -218,9 +231,6 @@ PyObject *PyImport_ImportModule(const char *name)
   return proc(name);
 }
 
-/* The following two functions are NOT part of the stable ABI !!! */
-
-
 PyObject *_PyImport_FindExtensionObject(PyObject *a, PyObject *b)
 {
   FUNC(PyObject *, _PyImport_FindExtensionObject, (PyObject *, PyObject *));
@@ -233,12 +243,16 @@ int _PyImport_FixupExtensionObject(PyObject *m, PyObject *a, PyObject *b)
   return proc(m, a, b);
 }
 
-// c:\Python33-64\include\Python.h
-
 int PySys_SetObject(const char *name, PyObject *v)
 { // Why do 
   FUNC(int, PySys_SetObject, (const char *, PyObject *));
   return proc(name, v);
+}
+
+void PyErr_SetObject(PyObject *type, PyObject *value)
+{
+  FUNC(PyObject *, PyErr_SetObject, (PyObject *, PyObject *));
+  proc(type, value);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -250,20 +264,23 @@ PyObject *PyErr_Format(PyObject *exception, const char *format, ...)
   return NULL;
 }
 
-void PyErr_SetObject(PyObject *type, PyObject *value)
+int PythonLoaded(HMODULE hmod)
 {
-  NYI("PyErr_SetObject");
-  DebugBreak();
+  hmod_pydll = hmod;
+  PyExc_SystemError = *((PyObject **)MyGetProcAddress(hmod, "PyExc_SystemError"));
+  if (PyExc_SystemError == NULL)
+    return -1;
+  PyExc_ImportError = *((PyObject **)MyGetProcAddress(hmod, "PyExc_ImportError"));
+  if (PyExc_ImportError == NULL)
+    return -1;
+  PyExc_RuntimeError = *((PyObject **)MyGetProcAddress(hmod, "PyExc_RuntimeError"));
+  if (PyExc_RuntimeError == NULL)
+    return -1;
+  return 0;
 }
 
 PyObject *PyExc_SystemError;
 PyObject *PyExc_ImportError;
+PyObject *PyExc_RuntimeError;
 
 //Py_VerboseFlag
-
-PyObject *PyUnicode_FromFormat(const char *format, ...)
-{
-  NYI("PyUnicode_FromFormat");
-  DebugBreak();
-  return NULL;
-}

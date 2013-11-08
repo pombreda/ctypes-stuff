@@ -75,9 +75,13 @@ int do_import(FARPROC init_func, char *modname)
 	/* Remember pointer to module init function. */
 	def = PyModule_GetDef(m);
 	if (def == NULL) {
-		PyErr_Format(PyExc_SystemError,
-			     "initialization of %s did not return an extension "
-			     "module", modname);
+		PyObject *msg = PyUnicode_FromFormat(
+			"initialization of %s did not return an extension module",
+			modname);
+		if (msg) {
+			PyErr_SetObject(PyExc_SystemError, msg);
+			Py_DECREF(msg);
+		}
 		Py_DECREF(name);
 		return -1;
 	}

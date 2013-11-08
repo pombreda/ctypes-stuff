@@ -27,7 +27,7 @@
 
 #include "MyLoadLibrary.h"
 
-extern HMODULE hPYDLL;
+extern int PythonLoaded(HMODULE);
 
 struct scriptinfo {
 	int tag;
@@ -226,41 +226,41 @@ int run_script(void)
 }
 
 /* XXX XXX XXX flags should be set elsewhere */
-void set_vars(void)
+void set_vars(HMODULE hmod_pydll)
 {
+	PyObject *p;
 	/*
 	  The python dll may be loaded from memory or in the usual way.
-	  MemoryGetProcAddress handles both cases.
+	  MyGetProcAddress handles both cases.
 	 */
-	int *pflag = (int *)MyGetProcAddress(hPYDLL, "Py_NoSiteFlag");
-//	printf("GetProcAddress(%p, 'Py_NoSiteFlag') -> %p\n", hPYDLL, pflag);
+	int *pflag = (int *)MyGetProcAddress(hmod_pydll, "Py_NoSiteFlag");
+//	printf("GetProcAddress(%p, 'Py_NoSiteFlag') -> %p\n", hmod_pydll, pflag);
 	*pflag = 1;
 
-	pflag = (int *)MyGetProcAddress(hPYDLL, "Py_OptimizeFlag");
-//	printf("GetProcAddress(%p, 'Py_OptimizeFlag') -> %p\n", hPYDLL, pflag);
+	pflag = (int *)MyGetProcAddress(hmod_pydll, "Py_OptimizeFlag");
+//	printf("GetProcAddress(%p, 'Py_OptimizeFlag') -> %p\n", hmod_pydll, pflag);
 	if (pflag)
 		*pflag = p_script_info->optimize;
+	p = (PyObject *)MyGetProcAddress(hmod_pydll, "PyExc_RuntimeError");
+	printf("GetProcAddress(%p, 'PyExc_RuntimeError') -> %p\n", hmod_pydll, p);
+	
 }
 
 /*
   Load the Python DLL, either from the resource in the library file (if found),
   or from the file system.
-  The module handle is stored in the global variable hPYDLL.
   
   This function should also be used to get all the function pointers that
   python3.c needs at once.
  */
-int load_pythondll(void)
+HMODULE load_pythondll(void)
 {
+	HMODULE hmod_pydll;
 	HANDLE hrsrc;
 	HMODULE hmod = LoadLibraryExW(libfilename, NULL, LOAD_LIBRARY_AS_DATAFILE);
-	hPYDLL = NULL;
-	
-//	wprintf(L"libfilename %s, hmod %p\n", libfilename, hmod);
 
 	// Try to locate pythonxy.dll as resource in the exe
 	hrsrc = FindResource(hmod, MAKEINTRESOURCE(1), PYTHONDLL);
-//	printf("FindResource(%p) %s %p\n", hmod, PYTHONDLL, hrsrc);
 	if (hrsrc) {
 		HGLOBAL hgbl;
 		DWORD size;
@@ -268,17 +268,16 @@ int load_pythondll(void)
 		hgbl = LoadResource(hmod, hrsrc);
 		size = SizeofResource(hmod, hrsrc);
 		ptr = LockResource(hgbl);
-		hPYDLL = MyLoadLibrary(PYTHONDLL, ptr, NULL);
+		hmod_pydll = MyLoadLibrary(PYTHONDLL, ptr, NULL);
 	} else
 		/*
 		  XXX We should probably call LoadLibraryEx with
 		  LOAD_WITH_ALTERED_SEARCH_PATH so that really our own one is
 		  used.
 		 */
-		hPYDLL = LoadLibrary(PYTHONDLL);
+		hmod_pydll = LoadLibrary(PYTHONDLL);
 	FreeLibrary(hmod);
-//	printf("load_pythondll: %p\n", hPYDLL);
-	return hPYDLL ? 0 : -1;
+	return hmod_pydll;
 }
 
 /*
@@ -287,6 +286,7 @@ int load_pythondll(void)
 int wmain (int argc, wchar_t **argv)
 {
 	int rc = 0;
+	HMODULE hmod_pydll;
 
 /*	Py_NoSiteFlag = 1; /* Suppress 'import site' */
 /*	Py_InspectFlag = 1; /* Needed to determine whether to exit at SystemExit */
@@ -300,14 +300,17 @@ int wmain (int argc, wchar_t **argv)
 		return -1;
 	}
 
-	rc = load_pythondll();
-	if (rc < 0) {
+	hmod_pydll = load_pythondll();
+	if (hmod_pydll == NULL) {
 		printf("FATAL Error: could not load python library\n");
-		return rc;
+		return -1;
+	}
+	if (PythonLoaded(hmod_pydll) < 0) {
+		printf("FATAL Error: failed to load some Python symbols\n");
+		return -1;
 	}
 
-
-	set_vars();
+	set_vars(hmod_pydll);
 
 	/*
 	  _memimporter contains the magic which allows to load
