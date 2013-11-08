@@ -72,13 +72,39 @@ class Runtime(object):
         if missing:
             mf.report_missing()
 
+    def build(self):
+        options = self.options
+
+        if not os.path.exists(options.destdir):
+            os.mkdir(options.destdir)
+        destdir = options.destdir
+
+        # basename of the exe to create
+        dest_base = os.path.splitext(os.path.basename(options.script))[0]
+
+        # full path to exe-file
+        exe_path = os.path.join(destdir, dest_base + ".exe")
+
+        if os.path.isfile(exe_path):
+            os.remove(exe_path)
+
+        # 'libname' is the path of the runtime library RELATIVE to the runner directory.
+        if options.libname:
+            libpath = os.path.join(destdir, options.libname)
+            if os.path.isfile(libpath):
+                os.remove(libpath)
+
+            if not os.path.exists(os.path.dirname(libpath)):
+                os.mkdir(os.path.dirname(libpath))
+
+        self.build_exe(exe_path, options.libname)
+        self.build_library(exe_path, options.libname)
+
+
     def build_exe(self, exe_path, libname):
         """Build the exe-file."""
         logger.info("Building exe '%s'", exe_path)
-        run_stub = '%s-py%s.%s-%s.exe' % ("run",
-                                          sys.version_info[0],
-                                          sys.version_info[1],
-                                          distutils.util.get_platform())
+        run_stub = "run.exe"
         print("Using exe-stub %r" % run_stub)
         exe_bytes = pkgutil.get_data("py3exe", run_stub)
         if exe_bytes is None:
