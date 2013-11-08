@@ -6,6 +6,7 @@ static char module_doc[] =
 
 #include "MyLoadLibrary.h"
 #include "actctx.h"
+#include "python-dynload.h"
 
 #if (PY_VERSION_HEX >= 0x03030000)
 
@@ -159,8 +160,7 @@ import_module(PyObject *self, PyObject *args)
 static PyObject *
 get_verbose_flag(PyObject *self, PyObject *args)
 {
-//	return PyLong_FromLong(Py_VerboseFlag);
-	return PyLong_FromLong(0);
+	return PyLong_FromLong(Py_VerboseFlag);
 }
 
 static PyMethodDef methods[] = {
