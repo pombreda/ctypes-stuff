@@ -21,25 +21,13 @@
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-/*
- * $Id: start.c 726 2013-06-05 18:42:13Z theller $
- *
- */
-
 #include <windows.h>
 #include <Python.h>
 #include <marshal.h>
-#include <compile.h>
-#include <eval.h>
 
 #include "MyLoadLibrary.h"
 
 extern HMODULE hPYDLL;
-
-
-#if defined(MS_WINDOWS) || defined(__CYGWIN__)
-#include <fcntl.h>
-#endif
 
 struct scriptinfo {
 	int tag;
@@ -52,6 +40,7 @@ struct scriptinfo {
 
 PyMODINIT_FUNC PyInit__memimporter(void);
 extern void SystemError(int error, char *msg);
+
 int run_script(void);
 void fini(void);
 char *pScript;
@@ -101,11 +90,15 @@ static int dprintf(char *fmt, ...)
 }
 */
 
+/*
+  Calculate the directory name where of the executable
+ */
 BOOL calc_dirname(HMODULE hmod)
 {
 	int is_special;
 	wchar_t *modulename_start;
 	wchar_t *cp;
+
 	// get module filename
 	if (!GetModuleFileNameW(hmod, modulename, sizeof(modulename))) {
 		SystemError(GetLastError(), "Retrieving module name");
@@ -126,7 +119,21 @@ BOOL calc_dirname(HMODULE hmod)
 	return TRUE;
 }
 
+/*
+  The executable contains a scriptinfo structure as a resource.
+  
+  This structure contains some flags for the Python interpreter, the pathname
+  of the library relative to the executable (if the pathname is empty the
+  executable is the library itself), and marshalled byte string which is a
+  Python list of code objects that we have to execute.
 
+  The first code objects contain some bootstrap code for py2exe, the last
+  one contains the main script that should be run.
+  
+  This function loads the structure from the resource, sets the pScript
+  pointer to the start of the marshalled byte string, and fills in the global
+  variable 'libfilename' with the absolute pathname of the library file.
+ */
 BOOL locate_script(HMODULE hmod)
 {
 	HRSRC hrsrc = FindResource(hmod, MAKEINTRESOURCE(1), "PYTHONSCRIPT");
@@ -165,11 +172,15 @@ BOOL locate_script(HMODULE hmod)
 	} else {
 		GetModuleFileNameW(hmod, libfilename, sizeof(libfilename));
 	}
-//	printf("LIBFILENAME '%S'\n", libfilename);
 	
 	return TRUE; // success
 }
 
+/*
+  Examine the PYTHONINSPECT environment variable (which may have been set by
+  the python script itself), run an interactive Python interpreter if it is
+  set, and finally call Py_Finalize().
+ */
 void fini(void)
 {
 	/* The standard Python does also allow this: Set PYTHONINSPECT
@@ -181,6 +192,10 @@ void fini(void)
 	Py_Finalize();
 }
 
+/*
+  This function creates the __main__ module and runs the bootstrap code and
+  the main Python script.
+ */
 int run_script(void)
 {
 	int rc = 0;
@@ -189,17 +204,12 @@ int run_script(void)
 	PyObject *m=NULL, *d=NULL, *seq=NULL;
 	/* We execute then in the context of '__main__' */
 	m = PyImport_AddModule("__main__");
-//	printf("m %p\n", m);
 	if (m) d = PyModule_GetDict(m);
-//	printf("d %p\n", d);
 	if (d) seq = PyMarshal_ReadObjectFromString(pScript, numScriptBytes);
-//	printf("seq %p\n", seq);
 	if (seq) {
 		Py_ssize_t i, max = PySequence_Length(seq);
-//		printf("len(seq) %d\n", max);
 		for (i=0; i<max; i++) {
 			PyObject *sub = PySequence_GetItem(seq, i);
-//			printf("seq[%d] %p\n", i, seq);
 			if (sub /*&& PyCode_Check(sub) */) {
 				PyObject *discard = PyEval_EvalCode(sub, d, d);
 				if (!discard) {
@@ -215,32 +225,42 @@ int run_script(void)
 	return rc;
 }
 
+/* XXX XXX XXX flags should be set elsewhere */
 void set_vars(void)
 {
-	HMODULE py = MyGetModuleHandle(PYTHONDLL);
-	int *pflag = (int *)MyGetProcAddress(py, "Py_NoSiteFlag");
-	printf("GetProcAddress(%p, 'Py_NoSiteFlag') -> %p\n", py, pflag);
+	/*
+	  The python dll may be loaded from memory or in the usual way.
+	  MemoryGetProcAddress handles both cases.
+	 */
+	int *pflag = (int *)MyGetProcAddress(hPYDLL, "Py_NoSiteFlag");
+//	printf("GetProcAddress(%p, 'Py_NoSiteFlag') -> %p\n", hPYDLL, pflag);
 	*pflag = 1;
 
-	pflag = (int *)MyGetProcAddress(py, "Py_OptimizeFlag");
-	printf("GetProcAddress(%p, 'Py_OptimizeFlag') -> %p\n", py, pflag);
+	pflag = (int *)MyGetProcAddress(hPYDLL, "Py_OptimizeFlag");
+//	printf("GetProcAddress(%p, 'Py_OptimizeFlag') -> %p\n", hPYDLL, pflag);
 	if (pflag)
 		*pflag = p_script_info->optimize;
 }
 
-/*****************************************************************/
-
+/*
+  Load the Python DLL, either from the resource in the library file (if found),
+  or from the file system.
+  The module handle is stored in the global variable hPYDLL.
+  
+  This function should also be used to get all the function pointers that
+  python3.c needs at once.
+ */
 int load_pythondll(void)
 {
 	HANDLE hrsrc;
 	HMODULE hmod = LoadLibraryExW(libfilename, NULL, LOAD_LIBRARY_AS_DATAFILE);
 	hPYDLL = NULL;
 	
-	wprintf(L"libfilename %s, hmod %p\n", libfilename, hmod);
+//	wprintf(L"libfilename %s, hmod %p\n", libfilename, hmod);
 
 	// Try to locate pythonxy.dll as resource in the exe
 	hrsrc = FindResource(hmod, MAKEINTRESOURCE(1), PYTHONDLL);
-	printf("FindResource(%p) %s %p\n", hmod, PYTHONDLL, hrsrc);
+//	printf("FindResource(%p) %s %p\n", hmod, PYTHONDLL, hrsrc);
 	if (hrsrc) {
 		HGLOBAL hgbl;
 		DWORD size;
@@ -250,28 +270,30 @@ int load_pythondll(void)
 		ptr = LockResource(hgbl);
 		hPYDLL = MyLoadLibrary(PYTHONDLL, ptr, NULL);
 	} else
+		/*
+		  XXX We should probably call LoadLibraryEx with
+		  LOAD_WITH_ALTERED_SEARCH_PATH so that really our own one is
+		  used.
+		 */
 		hPYDLL = LoadLibrary(PYTHONDLL);
 	FreeLibrary(hmod);
-	printf("load_pythondll: %p\n", hPYDLL);
+//	printf("load_pythondll: %p\n", hPYDLL);
 	return hPYDLL ? 0 : -1;
 }
 
+/*
+  The main function for our exe.
+*/
 int wmain (int argc, wchar_t **argv)
 {
 	int rc = 0;
-	wchar_t *path = NULL;
-
-/*
-	MessageBox(NULL, "Attach Debugger", "", MB_OK);
-	DebugBreak();
-*/
 
 /*	Py_NoSiteFlag = 1; /* Suppress 'import site' */
 /*	Py_InspectFlag = 1; /* Needed to determine whether to exit at SystemExit */
 
 	calc_dirname(NULL);
-	wprintf(L"modulename %s\n", modulename);
-	wprintf(L"dirname %s\n", dirname);
+//	wprintf(L"modulename %s\n", modulename);
+//	wprintf(L"dirname %s\n", dirname);
 
 	if (!locate_script(GetModuleHandle(NULL))) {
 		printf("FATAL ERROR locating script\n");
@@ -281,28 +303,32 @@ int wmain (int argc, wchar_t **argv)
 	rc = load_pythondll();
 	if (rc < 0) {
 		printf("FATAL Error: could not load python library\n");
-		return -1;
+		return rc;
 	}
 
 
-//	Py_IsInitialized();
-
 	set_vars();
 
-	// provide builtin modules:
+	/*
+	  _memimporter contains the magic which allows to load
+	  dlls from memory, without unpacking them to the file-system.
+
+	  It is compiled into all the exe-stubs.
+	*/
 	PyImport_AppendInittab("_memimporter", PyInit__memimporter);
 
+	/*
+	  Start the ball rolling.
+	*/
 	Py_SetProgramName(modulename);
-	path = Py_GetPath();
 	Py_SetPath(libfilename);
 	Py_Initialize();
+
 	// We don't care for the additional refcount here...
 	PySys_SetObject("frozen", PyUnicode_FromString("exe"));
 	PySys_SetArgvEx(argc, argv, 0);
 
 	rc = run_script();
-
 	fini();
-
 	return rc;
 }
