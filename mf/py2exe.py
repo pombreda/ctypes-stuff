@@ -44,8 +44,7 @@ def main():
                         dest="report",
                         action="store_true")
     parser.add_argument("-f", "--from",
-                        help="""print a detailed report listing all found modules,
-                        the missing modules, and which module imported them.""",
+                        help="""print where the module <modname> is imported.""",
                         metavar="modname",
                         dest="show_from",
                         action="append")

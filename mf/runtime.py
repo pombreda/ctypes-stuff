@@ -163,6 +163,11 @@ class Runtime(object):
             self.mf.report_summary()
             self.mf.report_missing()
 
+        if self.options.show_from:
+            for name in self.options.show_from:
+                deps = sorted(self.mf._depgraph[name])
+                print(" %-35s imported from %s" % (name, ", ".join(deps)))
+
         if libname is None:
             libpath = exe_path
             libmode = "a"
