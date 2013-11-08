@@ -3,20 +3,19 @@
 import os
 import sys
 
-from setuptools import setup, find_packages
+##from setuptools import setup, find_packages
+from distutils.core import setup
 
-from distutils.core import Extension, Command
+from distutils.core import Extension#, Command
 from distutils.dist import Distribution
 from distutils.command import build_ext, build
-from distutils.command.install_data import install_data
 from distutils.sysconfig import customize_compiler
 from distutils.dep_util import newer_group
-from distutils.errors import *
+from distutils.errors import DistutilsError, DistutilsSetupError
 from distutils.util import get_platform
 
 if sys.version_info < (3, 3):
     raise DistutilsError("This package requires Python 3.3 or later")
-
 
 # We don't need a manifest in the executable, so monkeypath the code away:
 from distutils.msvc9compiler import MSVCCompiler
@@ -214,92 +213,6 @@ InstallSubCommands()
 
 ############################################################################
 
-# This ensures that data files are copied into site_packages rather than
-# the main Python directory.
-class smart_install_data(install_data):
-    def run(self):
-        #need to change self.install_dir to the library dir
-        install_cmd = self.get_finalized_command('install')
-        self.install_dir = getattr(install_cmd, 'install_lib')
-        return install_data.run(self)
-
-## def iter_samples():
-##     excludedDirs = ['CVS', 'build', 'dist']
-##     for dirpath, dirnames, filenames in os.walk(r'py2exe\samples'):
-##         for dir in dirnames:
-##             if dir.startswith('.') and dir not in excludedDirs:
-##                 excludedDirs.append(dir)
-##         for dir in excludedDirs:
-##             if dir in dirnames:
-##                 dirnames.remove(dir)
-##         qualifiedFiles = []
-##         for filename in filenames:
-##             if not filename.startswith('.'):
-##                 qualifiedFiles.append(os.path.join(dirpath, filename))
-##         if qualifiedFiles:
-##             yield (dirpath, qualifiedFiles)
-
-class deinstall(Command):
-    description = "Remove all installed files"
-
-    user_options = []
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        self.run_command('build')
-        build = self.get_finalized_command('build')
-        install = self.get_finalized_command('install')
-        self.announce("removing files")
-        for n in 'platlib', 'purelib', 'headers', 'scripts', 'data':
-            dstdir = getattr(install, 'install_' + n)
-            try:
-                srcdir = getattr(build, 'build_' + n)
-            except AttributeError:
-                pass
-            else:
-                self._removefiles(dstdir, srcdir)
-
-    def _removefiles(self, dstdir, srcdir):
-        # Remove all files in dstdir which are present in srcdir
-        assert dstdir != srcdir
-        if not os.path.isdir(srcdir):
-            return
-        for n in os.listdir(srcdir):
-            name = os.path.join(dstdir, n)
-            if os.path.isfile(name):
-                self.announce("removing '%s'" % name)
-                if not self.dry_run:
-                    try:
-                        os.remove(name)
-                    except OSError as details:
-                        self.warn("Could not remove file: %s" % details)
-                    if os.path.splitext(name)[1] == '.py':
-                        # Try to remove .pyc and -pyo files also
-                        try:
-                            os.remove(name + 'c')
-                        except OSError:
-                            pass
-                        try:
-                            os.remove(name + 'o')
-                        except OSError:
-                            pass
-            elif os.path.isdir(name):
-                self._removefiles(name, os.path.join(srcdir, n))
-                if not self.dry_run:
-                    try:
-                        os.rmdir(name)
-                    except OSError as details:
-                        self.warn("Are there additional user files?\n"\
-                              "  Could not remove directory: %s" % details)
-            else:
-                self.announce("skipping removal of '%s' (does not exist)" %\
-                              name)
-
 def _is_debug_build():
     import imp
     for ext, _, _ in imp.get_suffixes():
@@ -341,15 +254,8 @@ run = Interpreter("py3exe.run",
                    "source/actctx.c",
 
                    "source/python-dynload.c",
-
-                   ## "source/Python-dynload.c",
-                   ## "source/MemoryModule.c",
-                   ## "source/MyLoadLibrary.c",
-                   ## "source/_memimporter.c",
-                   ## "source/actctx.c",
                    ],
                   libraries=["user32"],
-##                  depends=depends,
                   define_macros=macros,
                   extra_compile_args=extra_compile_args,
                   extra_link_args=extra_link_args,
@@ -380,32 +286,28 @@ run = Interpreter("py3exe.run",
 
 interpreters = [run] #, run_dll]
 
-setup(name="py3exe",
-      version="0.1.0",
-      description="Build standalone executables for Windows",
-      long_description=__doc__,
-      author="Thomas Heller",
-      author_email="theller@ctypes.org",
-##      maintainer="Jimmy Retzlaff",
-##      maintainer_email="jimmy@retzlaff.com",
-##      url="http://www.py2exe.org/",
-      license="MIT/X11",
-      platforms="Windows",
-##      download_url="http://sourceforge.net/project/showfiles.php?group_id=15583",
-##      classifiers=["Development Status :: 5 - Production/Stable"],
-      distclass = Dist,
-      cmdclass = {'build_interpreters': BuildInterpreters,
-##                  'deinstall': deinstall,
-##                  'install_data': smart_install_data,
-                 },
-
-      scripts = ["build_setup.py"],
-      interpreters = interpreters,
-      packages = find_packages(),
-##       packages=['py3exe',
-## ##                'py2exe.resources',
-##                ],
-      )
+if __name__ == "__main__":
+    setup(name="py3exe",
+          version="0.1.0",
+          description="Build standalone executables for Windows",
+          long_description=__doc__,
+          author="Thomas Heller",
+          author_email="theller@ctypes.org",
+    ##      maintainer="Jimmy Retzlaff",
+    ##      maintainer_email="jimmy@retzlaff.com",
+          url="http://www.py2exe.org/",
+          license="MIT/X11",
+          platforms="Windows",
+    ##      download_url="http://sourceforge.net/project/showfiles.php?group_id=15583",
+    ##      classifiers=["Development Status :: 5 - Production/Stable"],
+          distclass = Dist,
+          cmdclass = {'build_interpreters': BuildInterpreters},
+##          scripts = ["build_setup.py"],
+          interpreters = interpreters,
+          packages=['py3exe',
+    ## ##                'py2exe.resources',
+                    ],
+          )
 
 # Local Variables:
 # compile-command: "py -3.3 setup.py bdist_egg"
