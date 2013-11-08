@@ -55,7 +55,7 @@ def main():
 
     parser.add_argument("script",
                         metavar="script",
-##                        nargs="+",
+                        nargs="+",
                         )
 
     # what to build

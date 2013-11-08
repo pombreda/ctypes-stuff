@@ -64,7 +64,8 @@ class Runtime(object):
             for modname in self.options.packages:
                 mf.import_package(modname)
 
-        mf.run_script(self.options.script)
+        for script in self.options.script:
+            mf.run_script(script)
 
         missing, maybe = mf.missing_maybe()
         logger.info("Found %d modules, %d are missing, %d may be missing",
@@ -75,21 +76,35 @@ class Runtime(object):
     def build(self):
         options = self.options
 
-        if not os.path.exists(options.destdir):
-            os.mkdir(options.destdir)
         destdir = options.destdir
+        if not os.path.exists(destdir):
+            os.mkdir(destdir)
 
-        # basename of the exe to create
-        dest_base = os.path.splitext(os.path.basename(options.script))[0]
+        for i, script in enumerate(options.script):
+            # basename of the exe to create
+            dest_base = os.path.splitext(os.path.basename(script))[0]
 
-        # full path to exe-file
-        exe_path = os.path.join(destdir, dest_base + ".exe")
+            # full path to exe-file
+            exe_path = os.path.join(destdir, dest_base + ".exe")
 
-        if os.path.isfile(exe_path):
-            os.remove(exe_path)
+            if os.path.isfile(exe_path):
+                os.remove(exe_path)
 
-        # 'libname' is the path of the runtime library RELATIVE to the runner directory.
+            self.build_exe(script, exe_path, options.libname)
+
+            if options.libname is None:
+                # Put the library into the exe itself.
+
+                # XXX PYDs are copied multiple times into the dist dir,
+                # if bundle_files > 1 XXX XXX XXX
+
+                # XXX It would probably make sense to run analyze()
+                # separately for each exe so that they do not contain
+                # unneeded stuff (from other exes)
+                self.build_library(exe_path, "a", first_time = i == 0)
+
         if options.libname:
+            # Build a library shared by ALL exes.
             libpath = os.path.join(destdir, options.libname)
             if os.path.isfile(libpath):
                 os.remove(libpath)
@@ -97,11 +112,10 @@ class Runtime(object):
             if not os.path.exists(os.path.dirname(libpath)):
                 os.mkdir(os.path.dirname(libpath))
 
-        self.build_exe(exe_path, options.libname)
-        self.build_library(exe_path, options.libname)
+            shutil.copy2("dll.dll", libpath)
+            self.build_library(libpath, "a")
 
-
-    def build_exe(self, exe_path, libname):
+    def build_exe(self, script, exe_path, libname):
         """Build the exe-file."""
         logger.info("Building exe '%s'", exe_path)
         run_stub = "run.exe"
@@ -115,7 +129,7 @@ class Runtime(object):
         optimize = self.options.optimize
         unbuffered = False # XXX
 
-        script_data = self._create_script_data()
+        script_data = self._create_script_data(script)
 
         if libname is None:
             zippath = b""
@@ -133,56 +147,12 @@ class Runtime(object):
         with UpdateResources(exe_path) as resource:
             resource.add("PYTHONSCRIPT", 1, script_info)
 
-    def _create_script_data(self):
-        # We create a list of code objects, and return it as a
-        # marshaled stream.  The framework code then just exec's these
-        # in order.
-        code_objects = []
+    def build_library(self, libpath, libmode, first_time=True):
+        """Build the archive containing the Python library.
 
-        ## # First is our common boot script.
-        ## boot = self.get_boot_script("common")
-        ## boot_code = compile(file(boot, "U").read(),
-        ##                     os.path.abspath(boot), "exec")
-        ## code_objects = [boot_code]
-        ## if self.bundle_files < 3:
-        ##     code_objects.append(
-        ##         compile("import zipextimporter; zipextimporter.install()",
-        ##                 "<install zipextimporter>", "exec"))
-        ## for var_name, var_val in vars.iteritems():
-        ##     code_objects.append(
-        ##             compile("%s=%r\n" % (var_name, var_val), var_name, "exec")
-        ##     )
-        ## if self.custom_boot_script:
-        ##     code_object = compile(file(self.custom_boot_script, "U").read() + "\n",
-        ##                           os.path.abspath(self.custom_boot_script), "exec")
-        ##     code_objects.append(code_object)
-        ## if script:
-        ##     code_object = compile(open(script, "U").read() + "\n",
-        ##                           os.path.basename(script), "exec")
-        ##     code_objects.append(code_object)
-        ## code_bytes = marshal.dumps(code_objects)
-
-        code_objects = []
-        if self.options.bundle_files < 3:
-            obj = compile("import sys, os; sys.path.append(os.path.dirname(sys.path[0])); del sys, os",
-                          "<bootstrap>", "exec")
-            code_objects.append(obj)
-            obj = compile("import zipextimporter; zipextimporter.install(); del zipextimporter",
-                          "<install zipextimporter>", "exec")
-            code_objects.append(obj)
-
-        ## code_objects.append(
-        ##     compile("print(__name__); print(dir())",
-        ##             "<testing>", "exec"))
-        with open(self.options.script, "U") as script_file:
-            code_objects.append(
-                compile(script_file.read() + "\n",
-                        os.path.basename(self.options.script), "exec"))
-
-        return marshal.dumps(code_objects)
-
-    def build_library(self, exe_path, libname):
-        """Build the archive containing the Python library."""
+        For multiple exe files, this method is called multiple times.
+        first_time will be set to False on all except the first call.
+        """
         if self.options.report:
             self.mf.report()
         if self.options.summary:
@@ -194,13 +164,6 @@ class Runtime(object):
                 deps = sorted(self.mf._depgraph[name])
                 print(" %-35s imported from %s" % (name, ", ".join(deps)))
 
-        if libname is None:
-            libpath = exe_path
-            libmode = "a"
-        else:
-            libpath = os.path.join(os.path.dirname(exe_path), libname)
-            shutil.copy2("dll.dll", libpath)
-            libmode = "a"
         logger.info("Building the code archive %r", libpath)
 
         # Add pythonXY.dll as resource into the library file
@@ -266,8 +229,9 @@ class Runtime(object):
                     marshal.dump(code, stream)
                     arc.writestr(path, stream.getvalue())
 
-                    print("Copy PYD %s to %s" % (os.path.basename(mod.__file__), dlldir))
-                    shutil.copy2(mod.__file__, dlldir)
+                    if first_time:
+                        print("Copy PYD %s to %s" % (os.path.basename(mod.__file__), dlldir))
+                        shutil.copy2(mod.__file__, dlldir)
 
         for src in self.mf.required_dlls():
             if src.lower() == pydll:
@@ -275,7 +239,7 @@ class Runtime(object):
                     # Python dll is special, will be added as resource to the library archive...
                     # print("Skipping %s" % pydll)
                     pass
-                else:
+                elif first_time:
                     print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
                     shutil.copy2(src, dlldir)
             elif self.options.bundle_files < 3:
@@ -291,11 +255,60 @@ class Runtime(object):
                 arc.write(src, dst)
 ##                print("SKIP DLL", os.path.basename(src))
             else:
-                dst = os.path.join(dlldir, os.path.basename(src))
-                print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
-                shutil.copy2(src, dlldir)
+                if first_time:
+                    dst = os.path.join(dlldir, os.path.basename(src))
+                    print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
+                    shutil.copy2(src, dlldir)
 
         arc.close()
+
+    def _create_script_data(self, script):
+        # We create a list of code objects, and return it as a
+        # marshaled stream.  The framework code then just exec's these
+        # in order.
+        code_objects = []
+
+        ## # First is our common boot script.
+        ## boot = self.get_boot_script("common")
+        ## boot_code = compile(file(boot, "U").read(),
+        ##                     os.path.abspath(boot), "exec")
+        ## code_objects = [boot_code]
+        ## if self.bundle_files < 3:
+        ##     code_objects.append(
+        ##         compile("import zipextimporter; zipextimporter.install()",
+        ##                 "<install zipextimporter>", "exec"))
+        ## for var_name, var_val in vars.iteritems():
+        ##     code_objects.append(
+        ##             compile("%s=%r\n" % (var_name, var_val), var_name, "exec")
+        ##     )
+        ## if self.custom_boot_script:
+        ##     code_object = compile(file(self.custom_boot_script, "U").read() + "\n",
+        ##                           os.path.abspath(self.custom_boot_script), "exec")
+        ##     code_objects.append(code_object)
+        ## if script:
+        ##     code_object = compile(open(script, "U").read() + "\n",
+        ##                           os.path.basename(script), "exec")
+        ##     code_objects.append(code_object)
+        ## code_bytes = marshal.dumps(code_objects)
+
+        code_objects = []
+        if self.options.bundle_files < 3:
+            obj = compile("import sys, os; sys.path.append(os.path.dirname(sys.path[0])); del sys, os",
+                          "<bootstrap>", "exec")
+            code_objects.append(obj)
+            obj = compile("import zipextimporter; zipextimporter.install(); del zipextimporter",
+                          "<install zipextimporter>", "exec")
+            code_objects.append(obj)
+
+        ## code_objects.append(
+        ##     compile("print(__name__); print(dir())",
+        ##             "<testing>", "exec"))
+        with open(script, "U") as script_file:
+            code_objects.append(
+                compile(script_file.read() + "\n",
+                        os.path.basename(script), "exec"))
+
+        return marshal.dumps(code_objects)
 
 ################################################################
 
