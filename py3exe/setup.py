@@ -340,7 +340,7 @@ run = Interpreter("py3exe.run",
                    "source/_memimporter.c",
                    "source/actctx.c",
 
-                   "source/python3.c",
+                   "source/python-dynload.c",
 
                    ## "source/Python-dynload.c",
                    ## "source/MemoryModule.c",

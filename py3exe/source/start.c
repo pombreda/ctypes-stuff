@@ -26,8 +26,7 @@
 #include <marshal.h>
 
 #include "MyLoadLibrary.h"
-
-extern int PythonLoaded(HMODULE);
+#include "python-dynload.h"
 
 struct scriptinfo {
 	int tag;
@@ -225,25 +224,26 @@ int run_script(void)
 	return rc;
 }
 
+
 /* XXX XXX XXX flags should be set elsewhere */
 void set_vars(HMODULE hmod_pydll)
 {
-	PyObject *p;
-	/*
-	  The python dll may be loaded from memory or in the usual way.
-	  MyGetProcAddress handles both cases.
-	 */
-	int *pflag = (int *)MyGetProcAddress(hmod_pydll, "Py_NoSiteFlag");
+	int *pflag;
+
+	printf("BEFORE NoSite: %d\n", Py_NoSiteFlag);
+
+	pflag = (int *)MyGetProcAddress(hmod_pydll, "Py_NoSiteFlag");
 //	printf("GetProcAddress(%p, 'Py_NoSiteFlag') -> %p\n", hmod_pydll, pflag);
 	*pflag = 1;
+	printf("AFTER NoSite: %d\n", Py_NoSiteFlag);
 
 	pflag = (int *)MyGetProcAddress(hmod_pydll, "Py_OptimizeFlag");
 //	printf("GetProcAddress(%p, 'Py_OptimizeFlag') -> %p\n", hmod_pydll, pflag);
 	if (pflag)
 		*pflag = p_script_info->optimize;
-	p = (PyObject *)MyGetProcAddress(hmod_pydll, "PyExc_RuntimeError");
-	printf("GetProcAddress(%p, 'PyExc_RuntimeError') -> %p\n", hmod_pydll, p);
-	
+
+	Py_NoSiteFlag = 1;
+	Py_OptimizeFlag = 1;
 }
 
 /*

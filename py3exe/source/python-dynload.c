@@ -1,6 +1,7 @@
 #include <Python.h>
 #include <windows.h>
 #include "MyLoadLibrary.h"
+#include "python-dynload.h"
 
 /*
   This module allows us to dynamically load the python DLL.
@@ -25,26 +26,38 @@ static HMODULE hmod_pydll;
 
 #define NYI(x) MessageBox(NULL, x, "not yet implemented", MB_OK)
 
+/*
+  The python dll may be loaded from memory or in the usual way.
+  MyGetProcAddress handles both cases.
+*/
+
 #define FUNC(res, name, args) \
   static res(*proc)args; \
   if (!proc) (FARPROC)proc = MyGetProcAddress(hmod_pydll, #name)
 
-////////////////////////////////////////////////////////////////
+#define DATA(type, name)				\
+  static type pflag; \
+  if (!pflag) pflag = (type)MyGetProcAddress(hmod_pydll, #name); \
+  return pflag
 
-#define Py_OptimizeFlag *(_PyOptimze_Flag_PTR())
+////////////////////////////////////////////////////////////////
 
 int *_Py_OptimizeFlag_PTR()
 {
-  return (int *)MyGetProcAddress(hmod_pydll, "Py_OptimizeFlag");
+  DATA(int *, Py_OptimizeFlag);
 }
-
-#define Py_NoSiteFlag *(_Py_NoSiteFlag_PTR())
 
 int *_Py_NoSiteFlag_PTR()
 {
-  return (int *)MyGetProcAddress(hmod_pydll, "Py_NoSiteFlag");
+  DATA(int *, Py_NoSiteFlag);
 }
 
+int *_Py_VerboseFlag_PTR()
+{
+  DATA(int *, Py_VerboseFlag);
+}
+
+////////////////////////////////////////////////////////////////
 
 PyObject *PyErr_SetImportError(PyObject *msg, PyObject *name, PyObject *path)
 {
@@ -259,7 +272,7 @@ int _PyImport_FixupExtensionObject(PyObject *m, PyObject *a, PyObject *b)
 }
 
 int PySys_SetObject(const char *name, PyObject *v)
-{ // Why do 
+{
   FUNC(int, PySys_SetObject, (const char *, PyObject *));
   return proc(name, v);
 }
