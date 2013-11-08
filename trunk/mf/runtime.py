@@ -72,32 +72,6 @@ class Runtime(object):
         if missing:
             mf.report_missing()
 
-##     def build_bat(self, filename, libname):
-##         logger.info("Building batch-file %r", filename)
-##         if not self.options.optimize:
-##             options = ""
-##         elif self.options.optimize == 1:
-##             options = " -O "
-##         else:
-##             options = " -OO "
-##         ## if self.options.destdir:
-##         ##     path = os.path.join(self.options.destdir, filename)
-##         ## else:
-##         ##     path = filename
-##         path = filename
-
-##         with open(path, "wt") as ofi:
-##             ofi.write('@echo off\n')
-##             ofi.write('setlocal\n')
-##             if self.options.bundle_files < 3:
-##                 ofi.write('set PY2EXE_DLLDIR=%TMP%\\~py2exe-%RANDOM%-%TIME:~6,5%\n')
-##                 ofi.write('mkdir "%PY2EXE_DLLDIR%"\n')
-##             ofi.write('for /f %%i in ("%0") do set PYTHONHOME=%%~dpi\n')
-##             ofi.write('for /f %%i in ("%0") do set PYTHONPATH=%%~dpi\\{0}\n'.format(libname))
-##             ofi.write('%PYTHONHOME%\\{0} -S {1} -m __SCRIPT__\n'.format(libname, options))
-##             if self.options.bundle_files < 3:
-##                 ofi.write('rmdir /s/q "%PY2EXE_DLLDIR%"\n')
-
     def build_exe(self, exe_path, libname):
         """Build the exe-file."""
         logger.info("Building exe '%s'", exe_path)
@@ -107,6 +81,8 @@ class Runtime(object):
                                           distutils.util.get_platform())
         print("Using exe-stub %r" % run_stub)
         exe_bytes = pkgutil.get_data("py3exe", run_stub)
+        if exe_bytes is None:
+            raise RuntimeError("run-stub not found")
         with open(exe_path, "wb") as ofi:
             ofi.write(exe_bytes)
 
