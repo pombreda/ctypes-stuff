@@ -85,34 +85,9 @@ def main():
     level = logging.INFO if options.verbose else logging.WARNING
     logging.basicConfig(level=level)
 
-    if not os.path.exists(options.destdir):
-        os.mkdir(options.destdir)
-    destdir = options.destdir
-
-    # basename of the exe to create
-    dest_base = os.path.splitext(os.path.basename(options.script))[0]
-
-    # full path to exe-file
-    exe_path = os.path.join(destdir, dest_base + ".exe")
-
-    # XXX move to builder...
-    if os.path.isfile(exe_path):
-        os.remove(exe_path)
-
-    # 'libname' is the path of the runtime library RELATIVE to the runner directory.
-    # XXX move to builder...
-    if options.libname:
-        libpath = os.path.join(destdir, options.libname)
-        if os.path.isfile(libpath):
-            os.remove(libpath)
-
-        if not os.path.exists(os.path.dirname(libpath)):
-            os.mkdir(os.path.dirname(libpath))
-
     builder = runtime.Runtime(options)
     builder.analyze()
-    builder.build_exe(exe_path, options.libname)
-    builder.build_library(exe_path, options.libname)
+    builder.build()
 
 if __name__ == "__main__":
     main()
