@@ -3,6 +3,8 @@
 """ModuleFinder based on importlib
 """
 
+# XXX XXX XXX Does not yet support PEP 452 namespace packages!
+
 from collections import defaultdict
 import dis
 import importlib
@@ -21,6 +23,7 @@ STORE_GLOBAL = bytes([dis.opname.index('STORE_GLOBAL')])
 STORE_OPS = [STORE_NAME, STORE_GLOBAL]
 HAVE_ARGUMENT = bytes([dis.HAVE_ARGUMENT])
 
+# Monkeypatch some missing methods in Python 3.3's NamespaceLoader
 def __patch_py33():
     if sys.version_info < (3, 4):
         def is_package(self, fullname):
@@ -48,26 +51,6 @@ del __patch_py33
 class ModuleFinder:
     def __init__(self, path=None, verbose=0, excludes=[], optimize=0):
         self.excludes = excludes
-        # Maybe a good idea, but doesn't work.
-        # Try with 'include numpy' for an example.
-        self.conditional_excludes = {
-            ## "_dummy_threading": {"dummy_threading"},
-            ## "_emx_link": {"os"},
-            ## "_gestalt": {"platform"},
-            ## "_posixsubprocess": {"subprocess"},
-            ## "ce": {"os"},
-            ## "fcntl": {"tempfile"},
-            ## "grp": {"shutil", "tarfile"},
-            ## "java": {"platform"},
-            ## "os2": {"os"},
-            ## "org": {"copy", "pickle", "cPickle"},
-            ## "posix": {"os"},
-            ## "pwd": {"http.server", "posixpath", "shutil", "tarfile", "webbrowser"},
-            ## "termios": {"tty"},
-            ## "vms_lib": {"platform"},
-
-            ## "setuptools": {"numpy"},
-            }
         self.path = path
         self._optimize = optimize
         self._verbose = verbose
@@ -274,9 +257,6 @@ class ModuleFinder:
 
         self._depgraph[name].add(caller)
 
-        if caller in self.conditional_excludes.get(name, ()):
-            raise ImportError('No module named {!r}'.format(name), name=name)
-
         if name in self.excludes:
             raise ImportError('No module named {!r}'.format(name), name=name)
 
@@ -455,7 +435,9 @@ class ModuleFinder:
 
 
     def report_summary(self):
-        """Print the count of modules found and missing"""
+        """Print the count of found and missing modules.
+
+        """
         missing, maybe = self.missing_maybe()
         print("Found %d modules, %d are missing, %d could be missing"
               % (len(self.modules), len(missing), len(maybe)))
@@ -584,19 +566,6 @@ class Module:
                     self.__package__ = self.__package__.rpartition('.')[0]
             except AttributeError:
                 pass
-
-        # This would allow to find submodules (but it has to be extended for ziparchives):
-        ## if hasattr(self, "__path__"):
-        ##     print(self)
-        ##     for pathname in os.listdir(self.__path__[0]):
-        ##         dir, fname = os.path.split(pathname)
-        ##         modname, ext = os.path.splitext(fname)
-        ##         if modname != "__init__" and ext in (".py", ".pyc", ".pyo", ".pyd"):
-        ##             print("   ", modname)
-        ##     print()
-        # But what about pkgutil.walk_packages() and pkgutil.iter_modules()?
-        #
-        # Hm, pkgutil *imports* stuff, which is (probably) not what we want...
 
 
     @property
@@ -747,8 +716,6 @@ def main():
         verbose=verbose,
         optimize=optimize,
         )
-##    mf.add_packagepath("win32com",
-##                       r"c:\Python33\lib\site-packages\win32comext")
     for name in modules:
         # Hm, call import_hook() or safe_import_hook() here?
         if name.endswith(".*"):
