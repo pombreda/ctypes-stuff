@@ -179,7 +179,9 @@ class Scanner(ModuleFinder):
         if hasattr(mod, "__file__") \
                and mod.__file__.endswith(tuple(EXTENSION_SUFFIXES)):
             callers = {self.modules[n]
-                       for n in self._depgraph[name]}
+                       for n in self._depgraph[name]
+                       # self._depgraph can contain '-' entries!
+                       if n in self.modules}
             self._add_pyd(mod.__file__, callers)
 
     def _add_pyd(self, name, callers):
