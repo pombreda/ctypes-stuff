@@ -41,8 +41,11 @@ True
 >>>
 
 """
-import imp, sys
+import imp
+import sys
 import zipimport
+
+# _memimporter is a module built into the py2exe runstubs.
 import _memimporter
 
 class ZipExtensionImporter(zipimport.zipimporter):
@@ -53,9 +56,11 @@ class ZipExtensionImporter(zipimport.zipimporter):
         """
         loader, portions = super().find_loader(fullname)
         if loader is None:
+            pathname = fullname.replace(".", "\\")
             for s in self._suffixes:
-                if (fullname + s) in self._files:
+                if (pathname + s) in self._files:
                     return self, []
+            return None, []
         return loader, portions
 
     def find_module(self, fullname, path=None):
@@ -85,7 +90,7 @@ class ZipExtensionImporter(zipimport.zipimporter):
             return mod
         try:
             return zipimport.zipimporter.load_module(self, fullname)
-        except zipimport.ZipImportError:
+        except Exception:
             pass
         if sys.version_info >= (3, 0):
             # name of initfunction
@@ -127,4 +132,3 @@ def install():
     ## # Not sure if this is needed...
     ## import importlib
     ## importlib.invalidate_caches()
-    print("ZIPEXTImporter installed.")

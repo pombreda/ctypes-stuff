@@ -9,6 +9,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="Build runtime archive for a script")
 
+    # what to include, what to exclude...
     parser.add_argument("-i", "--include",
                         help="module to include",
                         dest="includes",
@@ -26,9 +27,9 @@ def main():
                         metavar="package_name",
                         action="append")
 
-    # how to scan...
+    # how to compile the code...
     parser.add_argument("-O", "--optimize",
-                        help="scan optimized bytecode",
+                        help="use optimized bytecode",
                         dest="optimize",
                         action="count")
 
@@ -53,6 +54,11 @@ def main():
                         dest="verbose",
                         action="store_true")
 
+    parser.add_argument("-c", "--compress",
+                        dest="compress",
+                        action="store_true")
+
+    # exe files to build...
     parser.add_argument("script",
                         metavar="script",
                         nargs="+",
@@ -81,6 +87,9 @@ def main():
                         default=3)
 
     options = parser.parse_args()
+
+    ## from build import write_setup
+    ## write_setup(options)
 
     level = logging.INFO if options.verbose else logging.WARNING
     logging.basicConfig(level=level)

@@ -178,8 +178,13 @@ class Runtime(object):
         else:
             bytecode_suffix = DEBUG_BYTECODE_SUFFIXES[0]
 
+        if self.options.compress:
+            compression = zipfile.ZIP_DEFLATED
+        else:
+            compression = zipfile.ZIP_STORED
+
         arc = zipfile.ZipFile(libpath, libmode,
-                              compression=zipfile.ZIP_DEFLATED)
+                              compression=compression)
 
         ## with open(self.options.script, "r") as scriptfile:
         ##     arc.writestr("__SCRIPT__.py", scriptfile.read())
@@ -205,19 +210,19 @@ class Runtime(object):
                 # bundle_files == 3: put .pyds in the same directory as the zip.archive
                 # bundle_files <= 2: put .pyds into the zip-archive, extract to TEMP dir when needed
 
-                pydfile = mod.__name__ + EXTENSION_SUFFIXES[0]
-
                 if self.options.bundle_files < 3:
+                    arcfnm = mod.__name__.replace(".", "\\") + EXTENSION_SUFFIXES[0]
                     print("Add PYD %s to %s" % (os.path.basename(mod.__file__), libpath))
-                    arc.write(mod.__file__, pydfile)
+                    arc.write(mod.__file__, arcfnm)
                 else:
                     # Copy the extension into dlldir. To be able to
                     # load it without putting dlldir into sys.path, we
                     # create a loader module and put that into the
                     # archive.
+                    pydfile = mod.__name__ + EXTENSION_SUFFIXES[0]
                     src = LOAD_FROM_DIR.format(pydfile)
 
-                    code = compile(src, "<string>", "exec")
+                    code = compile(src, "<loader>", "exec")
                     if hasattr(mod, "__path__"):
                         path = mod.__name__.replace(".", "\\") + "\\__init__" + bytecode_suffix
                     else:
@@ -230,8 +235,9 @@ class Runtime(object):
                     arc.writestr(path, stream.getvalue())
 
                     if first_time:
-                        print("Copy PYD %s to %s" % (os.path.basename(mod.__file__), dlldir))
-                        shutil.copy2(mod.__file__, dlldir)
+                        dst = os.path.join(dlldir, pydfile)
+                        print("Copy PYD %s to %s" % (os.path.basename(mod.__file__), dst))
+                        shutil.copy2(mod.__file__, dst)
 
         for src in self.mf.required_dlls():
             if src.lower() == pydll:
@@ -316,7 +322,10 @@ LOAD_FROM_DIR = r"""\
 def __load():
     import imp, os
     dllpath = os.path.join(os.path.dirname(__loader__.archive), '{0}')
-    mod = imp.load_dynamic(__name__, dllpath)
+    try:
+        mod = imp.load_dynamic(__name__, dllpath)
+    except ImportError as details:
+        raise ImportError('(%s) %s' % (details, os.path.basename(dllpath))) from None
     mod.frozen = 1
 __load()
 del __load
