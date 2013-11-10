@@ -140,6 +140,7 @@ class DllFinder:
 
 from  mf4 import ModuleFinder
 from importlib.machinery import EXTENSION_SUFFIXES
+import hooks
 
 # Exclude modules that the standard library imports (conditionally),
 # but which are not present on windows.
@@ -174,7 +175,14 @@ class Scanner(ModuleFinder):
         super().__init__(path, verbose, excludes, optimize)
         self.dllfinder = DllFinder()
 
+    def hook(self, mod):
+        hookname = "hook_%s" % mod.__name__.replace(".", "_")
+        mth = getattr(hooks, hookname, None)
+        if mth:
+            mth(self, mod)
+
     def _add_module(self, name, mod):
+        self.hook(mod)
         super()._add_module(name, mod)
         if hasattr(mod, "__file__") \
                and mod.__file__.endswith(tuple(EXTENSION_SUFFIXES)):
