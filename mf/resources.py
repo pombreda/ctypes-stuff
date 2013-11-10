@@ -18,7 +18,6 @@ class ResourceWriter(object):
         self._filename = filename
         
     def add(self, res_type, res_name, res_data):
-        print("Add RSC %s/%s %d bytes to %s" % (res_type, res_name, len(res_data), self._filename))
         try:
             _wapi.UpdateResourceW(self._hrscr,
                                   _wapi.LPCWSTR(res_type),
