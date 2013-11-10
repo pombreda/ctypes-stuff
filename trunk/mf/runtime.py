@@ -119,7 +119,8 @@ class Runtime(object):
         """Build the exe-file."""
         logger.info("Building exe '%s'", exe_path)
         run_stub = "run.exe"
-        print("Using exe-stub %r" % run_stub)
+        if self.options.verbose:
+            print("Using exe-stub %r" % run_stub)
         exe_bytes = pkgutil.get_data("py3exe", run_stub)
         if exe_bytes is None:
             raise RuntimeError("run-stub not found")
@@ -145,6 +146,9 @@ class Runtime(object):
         script_info += zippath + b"\0" + script_data + b"\0"
 
         with UpdateResources(exe_path) as resource:
+            if self.options.verbose:
+                print("Add RSC %s/%s(%d bytes) to %s"
+                      % ("PYTHONSCRIPT", 1, len(script_info), exe_path))
             resource.add("PYTHONSCRIPT", 1, script_info)
 
     def build_library(self, libpath, libmode, first_time=True):
@@ -171,6 +175,9 @@ class Runtime(object):
             with UpdateResources(libpath) as resource:
                 with open(pydll, "rb") as ifi:
                     pydll_bytes = ifi.read()
+                if self.options.verbose:
+                    print("Add RSC %s/%s(%d bytes) to %s"
+                          % (os.path.basename(pydll), 1, len(pydll_bytes), libpath))
                 resource.add(os.path.basename(pydll), 1, pydll_bytes)
 
         if self.options.optimize:
@@ -212,7 +219,8 @@ class Runtime(object):
 
                 if self.options.bundle_files < 3:
                     arcfnm = mod.__name__.replace(".", "\\") + EXTENSION_SUFFIXES[0]
-                    print("Add PYD %s to %s" % (os.path.basename(mod.__file__), libpath))
+                    if self.options.verbose:
+                        print("Add PYD %s to %s" % (os.path.basename(mod.__file__), libpath))
                     arc.write(mod.__file__, arcfnm)
                 else:
                     # Copy the extension into dlldir. To be able to
@@ -236,7 +244,8 @@ class Runtime(object):
 
                     if first_time:
                         dst = os.path.join(dlldir, pydfile)
-                        print("Copy PYD %s to %s" % (os.path.basename(mod.__file__), dst))
+                        if self.options.verbose:
+                            print("Copy PYD %s to %s" % (os.path.basename(mod.__file__), dst))
                         shutil.copy2(mod.__file__, dst)
 
         for src in self.mf.required_dlls():
@@ -246,14 +255,16 @@ class Runtime(object):
                     # print("Skipping %s" % pydll)
                     pass
                 elif first_time:
-                    print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
+                    if self.options.verbose:
+                        print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
                     shutil.copy2(src, dlldir)
             elif self.options.bundle_files == 1:
                 ## XXX We should refuse to do this with pywintypesXY.dll
                 ## or pythoncomXY.dll...  Or write a special loader for them...
                 ## Or submit the loader to the PyWin32 project...
                 dst = os.path.basename(src)
-                print("Add DLL %s to %s" % (dst, libpath))
+                if self.options.verbose:
+                    print("Add DLL %s to %s" % (dst, libpath))
                 arc.write(src, dst)
 ##                print("SKIP DLL", os.path.basename(src))
             else:
@@ -261,7 +272,8 @@ class Runtime(object):
                 # dist-directory, but pyds are put into the library.
                 if first_time:
                     dst = os.path.join(dlldir, os.path.basename(src))
-                    print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
+                    if self.options.verbose:
+                        print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
                     shutil.copy2(src, dlldir)
 
         arc.close()
