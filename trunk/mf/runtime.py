@@ -248,11 +248,7 @@ class Runtime(object):
                 elif first_time:
                     print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
                     shutil.copy2(src, dlldir)
-            elif self.options.bundle_files < 3:
-                ## dst = os.path.join("--DLLS--", os.path.basename(src))
-                ## print("Add DLL %s to %s" % (os.path.basename(dst), libpath))
-                ## arc.write(src, dst)
-
+            elif self.options.bundle_files == 1:
                 ## XXX We should refuse to do this with pywintypesXY.dll
                 ## or pythoncomXY.dll...  Or write a special loader for them...
                 ## Or submit the loader to the PyWin32 project...
@@ -261,6 +257,8 @@ class Runtime(object):
                 arc.write(src, dst)
 ##                print("SKIP DLL", os.path.basename(src))
             else:
+                # bundle_files in (2, 3) will copy dlls to the
+                # dist-directory, but pyds are put into the library.
                 if first_time:
                     dst = os.path.join(dlldir, os.path.basename(src))
                     print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
