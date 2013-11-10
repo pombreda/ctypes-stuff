@@ -7,7 +7,6 @@
 
 from collections import defaultdict
 import dis
-import hooks
 import importlib
 import importlib.machinery
 import os
@@ -326,15 +325,8 @@ class ModuleFinder:
 
 
     def _add_module(self, name, mod):
-        # hooks
-        self.hook(mod)
         self.modules[name] = mod
 
-    def hook(self, mod):
-        hookname = "hook_%s" % mod.__name__.replace(".", "_")
-        mth = getattr(hooks, hookname, None)
-        if mth:
-            mth(self, mod)
 
     def _load_module(self, loader, name):
         mod = Module(loader, name, self._optimize)

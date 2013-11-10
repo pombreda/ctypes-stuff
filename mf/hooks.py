@@ -7,6 +7,19 @@
 #    All rights reserved.
 #
 
+def hook_numpy_distutils(finder, module):
+    """
+    In a 'if sys.version_info[0] < 3:' block numpy.distutils
+    does 'import __config__'.  This will not work in Python 3;
+    so ignore it.
+    """
+    finder.excludes.append("__config__")
+
+def hook_numpy_f2py(finder, module):
+    """ numpy.f2py tries to import __svn_version__.  Ignore when his fails.
+    """
+    finder.excludes.append("__svn_version__")
+
 def hook_numpy_core_umath(finder, module):
     """the numpy.core.umath module is an extension module and the numpy module
        imports * from this module; define the list of global names available
