@@ -1,17 +1,42 @@
 # -*- coding: utf-8 -*-
 #
-# Hooks module.  Largely inspired by cx_freeze, which is:
+# Hooks module for py2exe.
+# Inspired by cx_freeze's hooks.py, which is:
 #
 #    Copyright © 2007-2013, Anthony Tuininga.
 #    Copyright © 2001-2006, Computronix (Canada) Ltd., Edmonton, Alberta, Canada.
 #    All rights reserved.
 #
+import os, sys
+
+def hook_tkinter(finder, module):
+    # Copy tcl and tk directories.
+    # It probably doesn't make sense to exclude tix from the tcl distribution,
+    # and only copy it when tkinter.tix is imported...
+    tcl_dir = os.path.join(sys.prefix, "tcl")
+    finder.add_datadirectory("tcl", tcl_dir, recursive=True)
+
+def hook_six(finder, module):
+    """six.py is a python2/python3 compaibility library.  Exclude the
+    python2 modules.
+    """
+    finder.excludes.append("StringIO")
+
+def hook_matplotlib(finder, module):
+    """matplotlib requires data files in a 'mpl-data' subdirectory in
+    the same directory as the executable.
+    """
+    # c:\Python33\lib\site-packages\matplotlib
+    mpl_data_path = os.path.join(os.path.dirname(module.__loader__.path),
+                                 "mpl-data")
+    finder.add_datadirectory("mpl-data", mpl_data_path, recursive=True)
+    finder.excludes.append("wx")
 
 def hook_numpy_distutils(finder, module):
     """
-    In a 'if sys.version_info[0] < 3:' block numpy.distutils
-    does 'import __config__'.  This will not work in Python 3;
-    so ignore it.
+    In a 'if sys.version_info[0] < 3:' block numpy.distutils does an
+    implicit relative import: 'import __config__'.  This will not work
+    in Python3 so ignore it.
     """
     finder.excludes.append("__config__")
 

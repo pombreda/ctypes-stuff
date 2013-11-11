@@ -115,6 +115,17 @@ class Runtime(object):
             shutil.copy2("dll.dll", libpath)
             self.build_library(libpath, "a")
 
+        # data files
+        for name, (src, recursive) in self.mf._data_directories.items():
+            if recursive:
+                dst = os.path.join(destdir, name)
+                if os.path.isdir(dst):
+                    # Emit a warning?
+                    shutil.rmtree(dst)
+                shutil.copytree(src, dst)
+            else:
+                raise RuntimeError("not yet supported")
+
     def build_exe(self, script, exe_path, libname):
         """Build the exe-file."""
         logger.info("Building exe '%s'", exe_path)
@@ -245,7 +256,7 @@ class Runtime(object):
                     if first_time:
                         dst = os.path.join(dlldir, pydfile)
                         if self.options.verbose:
-                            print("Copy PYD %s to %s" % (os.path.basename(mod.__file__), dst))
+                            print("Copy PYD %s to %s" % (mod.__file__, dst))
                         shutil.copy2(mod.__file__, dst)
 
         for src in self.mf.required_dlls():
@@ -256,7 +267,7 @@ class Runtime(object):
                     pass
                 elif first_time:
                     if self.options.verbose:
-                        print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
+                        print("Copy DLL %s to %s" % (src, dlldir))
                     shutil.copy2(src, dlldir)
             elif self.options.bundle_files == 1:
                 ## XXX We should refuse to do this with pywintypesXY.dll
@@ -264,7 +275,7 @@ class Runtime(object):
                 ## Or submit the loader to the PyWin32 project...
                 dst = os.path.basename(src)
                 if self.options.verbose:
-                    print("Add DLL %s to %s" % (dst, libpath))
+                    print("Add DLL %s to %s" % (src, libpath))
                 arc.write(src, dst)
 ##                print("SKIP DLL", os.path.basename(src))
             else:
@@ -273,7 +284,7 @@ class Runtime(object):
                 if first_time:
                     dst = os.path.join(dlldir, os.path.basename(src))
                     if self.options.verbose:
-                        print("Copy DLL %s to %s" % (os.path.basename(src), dlldir))
+                        print("Copy DLL %s to %s" % (src, dlldir))
                     shutil.copy2(src, dlldir)
 
         arc.close()
@@ -282,17 +293,12 @@ class Runtime(object):
         # We create a list of code objects, and return it as a
         # marshaled stream.  The framework code then just exec's these
         # in order.
-        code_objects = []
 
         ## # First is our common boot script.
         ## boot = self.get_boot_script("common")
         ## boot_code = compile(file(boot, "U").read(),
         ##                     os.path.abspath(boot), "exec")
         ## code_objects = [boot_code]
-        ## if self.bundle_files < 3:
-        ##     code_objects.append(
-        ##         compile("import zipextimporter; zipextimporter.install()",
-        ##                 "<install zipextimporter>", "exec"))
         ## for var_name, var_val in vars.iteritems():
         ##     code_objects.append(
         ##             compile("%s=%r\n" % (var_name, var_val), var_name, "exec")
@@ -301,13 +307,14 @@ class Runtime(object):
         ##     code_object = compile(file(self.custom_boot_script, "U").read() + "\n",
         ##                           os.path.abspath(self.custom_boot_script), "exec")
         ##     code_objects.append(code_object)
-        ## if script:
-        ##     code_object = compile(open(script, "U").read() + "\n",
-        ##                           os.path.basename(script), "exec")
-        ##     code_objects.append(code_object)
         ## code_bytes = marshal.dumps(code_objects)
 
         code_objects = []
+
+        # sys.executable has already been set in the run-stub
+        code_objects.append(
+            compile("import os, sys; sys.base_prefix = sys.prefix = os.path.dirname(sys.executable); del os, sys",
+                    "<bootstrap2>", "exec"))
         if self.options.bundle_files < 3:
             obj = compile("import sys, os; sys.path.append(os.path.dirname(sys.path[0])); del sys, os",
                           "<bootstrap>", "exec")
@@ -316,9 +323,6 @@ class Runtime(object):
                           "<install zipextimporter>", "exec")
             code_objects.append(obj)
 
-        ## code_objects.append(
-        ##     compile("print(__name__); print(dir())",
-        ##             "<testing>", "exec"))
         with open(script, "U") as script_file:
             code_objects.append(
                 compile(script_file.read() + "\n",

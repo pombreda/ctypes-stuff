@@ -76,21 +76,32 @@ class DllFinder:
         result = set()
 
         @_wapi.PIMAGEHLP_STATUS_ROUTINE
-        def status_routine(reason, imagename, dllname, va, parameter):
+        def status_routine(reason, img_name, dllname, va, parameter):
             if reason == _wapi.BindImportModule: # 5
+                assert img_name.decode("mbcs") == imagename
                 # imagename binds to dllname
                 dllname = self.search_path(dllname.decode("mbcs"), path)
                 result.add(dllname)
             return True
 
+        # BindImageEx uses the PATH environment variable to find
+        # dependend dlls; set it to our changed PATH:
+        old_path = os.environ["PATH"]
+        assert isinstance(path, str)
+        os.environ["PATH"] = path
+
         self._loaded_dlls[os.path.basename(imagename).lower()] = imagename
         _wapi.BindImageEx(_wapi.BIND_ALL_IMAGES
-                           | _wapi.BIND_CACHE_IMPORT_DLLS
-                           | _wapi.BIND_NO_UPDATE,
-                           imagename.encode("mbcs"),
-                           path.encode("mbcs"),
-                           None,
-                           status_routine)
+                          | _wapi.BIND_CACHE_IMPORT_DLLS
+                          | _wapi.BIND_NO_UPDATE,
+                          imagename.encode("mbcs"),
+                          None,
+                          ##path.encode("mbcs"),
+                          None,
+                          status_routine)
+        # Be a good citizen and cleanup:
+        os.environ["PATH"] = old_path
+
         return result
 
 
@@ -174,6 +185,7 @@ class Scanner(ModuleFinder):
         excludes = list(excludes) + windows_excludes
         super().__init__(path, verbose, excludes, optimize)
         self.dllfinder = DllFinder()
+        self._data_directories = {}
 
     def hook(self, mod):
         hookname = "hook_%s" % mod.__name__.replace(".", "_")
@@ -197,6 +209,9 @@ class Scanner(ModuleFinder):
 
     def required_dlls(self):
         return self.dllfinder.required_dlls()
+
+    def add_datadirectory(self, name, path, recursive):
+        self._data_directories[name] = (path, recursive)
 
     ## def report_dlls(self):
     ##     import pprint
