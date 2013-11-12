@@ -9,6 +9,14 @@
 #
 import os, sys
 
+def hook_pythoncom(finder, module):
+    import pythoncom
+    finder.add_dll(pythoncom.__file__)
+
+def hook_pythonwintypes(finder, module):
+    import pythonwintypes
+    finder.add_dll(pywintypes.__file__)
+
 def hook_tkinter(finder, module):
     # Copy tcl and tk directories.
     # It probably doesn't make sense to exclude tix from the tcl distribution,
