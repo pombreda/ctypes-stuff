@@ -259,8 +259,12 @@ class Runtime(object):
                             print("Copy PYD %s to %s" % (mod.__file__, dst))
                         shutil.copy2(mod.__file__, dst)
 
+        pywin32_ext_modules = ("pywintypes%d%d.dll" % sys.version_info[:2],
+                               "pythoncom%d%d.dll" % sys.version_info[:2])
+
         for src in self.mf.required_dlls():
             if src.lower() == pydll:
+                # The PYTHON dll.
                 if self.options.bundle_files < 3:
                     # Python dll is special, will be added as resource to the library archive...
                     # print("Skipping %s" % pydll)
@@ -269,15 +273,18 @@ class Runtime(object):
                     if self.options.verbose:
                         print("Copy DLL %s to %s" % (src, dlldir))
                     shutil.copy2(src, dlldir)
-            elif self.options.bundle_files == 1:
-                ## XXX We should refuse to do this with pywintypesXY.dll
-                ## or pythoncomXY.dll...  Or write a special loader for them...
-                ## Or submit the loader to the PyWin32 project...
+            elif self.options.bundle_files == 1 \
+                     or self.options.bundle_files == 2 and os.path.basename(src) in pywin32_ext_modules:
+                # bundle_files == 1: all DLLS are included in the library archive.
+                #
+                # bundle_files == 2: pywintypes3x.dll and
+                # pythoncom3x.dll are extension modules (although they
+                # have a .dll extension) and must be included in the
+                # library archive.
                 dst = os.path.basename(src)
                 if self.options.verbose:
                     print("Add DLL %s to %s" % (src, libpath))
                 arc.write(src, dst)
-##                print("SKIP DLL", os.path.basename(src))
             else:
                 # bundle_files in (2, 3) will copy dlls to the
                 # dist-directory, but pyds are put into the library.
