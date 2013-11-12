@@ -49,6 +49,10 @@ class DllFinder:
         # be included.
         self._dlls = collections.defaultdict(set)
 
+    def _add_dll(self, path):
+        self._dlls[path]
+        self.import_extension(path)
+
     def import_extension(self, pyd, callers=None):
         """Add an extension module and scan it for dependencies.
 
@@ -65,7 +69,6 @@ class DllFinder:
                 if not self.is_system_dll(dep_dll):
                     todo.add(dep_dll)
                     self._dlls[dep_dll].add(dll)
-
 
     def bind_image(self, imagename):
         """Call BindImageEx and collect all dlls that are bound.
@@ -104,7 +107,6 @@ class DllFinder:
 
         return result
 
-
     def is_system_dll(self, imagename):
         """is_system_dll must be called with a full pathname.
 
@@ -121,7 +123,6 @@ class DllFinder:
         if pydll in [x.lower() for x in deps]:
             return False
         return fnm.startswith(windir + os.sep) or fnm.startswith(sysdir + os.sep)
-
 
     def search_path(self, imagename, path):
         """Find an image (exe or dll) on the PATH."""
@@ -212,6 +213,9 @@ class Scanner(ModuleFinder):
 
     def add_datadirectory(self, name, path, recursive):
         self._data_directories[name] = (path, recursive)
+
+    def add_dll(self, path):
+        self.dllfinder._add_dll(path)
 
     ## def report_dlls(self):
     ##     import pprint
