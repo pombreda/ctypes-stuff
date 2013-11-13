@@ -99,3 +99,5 @@ UpdateResourceA = _kernel32.UpdateResourceA
 UpdateResourceA.restype = BOOL
 UpdateResourceA.argtypes = [HANDLE, LPCSTR, LPCSTR, WORD, LPVOID, DWORD]
 UpdateResourceA.errcheck = BOOL_errcheck
+RT_STRING = 6 # Variable WSTRING
+RT_VERSION = 16 # Variable WSTRING
