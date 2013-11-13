@@ -9,6 +9,10 @@
 #
 import os, sys
 
+def hook_urllib_request(finder, module):
+    # imports _scproxy on darwin
+    finder.excludes.append("_scproxy")
+
 def hook_pythoncom(finder, module):
     import pythoncom
     finder.add_dll(pythoncom.__file__)
