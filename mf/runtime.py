@@ -160,7 +160,11 @@ class Runtime(object):
             if self.options.verbose:
                 print("Add RSC %s/%s(%d bytes) to %s"
                       % ("PYTHONSCRIPT", 1, len(script_info), exe_path))
-            resource.add("PYTHONSCRIPT", 1, script_info)
+            resource.add(type="PYTHONSCRIPT", name=1, value=script_info)
+
+            # XXX testing
+            resource.add_string(1000, "foo bar")
+            resource.add_string(1001, "Hallöle €")
 
     def build_library(self, libpath, libmode, first_time=True):
         """Build the archive containing the Python library.
@@ -189,7 +193,7 @@ class Runtime(object):
                 if self.options.verbose:
                     print("Add RSC %s/%s(%d bytes) to %s"
                           % (os.path.basename(pydll), 1, len(pydll_bytes), libpath))
-                resource.add(os.path.basename(pydll), 1, pydll_bytes)
+                resource.add(type=os.path.basename(pydll), name=1, value=pydll_bytes)
 
         if self.options.optimize:
             bytecode_suffix = OPTIMIZED_BYTECODE_SUFFIXES[0]
