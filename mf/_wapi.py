@@ -101,3 +101,23 @@ UpdateResourceA.argtypes = [HANDLE, LPCSTR, LPCSTR, WORD, LPVOID, DWORD]
 UpdateResourceA.errcheck = BOOL_errcheck
 RT_STRING = 6 # Variable WSTRING
 RT_VERSION = 16 # Variable WSTRING
+class tagVS_FIXEDFILEINFO(Structure):
+    pass
+VS_FIXEDFILEINFO = tagVS_FIXEDFILEINFO
+tagVS_FIXEDFILEINFO._fields_ = [
+    ('dwSignature', DWORD),
+    ('dwStrucVersion', DWORD),
+    ('dwFileVersionMS', DWORD),
+    ('dwFileVersionLS', DWORD),
+    ('dwProductVersionMS', DWORD),
+    ('dwProductVersionLS', DWORD),
+    ('dwFileFlagsMask', DWORD),
+    ('dwFileFlags', DWORD),
+    ('dwFileOS', DWORD),
+    ('dwFileType', DWORD),
+    ('dwFileSubtype', DWORD),
+    ('dwFileDateMS', DWORD),
+    ('dwFileDateLS', DWORD),
+]
+VFT_APP = 1 # Variable c_long
+VOS_NT_WINDOWS32 = 262148 # Variable c_long
