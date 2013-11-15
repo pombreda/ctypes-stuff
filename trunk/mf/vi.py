@@ -2,22 +2,16 @@
 # -*- coding: utf-8 -*-
 import struct
 
-def WORD(i):
-    return struct.pack("<H", i)
-
-def DWORD(i):
-    return struct.pack("<L", i)
+WORD = struct.Struct("<H").pack
+DWORD = struct.Struct("<I").pack
 
 def pad32(text):
     """Pad to a 32-bit boundary"""
     delta = len(text) % 4
-    if not delta:
+    if delta == 0:
         return text
-    print("DELTA", delta, text.decode("utf-16-le"))
     padding = b'\0' * (4 - delta)
-    result = text + padding
-    assert len(result)%4 == 0
-    return result
+    return text + padding
 
 def pad32_2(text):
     """Pad to a 32-bit boundary + 16 bit"""
@@ -25,9 +19,7 @@ def pad32_2(text):
     if delta == 2:
         return text
     padding = b'\0' * ((2 - delta)%4)
-    result = text + padding
-    assert len(result)%4 == 2
-    return result
+    return text + padding
 
 def String(key, text):
     # 0: WORD length
