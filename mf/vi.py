@@ -31,16 +31,17 @@ def pad32_2(text):
 
 def String(key, text):
     # 0: WORD length
-    # 2: WORD valuelength
+    # 2: WORD valuelength - length of value in !!!WORDS!!!
     # 4: WORD type = 1 (text data)
     # 6: WCHAR[] key
     # WORD padding1
     # WCHAR[] value - zero terminated string
-    # WORD padding2
+    #
+    # valuelength is in WORDS, not BYTES!!!
     key = (key + '\0').encode("utf-16-le")
-    value = pad32((text + '\0').encode("utf-16-le"))
-    result = pad32_2(WORD(len(value)) + WORD(1) + key) + value
-    result = WORD(len(result)) + result
+    value = (text + '\0').encode("utf-16-le")
+    result = pad32_2(WORD(len(value)//2) + WORD(1) + key) + value
+    result = WORD(len(result)+2) + result
     return pad32(result)
 
 def StringTable(langid, *strings):
@@ -69,8 +70,6 @@ def StringFileInfo(*stringtables):
     result = WORD(len(result)) + result
     return pad32(result)
 
-################################################################
-
 def VarFileInfo(var):
     # 0: WORD length
     # 2: WORD valuelength - always 0
@@ -79,9 +78,10 @@ def VarFileInfo(var):
     # WORD padding1
     # Var[] Children
     key = "VarFileInfo\0".encode("utf-16-le")
-    padding = b"\0" * ((6 + len(key)) % 4) # align to 32-bit boundary
-    result = WORD(0) + WORD(1) + key + padding + var
-    return WORD(len(result)) + result
+    value = pad32(var)
+    result = pad32_2(WORD(0) + WORD(1) + key) + value
+    result = WORD(len(result) + 2) + result
+    return pad32(result)
 
 def Var(*langids):
     # 0: WORD length
@@ -91,11 +91,12 @@ def Var(*langids):
     # WORD padding1
     # DWORD[] Value - array of langid/codepage identifiers
     key = "Translation\0".encode("utf-16-le")
-    padding = b"\0" * ((6 + len(key)) % 4) # align to 32-bit boundary
-    values = b''.join([DWORD(id) for id in langids])
-    result = WORD(len(values)) + WORD(0) + key + padding + values
-    return WORD(len(result)) + result
-    
+    value = pad32(b''.join(DWORD(id) for id in langids))
+    result = pad32_2(WORD(len(value)) + WORD(0) + key) + value
+    result = WORD(len(result) + 2) + result
+    return pad32(result)
+
+################################################################
 
 def VS_VERSIONINFO(*items):
     # 0: WORD length
@@ -129,7 +130,7 @@ def VS_VERSIONINFO(*items):
     part1 = WORD(len(vs_fixedfileinfo)) + WORD(0) + key + padding1 + vs_fixedfileinfo
     padding2 = b"\0" * ((6 + len(part1)) % 4) # align to 32-bit boundary
     result = part1 + padding2 + b''.join(items)
-    return WORD(len(result)) + result
+    return WORD(len(result) + 2) + result
 
 # XXX NEED VarFileInfo with 0x000004b0
 
@@ -144,10 +145,12 @@ vs = VS_VERSIONINFO(StringFileInfo(StringTable("000004b0",
                                                String("ProductName", "Python"),
                                                String("ProductVersion", "3.3.1rc1"),
                                                )),
-##                    VarFileInfo(Var(0x04b00000)),
+                    VarFileInfo(Var(0x04b00000)),
                     )
 
 ##vs = VS_VERSIONINFO()
+
+# DOES IT WORK NOW?
 
 # This is still not correct:
 # VrFileInfo does nor work
