@@ -1,6 +1,7 @@
 #!/usr/bin/python3.3
 # -*- coding: utf-8 -*-
 import struct
+import _wapi
 
 WORD = struct.Struct("<H").pack
 DWORD = struct.Struct("<I").pack
@@ -90,7 +91,7 @@ def Var(*langids):
 
 ################################################################
 
-def VS_VERSIONINFO(*items):
+def VS_VERSIONINFO(ffi, *items):
     # 0: WORD length
     # 2: WORD valuelength - length if VS_FIXEDFILEINFO
     # 4: WORD type = 0 (binary data)
@@ -100,8 +101,22 @@ def VS_VERSIONINFO(*items):
     # WORD padding2
     # WORD[] Children - array of StringFileInfo and/or VaFileInfo structures
     key = "VS_VERSION_INFO\0".encode("utf-16-le")
-    import _wapi
-    ffi = _wapi.VS_FIXEDFILEINFO(
+    vs_fixedfileinfo = memoryview(ffi).tobytes()
+    value = pad32(vs_fixedfileinfo)
+
+    result = pad32_2(WORD(len(value)) + WORD(0) + key) + value
+
+    children = b''.join(items)
+
+    result = pad32_2(result) + children
+    result = WORD(len(result) + 2) + result
+    return pad32(result)
+
+################################################################
+# testing
+
+vs = VS_VERSIONINFO(
+    _wapi.VS_FIXEDFILEINFO(
         dwSignature = 0xFEEF04BD,
         dwStrucVersion = 0x00010000,
         dwFileVersionMS = 0x00030003,
@@ -115,32 +130,21 @@ def VS_VERSIONINFO(*items):
         dwFileSubtype = 0,
         dwFileDateMS = 0,
         dwFileDateLS = 0,
-        )
-    vs_fixedfileinfo = memoryview(ffi).tobytes()
-    value = pad32(vs_fixedfileinfo)
-
-    result = pad32_2(WORD(len(value)) + WORD(0) + key) + value
-
-    children = b''.join(items)
-
-    result = pad32_2(result) + children
-    result = WORD(len(result) + 2) + result
-    return pad32(result)
-
-vs = VS_VERSIONINFO(StringFileInfo(StringTable("000004b0",
-                                               String("CompanyName", "Python Software Foundation"),
-                                               String("FileDescription", "Python Core"),
-                                               String("FileVersion", "3.3.1rc1"),
-                                               String("InternalName", "Python DLL"),
-                                               String("LegalCopyright",
-                                                      "Copyright © 2001-2012 Python Software Foundation. "
-                                                      "Copyright © 2000 BeOpen.com. Copyright © 1995-2001 CNRI. "
-                                                      "Copyright © 1991-1995 SMC."),
-                                               String("OriginalFilename", "python33.dll"),
-                                               String("ProductName", "Python"),
-                                               String("ProductVersion", "3.3.1rc1"),
-                                               )),
-                    VarFileInfo(Var(0x04b00000)),
+        ),
+    StringFileInfo(StringTable("000004b0",
+                               String("CompanyName", "Python Software Foundation"),
+                               String("FileDescription", "Python Core"),
+                               String("FileVersion", "3.3.1rc1"),
+                               String("InternalName", "Python DLL"),
+                               String("LegalCopyright",
+                                      "Copyright © 2001-2012 Python Software Foundation. "
+                                      "Copyright © 2000 BeOpen.com. Copyright © 1995-2001 CNRI. "
+                                      "Copyright © 1991-1995 SMC."),
+                               String("OriginalFilename", "python33.dll"),
+                               String("ProductName", "Python"),
+                               String("ProductVersion", "3.3.1rc1"),
+                               )),
+    VarFileInfo(Var(0x04b00000)),
                     )
 
 ##vs = VS_VERSIONINFO()
