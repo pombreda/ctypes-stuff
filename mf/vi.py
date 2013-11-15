@@ -38,9 +38,8 @@ def String(key, text):
     # WCHAR[] value - zero terminated string
     # WORD padding2
     key = (key + '\0').encode("utf-16-le")
-    text = (text + '\0').encode("utf-16-le")
-    text = pad32(text)
-    result = pad32_2(WORD(len(text)) + WORD(1) + key) + text
+    value = pad32((text + '\0').encode("utf-16-le"))
+    result = pad32_2(WORD(len(value)) + WORD(1) + key) + value
     result = WORD(len(result)) + result
     return pad32(result)
 
@@ -51,10 +50,11 @@ def StringTable(langid, *strings):
     # 6: WCHAR[] key - 8-digit hex number, the language ID
     # WORD padding1
     # String[] Children array of String structures.
-    key = langid.encode("utf-16-le")
-    padding = b"\0" * ((6 + len(key)) % 4) # align to 32-bit boundary
-    result = WORD(0) + WORD(1) + key + padding + b''.join(strings)
-    return WORD(len(result)) + result
+    key = (langid + '\0').encode("utf-16-le")
+    value = pad32(b''.join(strings))
+    result = pad32_2(WORD(0) + WORD(1) + key) + value
+    result = WORD(len(result)) + result
+    return pad32(result)
 
 def StringFileInfo(*stringtables):
     # 0: WORD length
@@ -63,10 +63,13 @@ def StringFileInfo(*stringtables):
     # 6: WCHAR[] key - "StringFileInfo"
     # WORD padding1
     # StringTable[] Children
-    key = "StringFileInfo".encode("utf-16-le")
-    padding = b"\0" * ((6 + len(key)) % 4) # align to 32-bit boundary
-    result = WORD(0) + WORD(1) + key + padding + b''.join(stringtables)
-    return WORD(len(result)) + result
+    key = "StringFileInfo\0".encode("utf-16-le")
+    value = pad32(b''.join(stringtables))
+    result = pad32_2(WORD(0) + WORD(1) + key) + value
+    result = WORD(len(result)) + result
+    return pad32(result)
+
+################################################################
 
 def VarFileInfo(var):
     # 0: WORD length
