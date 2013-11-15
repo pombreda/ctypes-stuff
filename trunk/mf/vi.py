@@ -5,6 +5,9 @@ import struct
 def WORD(i):
     return struct.pack("<H", i)
 
+def DWORD(i):
+    return struct.pack("<L", i)
+
 def String(key, text):
     # 0: WORD length
     # 2: WORD valuelength
@@ -48,6 +51,32 @@ def StringFileInfo(*stringtables):
     padding = b"\0" * ((6 + len(key)) % 4) # align to 32-bit boundary
     result = WORD(0) + WORD(1) + key + padding + b''.join(stringtables)
     return WORD(len(result)) + result
+
+def VarFileInfo(var):
+    # 0: WORD length
+    # 2: WORD valuelength - always 0
+    # 4: WORD type = 1 (text data)
+    # 6: WCHAR[] key - "VarFileInfo"
+    # WORD padding1
+    # Var[] Children
+    key = "VarFileInfo\0".encode("utf-16-le")
+    padding = b"\0" * ((6 + len(key)) % 4) # align to 32-bit boundary
+    result = WORD(0) + WORD(1) + key + padding + var
+    return WORD(len(result)) + result
+
+def Var(*langids):
+    # 0: WORD length
+    # 2: WORD valuelength - length in bytes of Value member
+    # 4: WORD type = 0 (binary data)
+    # 6: WCHAR[] key - "Translation"
+    # WORD padding1
+    # DWORD[] Value - array of langid/codepage identifiers
+    key = "Translation\0".encode("utf-16-le")
+    padding = b"\0" * ((6 + len(key)) % 4) # align to 32-bit boundary
+    values = b''.join([DWORD(id) for id in langids])
+    result = WORD(len(values)) + WORD(0) + key + padding + values
+    return WORD(len(result)) + result
+    
 
 def VS_VERSIONINFO(*items):
     # 0: WORD length
@@ -95,6 +124,14 @@ vs = VS_VERSIONINFO(StringFileInfo(StringTable("000004b0",
                                                String("OriginalFilename", "python33.dll"),
                                                String("ProductName", "Python"),
                                                String("ProductVersion", "3.3.1rc1"),
-                                               )))
+                                               )),
+##                    VarFileInfo(Var(0x000004b0)),
+                    VarFileInfo(Var(0x04b00000)),
+                    )
 
 ##vs = VS_VERSIONINFO()
+
+# This is still not correct:
+# VrFileInfo does nor work
+# see tooltip in explorer window
+# or Open version resource a binary and compare with that in Python33.dll...
