@@ -43,10 +43,10 @@ def StringTable(langid, *strings):
     # 6: WCHAR[] key - 8-digit hex number, the language ID
     # WORD padding1
     # String[] Children array of String structures.
-    key = (langid + '\0').encode("utf-16-le")
+    key = langid.encode("utf-16-le") # Hm, no need to NUL terminate?
     value = pad32(b''.join(strings))
     result = pad32_2(WORD(0) + WORD(1) + key) + value
-    result = WORD(len(result)) + result
+    result = WORD(len(result)+2) + result
     return pad32(result)
 
 def StringFileInfo(*stringtables):
