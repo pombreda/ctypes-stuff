@@ -8,6 +8,27 @@ def WORD(i):
 def DWORD(i):
     return struct.pack("<L", i)
 
+def pad32(text):
+    """Pad to a 32-bit boundary"""
+    delta = len(text) % 4
+    if not delta:
+        return text
+    print("DELTA", delta, text.decode("utf-16-le"))
+    padding = b'\0' * (4 - delta)
+    result = text + padding
+    assert len(result)%4 == 0
+    return result
+
+def pad32_2(text):
+    """Pad to a 32-bit boundary + 16 bit"""
+    delta = len(text) % 4
+    if delta == 2:
+        return text
+    padding = b'\0' * ((2 - delta)%4)
+    result = text + padding
+    assert len(result)%4 == 2
+    return result
+
 def String(key, text):
     # 0: WORD length
     # 2: WORD valuelength
@@ -16,17 +37,12 @@ def String(key, text):
     # WORD padding1
     # WCHAR[] value - zero terminated string
     # WORD padding2
-    key = (key + "\0").encode("utf-16-le")
-    text = (text + "\0").encode("utf-16-le")
-    text = text + b'\0' * (len(text) % 4)
-    padding = b"\0" * ((6 + len(key)) % 4) # align to 32-bit boundary
-    result = WORD(len(text)) + WORD(1) + key + padding + text
-    assert len((WORD(0) + WORD(len(text)) + WORD(1) + key + padding)) % 4 == 0
+    key = (key + '\0').encode("utf-16-le")
+    text = (text + '\0').encode("utf-16-le")
+    text = pad32(text)
+    result = pad32_2(WORD(len(text)) + WORD(1) + key) + text
     result = WORD(len(result)) + result
-##    print((len(result), key, text))
-##    result = result + b'\0' * (len(result) % 4)
-    assert len(result) % 4 == 0
-    return result
+    return pad32(result)
 
 def StringTable(langid, *strings):
     # 0: WORD length
@@ -125,8 +141,7 @@ vs = VS_VERSIONINFO(StringFileInfo(StringTable("000004b0",
                                                String("ProductName", "Python"),
                                                String("ProductVersion", "3.3.1rc1"),
                                                )),
-##                    VarFileInfo(Var(0x000004b0)),
-                    VarFileInfo(Var(0x04b00000)),
+##                    VarFileInfo(Var(0x04b00000)),
                     )
 
 ##vs = VS_VERSIONINFO()
