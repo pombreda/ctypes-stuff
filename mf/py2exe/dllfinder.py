@@ -2,10 +2,14 @@
 # -*- coding: utf-8 -*-
 """dllfinder
 """
-import _wapi
+from . import _wapi
 import collections
+from importlib.machinery import EXTENSION_SUFFIXES
 import os
 import sys
+
+from . mf4 import ModuleFinder
+from . import hooks
 
 ################################
 # XXX Move these into _wapi???
@@ -149,10 +153,6 @@ class DllFinder:
         return set(self._loaded_dlls.values()) - set(self._dlls)
 
 ################################################################
-
-from  mf4 import ModuleFinder
-from importlib.machinery import EXTENSION_SUFFIXES
-import hooks
 
 # Exclude modules that the standard library imports (conditionally),
 # but which are not present on windows.

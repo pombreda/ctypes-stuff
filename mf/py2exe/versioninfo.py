@@ -1,7 +1,7 @@
 #!/usr/bin/python3.3
 # -*- coding: utf-8 -*-
 import struct
-import _wapi
+from . import _wapi
 
 WORD = struct.Struct("<H").pack
 DWORD = struct.Struct("<I").pack
@@ -37,7 +37,10 @@ class VS_STRUCT(object):
     # WORD padding2
     # Data[] array of other structures (only for VS_VersionInfo
     def tobytes(self):
-        result = pad32_2(WORD(self.valuelength) + WORD(self.valuetype) + self.key) + pad32(self.value)
+        result = pad32_2(WORD(self.valuelength)
+                         + WORD(self.valuetype)
+                         + self.key
+                         ) + pad32(self.value)
         return pad32(WORD(len(result)+2) + result)
 
 class VS_String(VS_STRUCT):

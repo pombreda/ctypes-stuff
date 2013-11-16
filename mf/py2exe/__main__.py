@@ -4,5 +4,5 @@
 """
 
 if __name__ == "__main__":
-    import build_exe
+    from . import build_exe
     build_exe.main()
