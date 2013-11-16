@@ -9,20 +9,43 @@
 #
 import os, sys
 
+def hook_pyreadline(finder, module):
+    """
+    """
+    finder.excludes.append("IronPythonConsole")
+    finder.excludes.append("StringIO") # in pyreadline.py3k_compat
+    finder.excludes.append("System")
+    finder.excludes.append("sets")
+    finder.excludes.append("startup")
+
+def hook_xml_etree_ElementTree(finder, module):
+    """ElementC14N is an optional extension. Ignore if it is not
+    found.
+    """
+    finder.excludes.append("ElementC14N")
+
 def hook_urllib_request(finder, module):
-    # imports _scproxy on darwin
+    """urllib.request imports _scproxy on darwin
+    """
     finder.excludes.append("_scproxy")
 
 def hook_pythoncom(finder, module):
+    """pythoncom is a Python extension module with .dll extension,
+    usually in the windows system directory as pythoncom3X.dll.
+    """
     import pythoncom
     finder.add_dll(pythoncom.__file__)
 
 def hook_pythonwintypes(finder, module):
-    import pythonwintypes
+    """pywintypes is a Python extension module with .dll extension,
+    usually in the windows system directory as pywintypes3X.dll.
+    """
+    import pywintypes
     finder.add_dll(pywintypes.__file__)
 
 def hook_tkinter(finder, module):
-    # Copy tcl and tk directories.
+    """Recusively copy tcl and tk directories.
+    """
     # It probably doesn't make sense to exclude tix from the tcl distribution,
     # and only copy it when tkinter.tix is imported...
     tcl_dir = os.path.join(sys.prefix, "tcl")
@@ -45,10 +68,9 @@ def hook_matplotlib(finder, module):
     finder.excludes.append("wx")
 
 def hook_numpy_distutils(finder, module):
-    """
-    In a 'if sys.version_info[0] < 3:' block numpy.distutils does an
-    implicit relative import: 'import __config__'.  This will not work
-    in Python3 so ignore it.
+    """In a 'if sys.version_info[0] < 3:' block numpy.distutils does
+    an implicit relative import: 'import __config__'.  This will not
+    work in Python3 so ignore it.
     """
     finder.excludes.append("__config__")
 
