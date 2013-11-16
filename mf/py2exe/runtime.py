@@ -134,7 +134,7 @@ class Runtime(object):
         run_stub = "run.exe"
         if self.options.verbose:
             print("Using exe-stub %r" % run_stub)
-        exe_bytes = pkgutil.get_data("py3exe", run_stub)
+        exe_bytes = pkgutil.get_data("py2exe", run_stub)
         if exe_bytes is None:
             raise RuntimeError("run-stub not found")
         with open(exe_path, "wb") as ofi:
