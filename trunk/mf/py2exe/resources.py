@@ -6,7 +6,7 @@ from collections import defaultdict
 import contextlib
 import ctypes
 
-import _wapi
+from . import _wapi
 
 @contextlib.contextmanager
 def UpdateResources(filename, *, delete_existing=False):

@@ -3,7 +3,7 @@
 import argparse
 import logging
 import os
-import runtime
+from . import runtime
 
 def main():
     import argparse

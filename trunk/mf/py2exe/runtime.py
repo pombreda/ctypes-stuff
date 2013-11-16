@@ -1,6 +1,6 @@
 #!/usr/bin/python3.3-32
 # -*- coding: utf-8 -*-
-from dllfinder import Scanner, pydll
+from .dllfinder import Scanner, pydll
 
 import distutils.util
 import imp
@@ -14,7 +14,7 @@ import struct
 import sys
 import zipfile
 
-from resources import UpdateResources
+from .resources import UpdateResources
 
 logger = logging.getLogger("runtime")
 
@@ -112,7 +112,9 @@ class Runtime(object):
             if not os.path.exists(os.path.dirname(libpath)):
                 os.mkdir(os.path.dirname(libpath))
 
-            shutil.copy2("dll.dll", libpath)
+            dll_bytes = pkgutil.get_data("py2exe", "dll.dll")
+            with open(libpath, "wb") as ofi:
+                  ofi.write(dll_bytes)
             self.build_library(libpath, "a")
 
         # data files
@@ -162,13 +164,13 @@ class Runtime(object):
                       % ("PYTHONSCRIPT", 1, len(script_info), exe_path))
             resource.add(type="PYTHONSCRIPT", name=1, value=script_info)
 
-            ## # XXX testing
-            ## resource.add_string(1000, "foo bar")
-            ## resource.add_string(1001, "Hallöle €")
+            # XXX testing
+            resource.add_string(1000, "foo bar")
+            resource.add_string(1001, "Hallöle €")
 
-            ## from _wapi import RT_VERSION
-            ## from versioninfo import vs
-            ## resource.add(type=RT_VERSION, name=1, value=vs)
+            from ._wapi import RT_VERSION
+            from .versioninfo import vs
+            resource.add(type=RT_VERSION, name=1, value=vs)
 
     def build_library(self, libpath, libmode, first_time=True):
         """Build the archive containing the Python library.
