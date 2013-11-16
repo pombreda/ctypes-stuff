@@ -162,9 +162,13 @@ class Runtime(object):
                       % ("PYTHONSCRIPT", 1, len(script_info), exe_path))
             resource.add(type="PYTHONSCRIPT", name=1, value=script_info)
 
-            # XXX testing
-            resource.add_string(1000, "foo bar")
-            resource.add_string(1001, "Hallöle €")
+            ## # XXX testing
+            ## resource.add_string(1000, "foo bar")
+            ## resource.add_string(1001, "Hallöle €")
+
+            ## from _wapi import RT_VERSION
+            ## from versioninfo import vs
+            ## resource.add(type=RT_VERSION, name=1, value=vs)
 
     def build_library(self, libpath, libmode, first_time=True):
         """Build the archive containing the Python library.
