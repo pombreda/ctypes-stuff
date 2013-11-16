@@ -176,7 +176,7 @@ BOOL locate_script(HMODULE hmod)
 }
 
 /*
-  Examine the PYTHONINSPECT environment variable (which may have been set by
+  Examine the PY2EXEINSPECT environment variable (which may have been set by
   the python script itself), run an interactive Python interpreter if it is
   set, and finally call Py_Finalize().
  */
@@ -185,7 +185,7 @@ void fini(void)
 	/* The standard Python does also allow this: Set PYTHONINSPECT
 	   in the script and examine it afterwards
 	*/
-	if (getenv("PYTHONINSPECT") && Py_FdIsInteractive(stdin, "<stdin>"))
+	if (getenv("PY2EXEINSPECT") && Py_FdIsInteractive(stdin, "<stdin>"))
 		PyRun_InteractiveLoop(stdin, "<stdin>");
 	/* Clean up */
 	Py_Finalize();
