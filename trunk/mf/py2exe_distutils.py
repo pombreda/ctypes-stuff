@@ -140,8 +140,7 @@ class BuildInterpreters(build_ext.build_ext):
             fnm = os.path.join(*ext_path) + '_d'
         else:
             fnm = os.path.join(*ext_path)
-##        return '%s-py%s.%s-%s' % (fnm, sys.version_info[0], sys.version_info[1], get_platform())
-        return fnm
+        return '%s-py%s.%s-%s' % (fnm, sys.version_info[0], sys.version_info[1], get_platform())
 
     def setup_compiler(self):
         # This method *should* be available separately in build_ext!

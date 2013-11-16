@@ -128,15 +128,29 @@ class Runtime(object):
             else:
                 raise RuntimeError("not yet supported")
 
-    def build_exe(self, script, exe_path, libname):
-        """Build the exe-file."""
-        logger.info("Building exe '%s'", exe_path)
-        run_stub = "run.exe"
-        if self.options.verbose:
+    def get_runstub_bytes(self):
+        from distutils.util import get_platform
+        run_stub = 'run-py%s.%s-%s.exe' % (sys.version_info[0], sys.version_info[1], get_platform())
+        if 1 or self.options.verbose:
             print("Using exe-stub %r" % run_stub)
         exe_bytes = pkgutil.get_data("py2exe", run_stub)
         if exe_bytes is None:
             raise RuntimeError("run-stub not found")
+        return exe_bytes
+
+    def get_exe_filename (self, inter_name):
+        ext_path = inter_name.split('.')
+        if self.debug:
+            fnm = os.path.join(*ext_path) + '_d'
+        else:
+            fnm = os.path.join(*ext_path)
+        return '%s-py%s.%s-%s' % (fnm, sys.version_info[0], sys.version_info[1], get_platform())
+
+    def build_exe(self, script, exe_path, libname):
+        """Build the exe-file."""
+        logger.info("Building exe '%s'", exe_path)
+
+        exe_bytes = self.get_runstub_bytes()
         with open(exe_path, "wb") as ofi:
             ofi.write(exe_bytes)
 
