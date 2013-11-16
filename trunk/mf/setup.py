@@ -81,6 +81,7 @@ if __name__ == "__main__":
           cmdclass = {'build_interpreters': BuildInterpreters},
 ##          scripts = ["build_setup.py"],
           interpreters = interpreters,
+          py_modules=['zipextimporter'],
           packages=['py2exe'],
           )
 
