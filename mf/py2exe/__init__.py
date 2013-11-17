@@ -2,6 +2,6 @@
 # -*- coding: utf-8 -*-
 """py2exe package
 """
+from .patch_distutils import patch_distutils
 
-import distutils
-print("install distutils extension")
+patch_distutils()
