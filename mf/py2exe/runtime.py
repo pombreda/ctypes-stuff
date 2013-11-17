@@ -172,7 +172,7 @@ class Runtime(object):
                                   len(script_data))
         script_info += zippath + b"\0" + script_data + b"\0"
 
-        with UpdateResources(exe_path) as resource:
+        with UpdateResources(exe_path, delete_existing=True) as resource:
             if self.options.verbose:
                 print("Add RSC %s/%s(%d bytes) to %s"
                       % ("PYTHONSCRIPT", 1, len(script_info), exe_path))
@@ -185,6 +185,9 @@ class Runtime(object):
             from ._wapi import RT_VERSION
             from .versioninfo import vs
             resource.add(type=RT_VERSION, name=1, value=vs)
+
+            resource.add_icon("128.ico", 1)
+            resource.add_icon("Alpha.ico", 2)
 
     def build_library(self, libpath, libmode, first_time=True):
         """Build the archive containing the Python library.
@@ -207,7 +210,7 @@ class Runtime(object):
 
         # Add pythonXY.dll as resource into the library file
         if self.options.bundle_files < 3:
-            with UpdateResources(libpath) as resource:
+            with UpdateResources(libpath, delete_existing=False) as resource:
                 with open(pydll, "rb") as ifi:
                     pydll_bytes = ifi.read()
                 if self.options.verbose:

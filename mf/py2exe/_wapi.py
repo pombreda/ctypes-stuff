@@ -121,3 +121,6 @@ tagVS_FIXEDFILEINFO._fields_ = [
 ]
 VFT_APP = 1 # Variable c_long
 VOS_NT_WINDOWS32 = 262148 # Variable c_long
+BYTE = c_ubyte
+RT_ICON = 3 # Variable WSTRING
+RT_GROUP_ICON = 14 # Variable WSTRING

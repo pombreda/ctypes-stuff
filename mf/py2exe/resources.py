@@ -7,6 +7,7 @@ import contextlib
 import ctypes
 
 from . import _wapi
+from . import icons
 
 @contextlib.contextmanager
 def UpdateResources(filename, *, delete_existing=False):
@@ -82,3 +83,21 @@ class ResourceWriter(object):
             self.add(type=_wapi.RT_STRING, name=key, value=data)
 
         self._strings = {}
+
+    def add_icon(self, iconpath, resource_id):
+        # Each RT_ICON resource in an image file (containing the icon
+        # for one specific resolution and number of colors) must have
+        # a unique id, and the id must be in the GRPICONDIRHEADER's
+        # nID member.
+
+        # So, we use a *static* variable rt_icon_id which is
+        # incremented for each RT_ICON resource and written into the
+        # GRPICONDIRHEADER's nID member.
+        with open(iconpath, "rb") as ifi:
+            hdr = icons.ICONDIRHEADER.readfrom(ifi)
+        grp_header = icons.CreateGrpIconDirHeader(hdr, resource_id*100)
+
+        for i, entry in enumerate(grp_header.idEntries):
+            self.add(type=_wapi.RT_ICON, name=entry.nID, value=hdr.iconimages[i])
+
+        self.add(type=_wapi.RT_GROUP_ICON, name=resource_id, value=grp_header.tobytes())
