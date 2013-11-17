@@ -3,8 +3,8 @@
 import os
 import sys
 
-##from setuptools import setup, find_packages
-from distutils.core import setup
+from setuptools import setup
+##from distutils.core import setup
 
 from py2exe_distutils import Dist, Interpreter, BuildInterpreters
 
