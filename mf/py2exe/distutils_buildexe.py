@@ -1,5 +1,7 @@
 from distutils.core import Command
+import os
 import sys
+import warnings
 
 ## from distutils.spawn import spawn
 ## from distutils.errors import *
@@ -85,60 +87,9 @@ def fancy_split(str, sep=","):
 ## del __load
 ## """
 
-## # A very loosely defined "target".  We assume either a "script" or "modules"
-## # attribute.  Some attributes will be target specific.
-## class Target:
-##     # A custom requestedExecutionLevel for the User Access Control portion
-##     # of the manifest for the target. May be a string, which will be used for
-##     # the 'requestedExecutionLevel' portion and False for 'uiAccess', or a tuple
-##     # of (string, bool) which specifies both values. If specified and the
-##     # target's 'template' executable has no manifest (ie, python 2.5 and
-##     # earlier), then a default manifest is created, otherwise the manifest from
-##     # the template is copied then updated.
-##     uac_info = None
 
-##     def __init__(self, **kw):
-##         self.__dict__.update(kw)
-##         # If modules is a simple string, assume they meant list
-##         m = self.__dict__.get("modules")
-##         if m and type(m) in types.StringTypes:
-##             self.modules = [m]
-##     def get_dest_base(self):
-##         dest_base = getattr(self, "dest_base", None)
-##         if dest_base: return dest_base
-##         script = getattr(self, "script", None)
-##         if script:
-##             return os.path.basename(os.path.splitext(script)[0])
-##         modules = getattr(self, "modules", None)
-##         assert modules, "no script, modules or dest_base specified"
-##         return modules[0].split(".")[-1]
+from . import runtime
 
-##     def validate(self):
-##         resources = getattr(self, "bitmap_resources", []) + \
-##                     getattr(self, "icon_resources", [])
-##         for r_id, r_filename in resources:
-##             if type(r_id) != type(0):
-##                 raise DistutilsOptionError("Resource ID must be an integer")
-##             if not os.path.isfile(r_filename):
-##                 raise DistutilsOptionError("Resource filename '%s' does not exist" % r_filename)
-
-## def FixupTargets(targets, default_attribute):
-##     if not targets:
-##         return targets
-##     ret = []
-##     for target_def in targets:
-##         if type(target_def) in types.StringTypes :
-##             # Create a default target object, with the string as the attribute
-##             target = Target(**{default_attribute: target_def})
-##         else:
-##             d = getattr(target_def, "__dict__", target_def)
-##             if not d.has_key(default_attribute):
-##                 raise DistutilsOptionError(
-##                       "This target class requires an attribute '%s'" % default_attribute)
-##             target = Target(**d)
-##         target.validate()
-##         ret.append(target)
-##     return ret
 
 class py2exe(Command):
     description = ""
@@ -206,8 +157,11 @@ class py2exe(Command):
         self.includes = fancy_split(self.includes)
         self.ignores = fancy_split(self.ignores)
         self.bundle_files = int(self.bundle_files)
-        if self.bundle_files < 0 or self.bundle_files > 3:
-            raise DistutilsOptionError("bundle-files must be 0, 1, 2, or 3, not %s" % self.bundle_files)
+        if self.bundle_files < 1 or self.bundle_files > 3:
+            raise DistutilsOptionError("bundle-files must be 1, 2, or 3, not %s"
+                                       % self.bundle_files)
+        if self.ascii:
+            warnings.warn("The 'ascii' option is no longer supported, ignored.")
         if self.skip_archive:
             if self.compressed:
                 raise DistutilsOptionError("can't compress when skipping archive")
@@ -248,6 +202,9 @@ class py2exe(Command):
         ## required_files = [target.script
         ##                   for target in dist.windows + dist.console]
 
+        dist.console = runtime.fixup_targets(dist.console, "script")
+
+
         from argparse import Namespace
         options = Namespace(xref = self.xref,
                             comppressed = self.compressed,
@@ -279,8 +236,6 @@ class py2exe(Command):
 
         ## level = logging.INFO if options.verbose else logging.WARNING
         ## logging.basicConfig(level=level)
-
-        from . import runtime
 
         builder = runtime.Runtime(options)
         builder.analyze()
