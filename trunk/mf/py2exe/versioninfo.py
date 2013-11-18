@@ -80,37 +80,113 @@ class VS_VersionInfo(VS_STRUCT):
         self.valuelength = len(value)
         self.value = value + item_bytes
 
+class Version(object):
+    def __init__(self,
+                 version,
+                 comments = None,
+                 company_name = None,
+                 file_description = None,
+                 internal_name = None,
+                 legal_copyright = None,
+                 legal_trademarks = None,
+                 original_filename = None,
+                 private_build = None,
+                 product_name = None,
+                 product_version = None,
+                 special_build = None):
+        self.version = version
+        self.product_version = version or product_version
+        strings = []
+        strings.append(("FileVersion", version))
+        if comments is not None:
+            strings.append(("Comments", comments))
+        if company_name is not None:
+            strings.append(("CompanyName", company_name))
+        if file_description is not None:
+            strings.append(("FileDescription", file_description))
+        strings.append(("FileVersion", version))
+        if internal_name is not None:
+            strings.append(("InternalName", internal_name))
+        if legal_copyright is not None:
+            strings.append(("LegalCopyright", legal_copyright))
+        if legal_trademarks is not None:
+            strings.append(("LegalTrademarks", legal_trademarks))
+        if original_filename is not None:
+            strings.append(("OriginalFilename", original_filename))
+        if private_build is not None:
+            strings.append(("PrivateBuild", private_build))
+        if product_name is not None:
+            strings.append(("ProductName", product_name))
+        strings.append(("ProductVersion", product_version or version))
+        if special_build is not None:
+            strings.append(("SpecialBuild", special_build))
+        self.strings = strings
+        
+    def _parse_version(self, version):
+        version = version.replace(",", ".")
+        fields = [f.strip()
+                  for f in (version + '.0.0.0.0').split(".")[:4]]
+        try:
+            MS = int(fields[0]) * 65536 + int(fields[1])
+            LS = int(fields[2]) * 65536 + int(fields[3])
+            return MS, LS
+        except ValueError:
+            raise VersionError("could not parse version number '%s'" % version)
+
+    def tobytes(self):
+        dwFileVersionMS, dwFileVersionLS = self._parse_version(self.version)
+        dwProductVersionMS, dwProductVersionLS = self._parse_version(self.product_version)
+        vs = VS_VersionInfo(
+            _wapi.VS_FIXEDFILEINFO(
+                dwSignature = 0xFEEF04BD,
+                dwStrucVersion = 0x00010000,
+                dwFileVersionMS = dwFileVersionMS,
+                dwFileVersionLS = dwFileVersionLS,
+                dwProductVersionMS = dwProductVersionMS,
+                dwProductVersionLS = dwProductVersionLS,
+                dwFileFlagsMask = 0x3F,
+                dwFileOS = _wapi.VOS_NT_WINDOWS32,
+                dwFileType = _wapi.VFT_APP,
+                ),
+            VS_StringFileInfo(
+                VS_StringTable("000004b0",
+                               *[VS_String(name, value) for (name, value) in self.strings]),
+                VS_VarFileInfo(VS_Var(0x04b00000))))
+        
+        return vs.tobytes()
+
 ################################################################
 
 # testing
 
-vs = VS_VersionInfo(
-    _wapi.VS_FIXEDFILEINFO(
-        dwSignature = 0xFEEF04BD,
-        dwStrucVersion = 0x00010000,
-        dwFileVersionMS = 0x00030003,
-        dwFileVersionLS = 0x046103f5,
-        dwProductVersionMS = 0x00030003,
-        dwProductVersionLS = 0x046103f5,
-        dwFileFlagsMask = 0x3F,
-        dwFileFlags = 0,
-        dwFileOS = _wapi.VOS_NT_WINDOWS32,
-        dwFileType = _wapi.VFT_APP,
-        dwFileSubtype = 0,
-        dwFileDateMS = 0,
-        dwFileDateLS = 0,
-        ),
-    VS_StringFileInfo(VS_StringTable("000004b0",
-                                     VS_String("CompanyName", "Python Software Foundation"),
-                                     VS_String("FileDescription", "Python Core"),
-                                     VS_String("FileVersion", "3.3.1rc1"),
-                                     VS_String("InternalName", "Python DLL"),
-                                     VS_String("LegalCopyright",
-                                               "Copyright © 2001-2012 Python Software Foundation. "
-                                               "Copyright © 2000 BeOpen.com. Copyright © 1995-2001 CNRI. "
-                                               "Copyright © 1991-1995 SMC."),
-                                     VS_String("OriginalFilename", "python33.dll"),
-                                     VS_String("ProductName", "Python"),
-                                     VS_String("ProductVersion", "3.3.1rc1"),
-                                     )),
-    VS_VarFileInfo(VS_Var(0x04b00000))).tobytes()
+if __name__ == "__main__":
+    vs = VS_VersionInfo(
+        _wapi.VS_FIXEDFILEINFO(
+            dwSignature = 0xFEEF04BD,
+            dwStrucVersion = 0x00010000,
+            dwFileVersionMS = 0x00030003,
+            dwFileVersionLS = 0x046103f5,
+            dwProductVersionMS = 0x00030003,
+            dwProductVersionLS = 0x046103f5,
+            dwFileFlagsMask = 0x3F,
+            dwFileFlags = 0,
+            dwFileOS = _wapi.VOS_NT_WINDOWS32,
+            dwFileType = _wapi.VFT_APP,
+            dwFileSubtype = 0,
+            dwFileDateMS = 0,
+            dwFileDateLS = 0,
+            ),
+        VS_StringFileInfo(VS_StringTable("000004b0",
+                                         VS_String("CompanyName", "Python Software Foundation"),
+                                         VS_String("FileDescription", "Python Core"),
+                                         VS_String("FileVersion", "3.3.1rc1"),
+                                         VS_String("InternalName", "Python DLL"),
+                                         VS_String("LegalCopyright",
+                                                   "Copyright © 2001-2012 Python Software Foundation. "
+                                                   "Copyright © 2000 BeOpen.com. Copyright © 1995-2001 CNRI. "
+                                                   "Copyright © 1991-1995 SMC."),
+                                         VS_String("OriginalFilename", "python33.dll"),
+                                         VS_String("ProductName", "Python"),
+                                         VS_String("ProductVersion", "3.3.1rc1"),
+                                         )),
+        VS_VarFileInfo(VS_Var(0x04b00000))).tobytes()
