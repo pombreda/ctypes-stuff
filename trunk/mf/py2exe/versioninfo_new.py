@@ -3,6 +3,8 @@
 import struct
 from . import _wapi
 
+raise RuntimeError("XXX This does not work correctly...")
+
 WORD = struct.Struct("<H").pack
 DWORD = struct.Struct("<I").pack
 
