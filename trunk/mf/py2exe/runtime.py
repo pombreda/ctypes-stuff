@@ -15,11 +15,81 @@ import sys
 import zipfile
 
 from .resources import UpdateResources
+from .versioninfo_py2 import Version
 
 logger = logging.getLogger("runtime")
 
 from importlib.machinery import EXTENSION_SUFFIXES
 from importlib.machinery import DEBUG_BYTECODE_SUFFIXES, OPTIMIZED_BYTECODE_SUFFIXES
+
+
+
+class Target:
+    """
+    A very loosely defined "target".  We assume either a "script" or "modules"
+    attribute.  Some attributes will be target specific.
+    """
+    # A custom requestedExecutionLevel for the User Access Control portion
+    # of the manifest for the target. May be a string, which will be used for
+    # the 'requestedExecutionLevel' portion and False for 'uiAccess', or a tuple
+    # of (string, bool) which specifies both values. If specified and the
+    # target's 'template' executable has no manifest (ie, python 2.5 and
+    # earlier), then a default manifest is created, otherwise the manifest from
+    # the template is copied then updated.
+    uac_info = None
+
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+        # If modules is a simple string, assume they meant list
+        m = self.__dict__.get("modules")
+        if m and isinstance(m, str):
+            self.modules = [m]
+
+    def get_dest_base(self):
+        dest_base = getattr(self, "dest_base", None)
+        if dest_base: return dest_base
+        script = getattr(self, "script", None)
+        if script:
+            return os.path.basename(os.path.splitext(script)[0])
+        modules = getattr(self, "modules", None)
+        assert modules, "no script, modules or dest_base specified"
+        return modules[0].split(".")[-1]
+
+    def validate(self):
+        resources = getattr(self, "bitmap_resources", []) + \
+                    getattr(self, "icon_resources", [])
+        for r_id, r_filename in resources:
+            if type(r_id) != type(0):
+                # Hm, strings are also allowed as resource ids...
+                raise DistutilsOptionError("Resource ID must be an integer")
+            if not os.path.isfile(r_filename):
+                raise DistutilsOptionError("Resource filename '%s' does not exist" % r_filename)
+
+
+def fixup_targets(targets, default_attribute):
+    """Fixup the targets; and ensure that the default_attribute is
+    present.  Depending on the type of target, 'default_attribute' is
+    "script" or "module".
+
+    Return a list of Target instances.
+    """
+    if not targets:
+        return targets
+    ret = []
+    for target_def in targets:
+        if isinstance(target_def, str):
+            # Create a default target object, with the string as the attribute
+            target = Target(**{default_attribute: target_def})
+        else:
+            d = getattr(target_def, "__dict__", target_def)
+            if not default_attribute in d:
+                raise DistutilsOptionError(
+                      "This target class requires an attribute '%s'" % default_attribute)
+            target = Target(**d)
+        target.validate()
+        ret.append(target)
+    return ret
+
 
 class Runtime(object):
     """This class represents the Python runtime: all needed modules
@@ -37,6 +107,9 @@ class Runtime(object):
 
     def __init__(self, options):
         self.options = options
+
+        self.targets = fixup_targets(self.options.script, "script")
+        del self.options.script
 
         if self.options.bundle_files < 3:
             self.bootstrap_modules.add("zipextimporter")
@@ -64,8 +137,8 @@ class Runtime(object):
             for modname in self.options.packages:
                 mf.import_package(modname)
 
-        for script in self.options.script:
-            mf.run_script(script)
+        for target in self.targets:
+            mf.run_script(target.script)
 
         missing, maybe = mf.missing_maybe()
         logger.info("Found %d modules, %d are missing, %d may be missing",
@@ -80,9 +153,9 @@ class Runtime(object):
         if not os.path.exists(destdir):
             os.mkdir(destdir)
 
-        for i, script in enumerate(options.script):
+        for i, target in enumerate(self.targets):
             # basename of the exe to create
-            dest_base = os.path.splitext(os.path.basename(script))[0]
+            dest_base = target.get_dest_base()
 
             # full path to exe-file
             exe_path = os.path.join(destdir, dest_base + ".exe")
@@ -90,7 +163,7 @@ class Runtime(object):
             if os.path.isfile(exe_path):
                 os.remove(exe_path)
 
-            self.build_exe(script, exe_path, options.libname)
+            self.build_exe(target, exe_path, options.libname)
 
             if options.libname is None:
                 # Put the library into the exe itself.
@@ -146,7 +219,7 @@ class Runtime(object):
             fnm = os.path.join(*ext_path)
         return '%s-py%s.%s-%s' % (fnm, sys.version_info[0], sys.version_info[1], get_platform())
 
-    def build_exe(self, script, exe_path, libname):
+    def build_exe(self, target, exe_path, libname):
         """Build the exe-file."""
         logger.info("Building exe '%s'", exe_path)
 
@@ -157,7 +230,7 @@ class Runtime(object):
         optimize = self.options.optimize
         unbuffered = False # XXX
 
-        script_data = self._create_script_data(script)
+        script_data = self._create_script_data(target.script)
 
         if libname is None:
             zippath = b""
@@ -178,16 +251,37 @@ class Runtime(object):
                       % ("PYTHONSCRIPT", 1, len(script_info), exe_path))
             resource.add(type="PYTHONSCRIPT", name=1, value=script_info)
 
-            # XXX testing
-            resource.add_string(1000, "foo bar")
-            resource.add_string(1001, "Hallöle €")
+##            # XXX testing
+##            resource.add_string(1000, "foo bar")
+##            resource.add_string(1001, "Hallöle €")
 
-            from ._wapi import RT_VERSION
-            from .versioninfo import vs
-            resource.add(type=RT_VERSION, name=1, value=vs)
+##            from ._wapi import RT_VERSION
+##            from .versioninfo import vs
+##            resource.add(type=RT_VERSION, name=1, value=vs)
 
-            resource.add_icon("128.ico", 1)
-            resource.add_icon("Alpha.ico", 2)
+            for res_id, ico_file in getattr(target, "icon_resources", ()):
+                resource.add_icon(res_id, ico_file)
+
+            # Build and add a versioninfo resource
+            def get(name):
+                return getattr(target, name, None)
+
+            if hasattr(target, "version"):
+                version = Version(target.version,
+                                  file_description = get("description"),
+                                  comments = get("comments"),
+                                  company_name = get("company_name"),
+                                  legal_copyright = get("copyright"),
+                                  legal_trademarks = get("trademarks"),
+                                  original_filename = os.path.basename(exe_path),
+                                  product_name = get("product_name"),
+                                  product_version = get("product_version") or target.version)
+                                  
+                from ._wapi import RT_VERSION
+                resource.add(type=RT_VERSION,
+                             name=1,
+                             value=version.resource_bytes())
+
 
     def build_library(self, libpath, libmode, first_time=True):
         """Build the archive containing the Python library.

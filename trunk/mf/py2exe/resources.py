@@ -84,7 +84,7 @@ class ResourceWriter(object):
 
         self._strings = {}
 
-    def add_icon(self, iconpath, resource_id):
+    def add_icon(self, resource_id, iconpath):
         # Each RT_ICON resource in an image file (containing the icon
         # for one specific resolution and number of colors) must have
         # a unique id, and the id must be in the GRPICONDIRHEADER's
