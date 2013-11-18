@@ -15,7 +15,7 @@ import sys
 import zipfile
 
 from .resources import UpdateResources
-from .versioninfo_py2 import Version
+from .versioninfo import Version
 
 logger = logging.getLogger("runtime")
 
