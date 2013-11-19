@@ -86,10 +86,25 @@ def main():
                         type=int,
                         default=3)
 
-    options = parser.parse_args()
+    parser.add_argument("-W", "--write-setup-script",
+                        help="""Instead of building the executables write a setup script
+                        that allows further customizations of the build process.""",
+                        metavar="setup_path",
+                        dest="setup_path")
 
-    ## from build import write_setup
-    ## write_setup(options)
+    options = parser.parse_args()
+    
+    if options.setup_path:
+        if os.path.isfile(options.setup_path):
+            message = "File %r already exists, are you sure you want to overwrite it? [yN]: "
+            answer = input(message % options.setup_path)
+            if answer not in "yY":
+                print("Canceled.")
+                return
+        from .setup_template import write_setup
+        write_setup(options)
+        # no further action
+        return
 
     level = logging.INFO if options.verbose else logging.WARNING
     logging.basicConfig(level=level)
