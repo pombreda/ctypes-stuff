@@ -227,6 +227,8 @@ class Version(object):
         strings.append(("ProductVersion", product_version or version))
         if special_build is not None:
             strings.append(("SpecialBuild", special_build))
+        from . import __version__
+        strings.append(("Creator", "py2exe %s" % __version__))
         self.strings = strings
         
     def resource_bytes(self):
