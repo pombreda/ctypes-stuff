@@ -143,10 +143,21 @@ class Runtime(object):
         missing, maybe = mf.missing_maybe()
         logger.info("Found %d modules, %d are missing, %d may be missing",
                     len(mf.modules), len(missing), len(maybe))
-        if missing:
+
+        if self.options.report:
+            self.mf.report()
+
+        elif self.options.summary:
+            self.mf.report_summary()
+            self.mf.report_missing()
+
+        elif missing:
             mf.report_missing()
 
+
     def build(self):
+        """Build everything.
+        """
         options = self.options
 
         destdir = options.destdir
@@ -168,15 +179,12 @@ class Runtime(object):
             if options.libname is None:
                 # Put the library into the exe itself.
 
-                # XXX PYDs are copied multiple times into the dist dir,
-                # if bundle_files > 1 XXX XXX XXX
-
-                # XXX It would probably make sense to run analyze()
+                # It would probably make sense to run analyze()
                 # separately for each exe so that they do not contain
                 # unneeded stuff (from other exes)
-                self.build_library(exe_path, "a", first_time = i == 0)
+                self.build_archive(exe_path)
 
-        if options.libname:
+        if options.libname is not None:
             # Build a library shared by ALL exes.
             libpath = os.path.join(destdir, options.libname)
             if os.path.isfile(libpath):
@@ -188,7 +196,9 @@ class Runtime(object):
             dll_bytes = pkgutil.get_data("py2exe", "dll.dll")
             with open(libpath, "wb") as ofi:
                   ofi.write(dll_bytes)
-            self.build_library(libpath, "a")
+            self.build_archive(libpath)
+
+        self.copy_files(destdir)
 
         # data files
         for name, (src, recursive) in self.mf._data_directories.items():
@@ -204,20 +214,12 @@ class Runtime(object):
     def get_runstub_bytes(self):
         from distutils.util import get_platform
         run_stub = 'run-py%s.%s-%s.exe' % (sys.version_info[0], sys.version_info[1], get_platform())
-        if 1 or self.options.verbose:
+        if self.options.verbose:
             print("Using exe-stub %r" % run_stub)
         exe_bytes = pkgutil.get_data("py2exe", run_stub)
         if exe_bytes is None:
             raise RuntimeError("run-stub not found")
         return exe_bytes
-
-    def get_exe_filename (self, inter_name):
-        ext_path = inter_name.split('.')
-        if self.debug:
-            fnm = os.path.join(*ext_path) + '_d'
-        else:
-            fnm = os.path.join(*ext_path)
-        return '%s-py%s.%s-%s' % (fnm, sys.version_info[0], sys.version_info[1], get_platform())
 
     def build_exe(self, target, exe_path, libname):
         """Build the exe-file."""
@@ -250,14 +252,9 @@ class Runtime(object):
                 print("Add RSC %s/%s(%d bytes) to %s"
                       % ("PYTHONSCRIPT", 1, len(script_info), exe_path))
             resource.add(type="PYTHONSCRIPT", name=1, value=script_info)
-
 ##            # XXX testing
 ##            resource.add_string(1000, "foo bar")
 ##            resource.add_string(1001, "Hallöle €")
-
-##            from ._wapi import RT_VERSION
-##            from .versioninfo import vs
-##            resource.add(type=RT_VERSION, name=1, value=vs)
 
             for res_id, ico_file in getattr(target, "icon_resources", ()):
                 resource.add_icon(res_id, ico_file)
@@ -282,32 +279,18 @@ class Runtime(object):
                              name=1,
                              value=version.resource_bytes())
 
-
-    def build_library(self, libpath, libmode, first_time=True):
+    def build_archive(self, libpath):
         """Build the archive containing the Python library.
-
-        For multiple exe files, this method is called multiple times.
-        first_time will be set to False on all except the first call.
         """
-        if self.options.report:
-            self.mf.report()
-        if self.options.summary:
-            self.mf.report_summary()
-            self.mf.report_missing()
-
-        if self.options.show_from:
-            for name in self.options.show_from:
-                deps = sorted(self.mf._depgraph[name])
-                print(" %-35s imported from %s" % (name, ", ".join(deps)))
-
-        logger.info("Building the code archive %r", libpath)
-
-        # Add pythonXY.dll as resource into the library file
-        # XXX Should update winver string resource in oython3X.dll
-        if self.options.bundle_files < 3:
+        if self.options.bundle_files <= 1:
+            # Add pythonXY.dll as resource into the library file
             with UpdateResources(libpath, delete_existing=False) as resource:
                 with open(pydll, "rb") as ifi:
                     pydll_bytes = ifi.read()
+                # We do not need to replace the winver string resource
+                # in the python dll since it will be loaded via
+                # MemoryLoadLibrary, and so python cannot find the
+                # string resources anyway.
                 if self.options.verbose:
                     print("Add RSC %s/%s(%d bytes) to %s"
                           % (os.path.basename(pydll), 1, len(pydll_bytes), libpath))
@@ -323,16 +306,14 @@ class Runtime(object):
         else:
             compression = zipfile.ZIP_STORED
 
-        arc = zipfile.ZipFile(libpath, libmode,
+        # Create a zipfile and append it to the library file
+        arc = zipfile.ZipFile(libpath, "a",
                               compression=compression)
 
-        ## with open(self.options.script, "r") as scriptfile:
-        ##     arc.writestr("__SCRIPT__.py", scriptfile.read())
         dlldir = os.path.dirname(libpath)
 
         for mod in self.mf.modules.values():
-            code = mod.__code__
-            if code:
+            if mod.__code__:
                 if hasattr(mod, "__path__"):
                     path = mod.__name__.replace(".", "\\") + "\\__init__" + bytecode_suffix
                 else:
@@ -341,29 +322,26 @@ class Runtime(object):
                 stream.write(imp.get_magic())
                 stream.write(b"\0\0\0\0") # null timestamp
                 stream.write(b"\0\0\0\0") # null size
-                marshal.dump(code, stream)
+                marshal.dump(mod.__code__, stream)
                 arc.writestr(path, stream.getvalue())
 
             elif hasattr(mod, "__file__"):
                 assert mod.__file__.endswith(EXTENSION_SUFFIXES[0])
-
-                # bundle_files == 3: put .pyds in the same directory as the zip.archive
-                # bundle_files <= 2: put .pyds into the zip-archive, extract to TEMP dir when needed
-
-                if self.options.bundle_files < 3:
+                if self.options.bundle_files <= 2:
+                    # put .pyds into the archive
                     arcfnm = mod.__name__.replace(".", "\\") + EXTENSION_SUFFIXES[0]
                     if self.options.verbose:
                         print("Add PYD %s to %s" % (os.path.basename(mod.__file__), libpath))
                     arc.write(mod.__file__, arcfnm)
                 else:
-                    # Copy the extension into dlldir. To be able to
-                    # load it without putting dlldir into sys.path, we
-                    # create a loader module and put that into the
-                    # archive.
+                    # The extension modules will be copied into
+                    # dlldir.  To be able to import it without dlldir
+                    # being on sys.path, create a loader module and
+                    # put that into the archive.
                     pydfile = mod.__name__ + EXTENSION_SUFFIXES[0]
-                    src = LOAD_FROM_DIR.format(pydfile)
+                    loader = LOAD_FROM_DIR.format(pydfile)
 
-                    code = compile(src, "<loader>", "exec")
+                    code = compile(loader, "<loader>", "exec")
                     if hasattr(mod, "__path__"):
                         path = mod.__name__.replace(".", "\\") + "\\__init__" + bytecode_suffix
                     else:
@@ -375,53 +353,41 @@ class Runtime(object):
                     marshal.dump(code, stream)
                     arc.writestr(path, stream.getvalue())
 
-                    if first_time:
-                        dst = os.path.join(dlldir, pydfile)
-                        if self.options.verbose:
-                            print("Copy PYD %s to %s" % (mod.__file__, dst))
-                        shutil.copy2(mod.__file__, dst)
-
-        pywin32_ext_modules = ("pywintypes%d%d.dll" % sys.version_info[:2],
-                               "pythoncom%d%d.dll" % sys.version_info[:2])
-
-        for src in self.mf.required_dlls():
-            if src.lower() == pydll:
-                # The PYTHON dll.
-                if self.options.bundle_files < 3:
-                    # Python dll is special, will be added as resource to the library archive...
-                    # print("Skipping %s" % pydll)
-                    pass
-                elif first_time:
-                    if self.options.verbose:
-                        print("Copy DLL %s to %s" % (src, dlldir))
-                    shutil.copy2(src, dlldir)
-                    dst = os.path.join(dlldir, os.path.basename(pydll))
-                    print("UPD", dst)
-                    with UpdateResources(dst, delete_existing=False) as resource:
-                        resource.add_string(1000, "py2exe")
-                    # XXX restore time stamp
-                    # XXX restore file checksum
-            elif self.options.bundle_files == 1 \
-                     or self.options.bundle_files == 2 and os.path.basename(src) in pywin32_ext_modules:
-                # bundle_files == 1: all DLLS are included in the library archive.
-                #
-                # bundle_files == 2: pywintypes3x.dll and
-                # pythoncom3x.dll are extension modules (although they
-                # have a .dll extension) and must be included in the
-                # library archive.
-                dst = os.path.basename(src)
-                if self.options.verbose:
-                    print("Add DLL %s to %s" % (src, libpath))
-                arc.write(src, dst)
-            else:
-                # bundle_files in (2, 3) will copy dlls to the
-                # dist-directory, but pyds are put into the library.
-                if first_time:
-                    dst = os.path.join(dlldir, os.path.basename(src))
-                    if self.options.verbose:
-                        print("Copy DLL %s to %s" % (src, dlldir))
-                    shutil.copy2(src, dlldir)
         arc.close()
+
+    def copy_files(self, dlldir):
+        """Copy files (pyds, dlls, depending on the bundle_files value,
+        into the library directory.
+        """
+        if self.options.bundle_files == 3:
+            # copy extension modules:
+            for mod in self.mf.modules.values():
+                if mod.__code__:
+                    # nothing to do for python modules.
+                    continue
+                if hasattr(mod, "__file__"):
+                    assert mod.__file__.endswith(EXTENSION_SUFFIXES[0])
+                    pydfile = mod.__name__ + EXTENSION_SUFFIXES[0]
+
+                    dst = os.path.join(dlldir, pydfile)
+                    if self.options.verbose:
+                        print("Copy PYD %s to %s" % (mod.__file__, dst))
+                    shutil.copy2(mod.__file__, dst)
+
+        ## pywin32_ext_modules = ("pywintypes%d%d.dll" % sys.version_info[:2],
+        ##                        "pythoncom%d%d.dll" % sys.version_info[:2])
+
+        if self.options.bundle_files < 1:
+            return
+        # need to copy the dlls
+        for src in self.mf.required_dlls():
+            if self.options.bundle_files < 2 \
+                   and os.path.basename(src).lower() == os.path.basename(pydll).lower():
+                continue
+            dst = os.path.join(dlldir, os.path.basename(src))
+            if self.options.verbose:
+                print("Copy DLL %s to %s" % (src, dlldir))
+            shutil.copy2(src, dlldir)
 
     def _create_script_data(self, script):
         # We create a list of code objects, and return it as a
@@ -446,10 +412,13 @@ class Runtime(object):
         code_objects = []
 
         # sys.executable has already been set in the run-stub
+
+        # XXX should this be done in the exe-stub?
         code_objects.append(
             compile("import os, sys; sys.base_prefix = sys.prefix = os.path.dirname(sys.executable); del os, sys",
                     "<bootstrap2>", "exec"))
         if self.options.bundle_files < 3:
+            # XXX do we need this one?
             obj = compile("import sys, os; sys.path.append(os.path.dirname(sys.path[0])); del sys, os",
                           "<bootstrap>", "exec")
             code_objects.append(obj)
