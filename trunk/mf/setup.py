@@ -1,5 +1,8 @@
 #!/usr/bin/python3.3
 # -*- coding: utf-8 -*-
+"""Hello, World.
+"""
+
 import os
 import sys
 
@@ -64,8 +67,9 @@ run = Interpreter("py2exe.run",
 interpreters = [run] #, run_dll]
 
 if __name__ == "__main__":
+    import py2exe
     setup(name="py2exe",
-          version="0.9.0",
+          version=py2exe.__version__,
           description="Build standalone executables for Windows (python 3 version)",
           long_description=__doc__,
           author="Thomas Heller",
@@ -79,10 +83,11 @@ if __name__ == "__main__":
     ##      classifiers=["Development Status :: 5 - Production/Stable"],
           distclass = Dist,
           cmdclass = {'build_interpreters': BuildInterpreters},
-##          scripts = ["build_setup.py"],
+          scripts = ["build_exe.py"],
           interpreters = interpreters,
           py_modules=['zipextimporter'],
           packages=['py2exe'],
+          zip_safe=True, # pip does unpack anyway, only .egg uses this.
           )
 
 # Local Variables:
