@@ -22,6 +22,7 @@ def UpdateResources(filename, *, delete_existing=False):
     yield resource_writer
     resource_writer.flush()
     _wapi.EndUpdateResourceW(hrscr, False)
+    # XXX We should update the file checksum here...
 
 
 class ResourceWriter(object):
@@ -29,7 +30,7 @@ class ResourceWriter(object):
         self._hrscr = hrscr
         self._filename = filename
         self._strings = {}
-        
+
     def add(self, *, type, name, value):
         """Write a resource to the exefile.
         <type> is typically a RT_xxx value.
@@ -95,8 +96,15 @@ class ResourceWriter(object):
         # GRPICONDIRHEADER's nID member.
         with open(iconpath, "rb") as ifi:
             hdr = icons.ICONDIRHEADER.readfrom(ifi)
+
+        # CreateGrpIconDirHeader creates RT_ICON resources for each
+        # image in the icon file; for this it needs separate resource
+        # ids.  We start with resource_id*100 and increment it for
+        # each image.  All these ids must be unique for the exe-file.
         grp_header = icons.CreateGrpIconDirHeader(hdr, resource_id*100)
 
+        # Maybe we should manage the resource ids for the RT_ICON
+        # resources here, in this class?
         for i, entry in enumerate(grp_header.idEntries):
             self.add(type=_wapi.RT_ICON, name=entry.nID, value=hdr.iconimages[i])
 

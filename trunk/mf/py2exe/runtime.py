@@ -303,6 +303,7 @@ class Runtime(object):
         logger.info("Building the code archive %r", libpath)
 
         # Add pythonXY.dll as resource into the library file
+        # XXX Should update winver string resource in oython3X.dll
         if self.options.bundle_files < 3:
             with UpdateResources(libpath, delete_existing=False) as resource:
                 with open(pydll, "rb") as ifi:
@@ -394,6 +395,12 @@ class Runtime(object):
                     if self.options.verbose:
                         print("Copy DLL %s to %s" % (src, dlldir))
                     shutil.copy2(src, dlldir)
+                    dst = os.path.join(dlldir, os.path.basename(pydll))
+                    print("UPD", dst)
+                    with UpdateResources(dst, delete_existing=False) as resource:
+                        resource.add_string(1000, "py2exe")
+                    # XXX restore time stamp
+                    # XXX restore file checksum
             elif self.options.bundle_files == 1 \
                      or self.options.bundle_files == 2 and os.path.basename(src) in pywin32_ext_modules:
                 # bundle_files == 1: all DLLS are included in the library archive.
@@ -414,7 +421,6 @@ class Runtime(object):
                     if self.options.verbose:
                         print("Copy DLL %s to %s" % (src, dlldir))
                     shutil.copy2(src, dlldir)
-
         arc.close()
 
     def _create_script_data(self, script):
