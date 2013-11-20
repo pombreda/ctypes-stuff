@@ -79,10 +79,11 @@ def main():
                         help="""How to bundle the files. 3 - create an .exe, a zip-archive, and .pyd
                         files in the file system.  2 - create .exe and
                         a zip-archive that contains the pyd files.
+                        XXX more
                         pyd files are extracted on demand to a
                         temporary directory, this directory is removed
                         after the program has finished.""",
-                        choices=[1, 2, 3],
+                        choices=[0, 1, 2, 3],
                         type=int,
                         default=3)
 
