@@ -50,6 +50,7 @@ def hook_tkinter(finder, module):
     # and only copy it when tkinter.tix is imported...
     tcl_dir = os.path.join(sys.prefix, "tcl")
     finder.add_datadirectory("tcl", tcl_dir, recursive=True)
+##XXX    finder.minimum_bundle("tkinter", 2)
 
 def hook_six(finder, module):
     """six.py is a python2/python3 compaibility library.  Exclude the
