@@ -353,12 +353,27 @@ class Runtime(object):
                     marshal.dump(code, stream)
                     arc.writestr(path, stream.getvalue())
 
+        if self.options.bundle_files < 1:
+            for src in self.mf.required_dlls():
+                if self.options.verbose:
+                    print("Add DLL %s to %s" % (os.path.basename(src), libpath))
+                arc.write(src, os.path.basename(src))
+
         arc.close()
 
     def copy_files(self, dlldir):
         """Copy files (pyds, dlls, depending on the bundle_files value,
         into the library directory.
         """
+        if self.options.bundle_files >= 2:
+            # Python dll is nt bundled; copy it.
+            dst = os.path.join(dlldir, os.path.basename(pydll))
+            if self.options.verbose:
+                print("Copy DLL %s to %s" % (pydll, dlldir))
+            shutil.copy2(pydll, dst)
+            with UpdateResources(dst, delete_existing=False) as resource:
+                resource.add_string(1000, "py2exe")
+
         if self.options.bundle_files == 3:
             # copy extension modules:
             for mod in self.mf.modules.values():
@@ -374,16 +389,10 @@ class Runtime(object):
                         print("Copy PYD %s to %s" % (mod.__file__, dst))
                     shutil.copy2(mod.__file__, dst)
 
-        ## pywin32_ext_modules = ("pywintypes%d%d.dll" % sys.version_info[:2],
-        ##                        "pythoncom%d%d.dll" % sys.version_info[:2])
-
         if self.options.bundle_files < 1:
             return
-        # need to copy the dlls
+
         for src in self.mf.required_dlls():
-            if self.options.bundle_files < 2 \
-                   and os.path.basename(src).lower() == os.path.basename(pydll).lower():
-                continue
             dst = os.path.join(dlldir, os.path.basename(src))
             if self.options.verbose:
                 print("Copy DLL %s to %s" % (src, dlldir))
