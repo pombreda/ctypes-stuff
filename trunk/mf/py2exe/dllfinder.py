@@ -142,9 +142,11 @@ class DllFinder:
 
     def required_dlls(self):
         """Return a set containing the pathnames of required dlls.
-        System dlls are not included in the result.
+        System dlls are not included in the result; neither is the
+        python dll.
         """
-        return self._dlls
+        return {dll for dll in self._dlls
+                if dll.lower() != pydll.lower()}
 
     def system_dlls(self):
         """Return a set containing the pathnames of system dlls.
