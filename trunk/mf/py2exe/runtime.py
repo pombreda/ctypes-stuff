@@ -353,11 +353,20 @@ class Runtime(object):
                     marshal.dump(code, stream)
                     arc.writestr(path, stream.getvalue())
 
-        if self.options.bundle_files < 1:
-            for src in self.mf.required_dlls():
-                if self.options.verbose:
-                    print("Add DLL %s to %s" % (os.path.basename(src), libpath))
-                arc.write(src, os.path.basename(src))
+        if self.options.bundle_files == 0:
+            # put everything into the arc
+            files = self.mf.all_dlls()
+        elif self.options.bundle_files in (1, 2):
+            # put only extension dlls into the arc
+            files = self.mf.extension_dlls()
+        else:
+            arc.close()
+            return
+
+        for src in files:
+            if self.options.verbose:
+                print("Add DLL %s to %s" % (os.path.basename(src), libpath))
+            arc.write(src, os.path.basename(src))
 
         arc.close()
 
@@ -392,7 +401,7 @@ class Runtime(object):
         if self.options.bundle_files < 1:
             return
 
-        for src in self.mf.required_dlls():
+        for src in self.mf.real_dlls():
             dst = os.path.join(dlldir, os.path.basename(src))
             if self.options.verbose:
                 print("Copy DLL %s to %s" % (src, dlldir))
@@ -428,9 +437,9 @@ class Runtime(object):
                     "<bootstrap2>", "exec"))
         if self.options.bundle_files < 3:
             # XXX do we need this one?
-            obj = compile("import sys, os; sys.path.append(os.path.dirname(sys.path[0])); del sys, os",
-                          "<bootstrap>", "exec")
-            code_objects.append(obj)
+            ## obj = compile("import sys, os; sys.path.append(os.path.dirname(sys.path[0])); del sys, os",
+            ##               "<bootstrap>", "exec")
+            ## code_objects.append(obj)
             obj = compile("import zipextimporter; zipextimporter.install(); del zipextimporter",
                           "<install zipextimporter>", "exec")
             code_objects.append(obj)

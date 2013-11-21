@@ -70,13 +70,20 @@ class DllFinder:
             for dep_dll in self.bind_image(dll):
                 if dep_dll in self._loaded_dlls:
                     continue
-                if not self.is_system_dll(dep_dll):
-                    todo.add(dep_dll)
-                    self._dlls[dep_dll].add(dll)
+                dll_type = self.determine_dll_type(dep_dll)
+                if dll_type is None:
+                    continue
+                ## if dll_type == "EXT":
+                ##     print("EXT", dep_dll)
+                ## elif dll_type == "DLL":
+                ##     print("DLL", dep_dll)
+                todo.add(dep_dll)
+                self._dlls[dep_dll].add(dll)
 
     def bind_image(self, imagename):
         """Call BindImageEx and collect all dlls that are bound.
         """
+        # XXX Should cache results!
         path = ";".join([os.path.dirname(imagename),
                          os.path.dirname(sys.executable),
                          os.environ["PATH"]])
@@ -111,22 +118,26 @@ class DllFinder:
 
         return result
 
-    def is_system_dll(self, imagename):
-        """is_system_dll must be called with a full pathname.
+    def determine_dll_type(self, imagename):
+        """determine_dll_type must be called with a full pathname.
 
-        For any dll in the Windows or System directory or any subdirectory
-        of those, except when the dll binds to or IS the current python
-        dll.
+        For any dll in the Windows or System directory or any
+        subdirectory thereof return None, except when the dll binds to
+        or IS the current python dll.
 
-        For any other dll it returns False.
+        Return "DLL" when the image binds to the python dll, return
+        None when the image is in the windows or system directory,
+        return "EXT" otherwise.
         """
         fnm = imagename.lower()
-        if fnm == pydll:
-            return False
+        if fnm == pydll.lower():
+            return "DLL"
         deps = self.bind_image(imagename)
-        if pydll in [x.lower() for x in deps]:
-            return False
-        return fnm.startswith(windir + os.sep) or fnm.startswith(sysdir + os.sep)
+        if pydll in [d.lower() for d in deps]:
+            return "EXT"
+        if fnm.startswith(windir + os.sep) or fnm.startswith(sysdir + os.sep):
+            return None
+        return "DLL"
 
     def search_path(self, imagename, path):
         """Find an image (exe or dll) on the PATH."""
@@ -140,19 +151,27 @@ class DllFinder:
                 return found
         return SearchPath(imagename, path)
 
-    def required_dlls(self):
-        """Return a set containing the pathnames of required dlls.
-        System dlls are not included in the result; neither is the
-        python dll.
+    def all_dlls(self):
+        """Return a set containing all dlls that are needed,
+        except the python dll.
         """
         return {dll for dll in self._dlls
                 if dll.lower() != pydll.lower()}
 
-    def system_dlls(self):
-        """Return a set containing the pathnames of system dlls.
-        The required_dlls are NOT included in the result.
+    def extension_dlls(self):
+        """Return a set containing only the extension dlls that are
+        needed.
         """
-        return set(self._loaded_dlls.values()) - set(self._dlls)
+        return {dll for dll in self._dlls
+                if "EXT" == self.determine_dll_type(dll)}
+
+    def real_dlls(self):
+        """Return a set containing only the dlls that do not bind to
+        the python dll.
+        """
+        return {dll for dll in self._dlls
+                if "DLL" == self.determine_dll_type(dll)
+                and dll.lower() != pydll.lower()}
 
 ################################################################
 
@@ -210,8 +229,16 @@ class Scanner(ModuleFinder):
     def _add_pyd(self, name, callers):
         self.dllfinder.import_extension(name, callers)
 
-    def required_dlls(self):
-        return self.dllfinder.required_dlls()
+##    def required_dlls(self):
+##        return self.dllfinder.required_dlls()
+    def all_dlls(self):
+        return self.dllfinder.all_dlls()
+
+    def real_dlls(self):
+        return self.dllfinder.real_dlls()
+
+    def extension_dlls(self):
+        return self.dllfinder.extension_dlls()
 
     def add_datadirectory(self, name, path, recursive):
         self._data_directories[name] = (path, recursive)

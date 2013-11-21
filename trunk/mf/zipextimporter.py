@@ -67,16 +67,10 @@ class ZipExtensionImporter(zipimport.zipimporter):
         result = zipimport.zipimporter.find_module(self, fullname, path)
         if result:
             return result
-        if fullname in ("pywintypes", "pythoncom"):
-            fullname = fullname + "%d%d" % sys.version_info[:2]
-            fullname = fullname.replace(".", "\\") + ".dll"
-            if fullname in self._files:
+        fullname = fullname.replace(".", "\\")
+        for s in self._suffixes:
+            if (fullname + s) in self._files:
                 return self
-        else:
-            fullname = fullname.replace(".", "\\")
-            for s in self._suffixes:
-                if (fullname + s) in self._files:
-                    return self
         return None
 
     def load_module(self, fullname):
