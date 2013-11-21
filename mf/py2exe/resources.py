@@ -31,7 +31,7 @@ class ResourceWriter(object):
         self._filename = filename
         self._strings = {}
 
-    def add(self, *, type, name, value):
+    def add(self, *, type, name, value, langid=0):
         """Write a resource to the exefile.
         <type> is typically a RT_xxx value.
         <name> can be a string or an integer.
@@ -43,7 +43,7 @@ class ResourceWriter(object):
             _wapi.UpdateResourceW(self._hrscr,
                                   _wapi.LPCWSTR(type),
                                   _wapi.LPCWSTR(name),
-                                  0, # wLanguage
+                                  langid, # wLanguage
                                   value,
                                   len(value))
         except WindowsError as details:
@@ -56,6 +56,7 @@ class ResourceWriter(object):
         Note: flush is called automatically in the UpdateResource
         context manager.
         """
+        # Should we be able to specify a langid here? (see below)
         self._strings[key] = value
 
     def flush(self):
@@ -81,7 +82,8 @@ class ResourceWriter(object):
                                 ("text", ctypes.c_wchar * len(text))]
                 entry = Entry(len(text), text)
                 data += memoryview(entry).tobytes()
-            self.add(type=_wapi.RT_STRING, name=key, value=data)
+            self.add(type=_wapi.RT_STRING, name=key, value=data,
+                     langid=0x04b00409) # US english
 
         self._strings = {}
 
