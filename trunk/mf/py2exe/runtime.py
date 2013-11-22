@@ -140,6 +140,8 @@ class Runtime(object):
         for target in self.targets:
             mf.run_script(target.script)
 
+        mf.finish()
+
         missing, maybe = mf.missing_maybe()
         logger.info("Found %d modules, %d are missing, %d may be missing",
                     len(mf.modules), len(missing), len(maybe))
@@ -154,6 +156,11 @@ class Runtime(object):
         elif missing:
             mf.report_missing()
 
+        for name, value in self.mf.get_min_bundle().items():
+            if value > self.options.bundle_files:
+                # warn if modules are know to work only for a minimum
+                # bundle_files value
+                print("OOPS:", name, value)
 
     def build(self):
         """Build everything.

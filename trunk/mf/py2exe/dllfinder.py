@@ -208,6 +208,15 @@ class Scanner(ModuleFinder):
         super().__init__(path, verbose, excludes, optimize)
         self.dllfinder = DllFinder()
         self._data_directories = {}
+        self._min_bundle = {}
+        self._import_package_later = []
+        self._safe_import_hook_later = []
+
+    def set_min_bundle(self, name, value):
+        self._min_bundle[name] = value
+
+    def get_min_bundle(self):
+        return self._min_bundle
 
     def hook(self, mod):
         hookname = "hook_%s" % mod.__name__.replace(".", "_")
@@ -250,6 +259,33 @@ class Scanner(ModuleFinder):
     ##     import pprint
     ##     pprint.pprint(set(self.dllfinder.required_dlls()))
     ##     pprint.pprint(set(self.dllfinder.system_dlls()))
+
+    def import_package_later(self, package):
+        # This method can be called from hooks to add additional
+        # packages.  It is called BEFORE a module is imported
+        # completely!
+        self._import_package_later.append(package)
+
+    def safe_import_hook_later(self, name,
+                               caller=None,
+                               fromlist=(),
+                               level=0):
+        # This method can be called from hooks to add additional
+        # packages.  It is called BEFORE a module is imported
+        # completely!
+        self._safe_import_hook_later.append((name, caller, fromlist, level))
+
+    def finish(self):
+        while self._import_package_later:
+            pkg = self._import_package_later.pop()
+            self.import_package(pkg)
+        while self._safe_import_hook_later:
+            args = self._safe_import_hook_later.pop()
+            name, caller, freomlist, level = args
+            self.safe_import_hook(name,
+                                  caller=caller,
+                                  fromlist=fromlist,
+                                  level=level)
 
 ################################################################
     
