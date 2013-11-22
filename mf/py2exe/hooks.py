@@ -9,6 +9,14 @@
 #
 import os, sys
 
+def hook_PIL(finder, module):
+    # c:\Python33-64\lib\site-packages\PIL
+    """Pillow loads plugins"""
+    # Exclude python 2 imports
+    finder.excludes.append("__builtin__")
+    finder.excludes.append("Tkinter")
+    finder.import_package_later("PIL")
+
 def hook_pyreadline(finder, module):
     """
     """
@@ -56,7 +64,7 @@ def hook_tkinter(finder, module):
     # and only copy it when tkinter.tix is imported...
     tcl_dir = os.path.join(sys.prefix, "tcl")
     finder.add_datadirectory("tcl", tcl_dir, recursive=True)
-##XXX    finder.minimum_bundle("tkinter", 2)
+    finder.set_min_bundle("tkinter", 2)
 
 def hook_six(finder, module):
     """six.py is a python2/python3 compaibility library.  Exclude the
