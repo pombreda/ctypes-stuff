@@ -8,7 +8,7 @@ from importlib.machinery import EXTENSION_SUFFIXES
 import os
 import sys
 
-from . mf4 import ModuleFinder
+from . mf3 import ModuleFinder
 from . import hooks
 
 ################################

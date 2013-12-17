@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 ##import modulefinder
-import mf4 as modulefinder
+import mf3 as modulefinder
 
 TEST_DIR = tempfile.mkdtemp()
 TEST_PATH = [TEST_DIR]#, os.path.dirname(tempfile.__file__)]
