@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, with_statement, absolute_import, print_function
 
-from mf4 import ModuleFinder
+from mf3 import ModuleFinder
 
 import errno
 import os
