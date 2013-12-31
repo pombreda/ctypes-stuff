@@ -218,9 +218,12 @@ class Runtime(object):
             else:
                 raise RuntimeError("not yet supported")
 
-    def get_runstub_bytes(self):
+    def get_runstub_bytes(self, target):
         from distutils.util import get_platform
-        run_stub = 'run-py%s.%s-%s.exe' % (sys.version_info[0], sys.version_info[1], get_platform())
+        if target.exe_type == "console_exe":
+            run_stub = 'run-py%s.%s-%s.exe' % (sys.version_info[0], sys.version_info[1], get_platform())
+        else:
+            run_stub = 'run_w-py%s.%s-%s.exe' % (sys.version_info[0], sys.version_info[1], get_platform())
         if self.options.verbose:
             print("Using exe-stub %r" % run_stub)
         exe_bytes = pkgutil.get_data("py2exe", run_stub)
@@ -232,7 +235,7 @@ class Runtime(object):
         """Build the exe-file."""
         logger.info("Building exe '%s'", exe_path)
 
-        exe_bytes = self.get_runstub_bytes()
+        exe_bytes = self.get_runstub_bytes(target)
         with open(exe_path, "wb") as ofi:
             ofi.write(exe_bytes)
 
@@ -450,6 +453,11 @@ class Runtime(object):
             obj = compile("import zipextimporter; zipextimporter.install(); del zipextimporter",
                           "<install zipextimporter>", "exec")
             code_objects.append(obj)
+
+        boot = os.path.join(os.path.dirname(__file__), "boot_common.py")
+        boot_code = compile(open(boot, "U").read(),
+                            os.path.abspath(boot), "exec")
+        code_objects.append(boot_code)
 
         with open(script, "U") as script_file:
             code_objects.append(
