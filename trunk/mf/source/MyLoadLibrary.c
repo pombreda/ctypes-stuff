@@ -170,8 +170,8 @@ static HCUSTOMMODULE _LoadLibrary(LPCSTR filename, void *userdata)
 			if (result) {
 				lib = _AddMemoryModule(filename, result);
 				POP();
-				dprintf("_LoadLibrary(%s, %p) -> %s[%d]\n\n",
-					filename, userdata, lib->name, lib->refcount);
+				dprintf("_LoadLibrary(%s, %p) -> %p %s[%d]\n\n",
+					filename, userdata, lib->module, lib->name, lib->refcount);
 				return lib->module;
 			} else {
 				dprintf("_LoadLibrary(%s, %p) failed with error %d\n",
@@ -181,6 +181,7 @@ static HCUSTOMMODULE _LoadLibrary(LPCSTR filename, void *userdata)
 			PyErr_Clear();
 		}
 	}
+	SetLastError(0);
 	result = (HCUSTOMMODULE)LoadLibraryA(filename);
 	POP();
 	dprintf("LoadLibraryA(%s) -> %p\n\n", filename, result);
@@ -196,6 +197,7 @@ HMODULE MyGetModuleHandle(LPCSTR name)
 	lib = _FindMemoryModule(name, NULL);
 	if (lib)
 		return lib->module;
+	SetLastError(0);
 	return GetModuleHandle(name);
 }
 
@@ -226,8 +228,10 @@ BOOL MyFreeLibrary(HMODULE module)
 		if (--lib->refcount == 0)
 			MemoryFreeLibrary(module);
 		return TRUE;
-	} else
+	} else {
+		SetLastError(0);
 		return FreeLibrary(module);
+	}
 }
 
 FARPROC MyGetProcAddress(HMODULE module, LPCSTR procname)
@@ -236,7 +240,9 @@ FARPROC MyGetProcAddress(HMODULE module, LPCSTR procname)
 	LIST *lib = _FindMemoryModule(NULL, module);
 	if (lib)
 		proc = MemoryGetProcAddress(lib->module, procname);
-	else
+	else {
+		SetLastError(0);
 		proc = GetProcAddress(module, procname);
+	}
 	return proc;
 }
