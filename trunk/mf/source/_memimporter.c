@@ -127,6 +127,7 @@ import_module(PyObject *self, PyObject *args)
 
 	if (!hmem) {
 	        char *msg;
+		PyObject *error;
 		FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
 			       NULL,
 			       GetLastError(),
@@ -135,15 +136,16 @@ import_module(PyObject *self, PyObject *args)
 			       0,
 			       NULL);
 		msg[strlen(msg)-2] = '\0';
-		PyErr_Format(PyExc_ImportError,
-			     "MemoryLoadLibrary failed loading %s: %s (%d)",
-			     pathname, msg, GetLastError());
+		error = PyUnicode_FromFormat("MemoryLoadLibrary failed loading %s: %s (%d)",
+					     pathname, msg, GetLastError());
+		if (error) {
+			PyErr_SetObject(PyExc_ImportError, error);
+			Py_DECREF(error);
+		} else {
+			PyErr_Clear();
+			PyErr_SetString(PyExc_ImportError, "foobar");
+		}
 		LocalFree(msg);
-		/* PyErr_Format(PyExc_ImportError, */
-		/* 	     "MemoryLoadLibrary failed loading %s (Error %d loading %s)", */
-		/* 	     pathname, GetLastError(), LastErrorString); */
-		/* PyErr_Format(PyExc_ImportError, */
-		/* 	     "MemoryLoadLibrary failed loading %s", pathname); */
 		return NULL;
 	}
 
