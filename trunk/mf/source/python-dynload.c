@@ -24,8 +24,6 @@
 
 static HMODULE hmod_pydll;
 
-#define NYI(x) MessageBox(NULL, x, "not yet implemented", MB_OK)
-
 /*
   The python dll may be loaded from memory or in the usual way.
   MyGetProcAddress handles both cases.
@@ -63,6 +61,12 @@ PyObject *PyErr_SetImportError(PyObject *msg, PyObject *name, PyObject *path)
 {
   FUNC(PyObject *, PyErr_SetImportError, (PyObject *, PyObject *, PyObject *));
   return proc(msg, name, path);
+}
+
+void PyErr_SetString(PyObject *type, const char *message)
+{
+  FUNC(void, PyErr_SetString, (PyObject *, const char *));
+  proc(type, message);
 }
 
 int Py_FdIsInteractive(FILE *fp, const char *filename)
@@ -207,7 +211,11 @@ PyObject *PyUnicode_FromFormat(const char *format, ...)
   return result;
 }
 
-
+PyObject *PyUnicode_FromWideChar(const wchar_t *w, Py_ssize_t size)
+{
+  FUNC(PyObject *, PyUnicode_FromWideChar, (const wchar_t *, Py_ssize_t));
+  return proc(w, size);
+}
 
 PyObject *PyObject_CallObject(PyObject *callable, PyObject *args)
 {
@@ -283,14 +291,25 @@ void PyErr_SetObject(PyObject *type, PyObject *value)
   proc(type, value);
 }
 
-////////////////////////////////////////////////////////////////
-
-PyObject *PyErr_Format(PyObject *exception, const char *format, ...)
+PyObject *PyBool_FromLong(long v)
 {
-  NYI("PyErrFormat");
-  DebugBreak();
-  return NULL;
+  FUNC(PyObject *, PyBool_FromLong, (long));
+  return proc(v);
 }
+
+int PyObject_SetAttrString(PyObject *o, const char *attr_name, PyObject *v)
+{
+  FUNC(int, PyObject_SetAttrString, (PyObject *, const char *, PyObject *));
+  return proc(o, attr_name, v);
+}
+
+PyObject *PyCFunction_NewEx(PyMethodDef *methdef, PyObject *self, PyObject *foo)
+{
+  FUNC(PyObject *, PyCFunction_NewEx, (PyMethodDef *, PyObject *, PyObject *));
+  return proc(methdef, self, foo);
+}
+
+////////////////////////////////////////////////////////////////
 
 int PythonLoaded(HMODULE hmod)
 {
