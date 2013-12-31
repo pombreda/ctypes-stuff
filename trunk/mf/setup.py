@@ -27,11 +27,11 @@ def _is_debug_build():
 
 if _is_debug_build():
     macros = [("PYTHONDLL", '\\"python%d%d_d.dll\\"' % sys.version_info[:2]),
-              ("PYTHONCOM", '\\"pythoncom%d%d_d.dll\\"' % sys.version_info[:2]),
+##              ("PYTHONCOM", '\\"pythoncom%d%d_d.dll\\"' % sys.version_info[:2]),
               ("_CRT_SECURE_NO_WARNINGS", '1')]
 else:
     macros = [("PYTHONDLL", '\\"python%d%d.dll\\"' % sys.version_info[:2]),
-              ("PYTHONCOM", '\\"pythoncom%d%d.dll\\"' % sys.version_info[:2]),
+##              ("PYTHONCOM", '\\"pythoncom%d%d.dll\\"' % sys.version_info[:2]),
               ("_CRT_SECURE_NO_WARNINGS", '1')]
 
 macros.append(("Py_BUILD_CORE", '1'))
@@ -47,8 +47,8 @@ if 0:
     macros.append(("VERBOSE", "1"))
 
 run = Interpreter("py2exe.run",
-                  ["source/start.c",
-                   ## "source/run.c",
+                  ["source/run.c",
+                   "source/start.c",
                    "source/icon.rc",
 
                    "source/MemoryModule.c",
@@ -58,13 +58,31 @@ run = Interpreter("py2exe.run",
 
                    "source/python-dynload.c",
                    ],
-                  libraries=["user32"],
+                  libraries=["user32", "shell32"],
                   define_macros=macros,
                   extra_compile_args=extra_compile_args,
                   extra_link_args=extra_link_args,
                   )
 
-interpreters = [run] #, run_dll]
+run_w = Interpreter("py2exe.run_w",
+                    ["source/run_w.c",
+                     "source/start.c",
+                     "source/icon.rc",
+
+                     "source/MemoryModule.c",
+                     "source/MyLoadLibrary.c",
+                     "source/_memimporter.c",
+                     "source/actctx.c",
+
+                     "source/python-dynload.c",
+                     ],
+                    libraries=["user32", "shell32"],
+                    define_macros=macros,
+                    extra_compile_args=extra_compile_args,
+                    extra_link_args=extra_link_args,
+                    )
+
+interpreters = [run, run_w]
 
 if __name__ == "__main__":
     import py2exe
@@ -83,7 +101,10 @@ if __name__ == "__main__":
     ##      classifiers=["Development Status :: 5 - Production/Stable"],
           distclass = Dist,
           cmdclass = {'build_interpreters': BuildInterpreters},
-          scripts = ["build_exe.py"],
+##          scripts = ["build_exe.py"],
+          entry_points = {
+              'console_scripts': ['build_exe = py2exe.build_exe:main'],
+              },
           interpreters = interpreters,
           py_modules=['zipextimporter'],
           packages=['py2exe'],
@@ -93,3 +114,6 @@ if __name__ == "__main__":
 # Local Variables:
 # compile-command: "py -3.3 setup.py bdist_egg"
 # End:
+
+# c:\python33-64\lib\site-packages
+# c:\python33-64\scripts

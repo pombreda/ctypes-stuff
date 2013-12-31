@@ -204,6 +204,10 @@ class py2exe(Command):
 
         dist.console = runtime.fixup_targets(dist.console, "script")
 
+        for target in dist.console:
+            target.exe_type = "console_exe"
+        for target in dist.windows:
+            target.exe_type = "windows_exe"
 
         from argparse import Namespace
         options = Namespace(xref = self.xref,

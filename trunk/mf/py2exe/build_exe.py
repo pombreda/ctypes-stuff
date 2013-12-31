@@ -94,6 +94,13 @@ def main():
                         dest="setup_path")
 
     options = parser.parse_args()
+
+    options.script = runtime.fixup_targets(options.script, "script")
+    for script in options.script:
+        if script.script.endswith(".pyw"):
+            script.exe_type = "windows_exe"
+        else:
+            script.exe_type = "console_exe"
     
     if options.setup_path:
         if os.path.isfile(options.setup_path):

@@ -22,6 +22,7 @@
  */
 
 #include <windows.h>
+#include <shlobj.h>
 #include <Python.h>
 #include <marshal.h>
 
@@ -50,30 +51,6 @@ wchar_t dirname[_MAX_PATH]; // directory part of GetModuleName()
 wchar_t libdirname[_MAX_PATH]; // library directory - probably same as above.
 wchar_t libfilename[_MAX_PATH + _MAX_FNAME + _MAX_EXT]; // library filename
 struct scriptinfo *p_script_info;
-
-void SystemError(int error, char *msg)
-{
-	char Buffer[1024];
-
-	if (msg)
-		fprintf(stderr, msg);
-	if (error) {
-		LPVOID lpMsgBuf;
-		FormatMessage( 
-			FORMAT_MESSAGE_ALLOCATE_BUFFER | 
-			FORMAT_MESSAGE_FROM_SYSTEM,
-			NULL,
-			error,
-			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-			(LPSTR)&lpMsgBuf,
-			0,
-			NULL 
-			);
-		strncpy(Buffer, lpMsgBuf, sizeof(Buffer));
-		LocalFree(lpMsgBuf);
-		fprintf(stderr, Buffer);
-	}
-}
 
 /*
 static int dprintf(char *fmt, ...)
@@ -280,11 +257,9 @@ HMODULE load_pythondll(void)
 	return hmod_pydll;
 }
 
-/*
-  The main function for our exe.
-*/
-int wmain (int argc, wchar_t **argv)
+int init(char *frozen)
 {
+
 	int rc = 0;
 	HMODULE hmod_pydll;
 
@@ -327,9 +302,70 @@ int wmain (int argc, wchar_t **argv)
 	Py_SetPath(libfilename);
 	Py_Initialize();
 
-	// We don't care for the additional refcount here...
-	PySys_SetObject("frozen", PyUnicode_FromString("exe"));
+
+	/* Set sys.frozen so apps that care can tell.  If the caller did pass
+	   NULL, sys.frozen will be set to 'True'.  If a string is passed this
+	   is used as the frozen attribute.  run.c passes "console_exe",
+	   run_w.c passes "windows_exe", run_dll.c passes "dll" This falls
+	   apart when you consider that in some cases, a single process may
+	   end up with two py2exe generated apps - but still, we reset frozen
+	   to the correct 'current' value for the newly initializing app.
+	*/
+	if (frozen == NULL)
+		PySys_SetObject("frozen", PyBool_FromLong(1));
+	else {
+		PyObject *o = PyUnicode_FromString(frozen);
+		if (o) {
+			PySys_SetObject("frozen", o);
+			Py_DECREF(o);
+		}
+	}
+	return rc;
+}
+
+static PyObject *Py_MessageBox(PyObject *self, PyObject *args)
+{
+	HWND hwnd;
+	char *message;
+	char *title = NULL;
+	int flags = MB_OK;
+
+	if (!PyArg_ParseTuple(args, "is|zi", &hwnd, &message, &title, &flags))
+		return NULL;
+	return PyLong_FromLong(MessageBox(hwnd, message, title, flags));
+}
+
+static PyObject *Py_SHGetSpecialFolderPath(PyObject *self, PyObject *args)
+{
+	wchar_t path[MAX_PATH];
+	int nFolder;
+	if (!PyArg_ParseTuple(args, "i", &nFolder))
+		return NULL;
+	SHGetSpecialFolderPathW(NULL, path, nFolder, TRUE);
+	return PyUnicode_FromWideChar(path, -1);
+}
+
+PyMethodDef method[] = {
+	{ "_MessageBox", Py_MessageBox, METH_VARARGS },
+	{ "_SHGetSpecialFolderPath", Py_SHGetSpecialFolderPath, METH_VARARGS },
+};
+
+
+int start(int argc, wchar_t **argv)
+{
+	int rc;
+	PyObject *mod;
 	PySys_SetArgvEx(argc, argv, 0);
+
+	mod = PyImport_ImportModule("sys");
+	if (mod) {
+		PyObject_SetAttrString(mod,
+				       method[0].ml_name,
+				       PyCFunction_New(&method[0], NULL));
+		PyObject_SetAttrString(mod,
+				       method[1].ml_name,
+				       PyCFunction_New(&method[1], NULL));
+	}
 
 	rc = run_script();
 	fini();
