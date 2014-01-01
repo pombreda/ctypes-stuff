@@ -385,7 +385,7 @@ class Runtime(object):
         into the library directory.
         """
         if self.options.bundle_files >= 2:
-            # Python dll is nt bundled; copy it.
+            # Python dll is not bundled; copy it.
             dst = os.path.join(dlldir, os.path.basename(pydll))
             if self.options.verbose:
                 print("Copy DLL %s to %s" % (pydll, dlldir))
@@ -416,6 +416,13 @@ class Runtime(object):
             if self.options.verbose:
                 print("Copy DLL %s to %s" % (src, dlldir))
             shutil.copy2(src, dlldir)
+
+        if self.options.bundle_files == 3:
+            for src in self.mf.extension_dlls():
+                dst = os.path.join(dlldir, os.path.basename(src))
+                if self.options.verbose:
+                    print("Copy ExtensionDLL %s to %s" % (src, dlldir))
+                shutil.copy2(src, dlldir)
 
     def _create_script_data(self, script):
         # We create a list of code objects, and return it as a
