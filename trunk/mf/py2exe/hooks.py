@@ -44,18 +44,22 @@ def hook_pythoncom(finder, module):
     import pythoncom
     finder.add_dll(pythoncom.__file__)
 
-def hook_win32com(finder, module):
-    """The win32com package extends it's __path__ at runtime.
-    """
-    import win32com
-    module.__path__ = win32com.__path__
-
 def hook_pywintypes(finder, module):
     """pywintypes is a Python extension module with .dll extension,
     usually in the windows system directory as pywintypes3X.dll.
     """
     import pywintypes
     finder.add_dll(pywintypes.__file__)
+
+def hook_win32com(finder, module):
+    """The win32com package extends it's __path__ at runtime.
+    """
+    import win32com
+    module.__path__ = win32com.__path__
+
+def hook_win32api(finder, module):
+    """win32api.FindFiles(...) needs this."""
+    finder.import_hook("win32timezone")
 
 def hook_tkinter(finder, module):
     """Recusively copy tcl and tk directories.
