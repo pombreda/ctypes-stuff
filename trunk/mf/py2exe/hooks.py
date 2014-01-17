@@ -9,6 +9,14 @@
 #
 import os, sys
 
+def import_psutil(finder, module):
+    """Exclude stuff for other operating systems."""
+    finder.excludes.append("_psutil_bsd")
+    finder.excludes.append("_psutil_linux")
+    finder.excludes.append("_psutil_osx")
+    finder.excludes.append("_psutil_posix")
+    finder.excludes.append("_psutil_sunos")
+
 def hook_PIL(finder, module):
     # c:\Python33-64\lib\site-packages\PIL
     """Pillow loads plugins"""
@@ -69,6 +77,9 @@ def hook_tkinter(finder, module):
     tcl_dir = os.path.join(sys.prefix, "tcl")
     finder.add_datadirectory("tcl", tcl_dir, recursive=True)
     finder.set_min_bundle("tkinter", 2)
+
+def hook_PySide(finder, module):
+    finder.set_min_bundle("PySide", 3)
 
 def hook_six(finder, module):
     """six.py is a python2/python3 compaibility library.  Exclude the
