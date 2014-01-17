@@ -22,7 +22,7 @@ logger = logging.getLogger("runtime")
 from importlib.machinery import EXTENSION_SUFFIXES
 from importlib.machinery import DEBUG_BYTECODE_SUFFIXES, OPTIMIZED_BYTECODE_SUFFIXES
 
-
+RT_MANIFEST = 24
 
 class Target:
     """
@@ -270,6 +270,8 @@ class Runtime(object):
                 resource.add_icon(res_id, ico_file)
 
             for res_type, res_name, res_data in getattr(target, "other_resources", ()):
+                if res_type == RT_MANIFEST and isinstance(res_data, str):
+                    res_data = res_data.encode("utf-8")
                 resource.add(type=res_type, name=res_name, value=res_data)
 
             # Build and add a versioninfo resource
