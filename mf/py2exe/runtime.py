@@ -269,6 +269,9 @@ class Runtime(object):
             for res_id, ico_file in getattr(target, "icon_resources", ()):
                 resource.add_icon(res_id, ico_file)
 
+            for res_type, res_name, res_data in getattr(target, "other_resources", ()):
+                resource.add(type=res_type, name=res_name, value=res_data)
+
             # Build and add a versioninfo resource
             def get(name):
                 return getattr(target, name, None)
