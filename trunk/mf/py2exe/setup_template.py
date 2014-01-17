@@ -7,6 +7,7 @@ import string
 HEADER = """\
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
+# Created by: $created_by
 
 from distutils.core import setup
 import py2exe
@@ -20,6 +21,9 @@ class Target(object):
 
         # the VersionInfo resource, uncomment and fill in those items
         # that make sense:
+        
+        # The 'version' attribute MUST be defined, otherwise no versioninfo will be built:
+        # self.version = "1.0"
         
         # self.company_name = "Company Name"
         # self.copyright = "Copyright Company Name © 2013"
@@ -37,15 +41,56 @@ class Target(object):
     def __setitem__(self, name, value):
         self.__dict__[name] = value
 
+RT_BITMAP = 2
+RT_MANIFEST = 24
+
+# A manifest which specifies the executionlevel
+# and windows common-controls library version 6
+
+manifest_template = '''\
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity
+    version="5.0.0.0"
+    processorArchitecture="*"
+    name="%(prog)s"
+    type="win32"
+  />
+  <description>%(prog)s</description>
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel
+            level="%(level)s"
+            uiAccess="false">
+        </requestedExecutionLevel>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <dependency>
+    <dependentAssembly>
+        <assemblyIdentity
+            type="win32"
+            name="Microsoft.Windows.Common-Controls"
+            version="6.0.0.0"
+            processorArchitecture="*"
+            publicKeyToken="6595b64144ccf1df"
+            language="*"
+        />
+    </dependentAssembly>
+  </dependency>
+</assembly>
+'''
+
 """
 
 TARGET = """
 $myapp = Target(
-    # We can extend or override the VersionInfo of the base class
-    # self.version = "1.0.0.0"
-    # self.file_description = "File Description"
-    # self.comments = "Some Comments"
-    # self.internal_name = "spam"
+    # We can extend or override the VersionInfo of the base class:
+    # version = "1.0",
+    # file_description = "File Description",
+    # comments = "Some Comments",
+    # internal_name = "spam",
 
     script="$script", # path of the main script
 
@@ -53,10 +98,12 @@ $myapp = Target(
     # dest_base = "$myapp",
 
     # Icon resources:[(resource_id, path to .ico file), ...]
-    # icon_resources=[(1, r"icon1.ico")]
+    # icon_resources=[(1, r"$myapp.ico")]
 
-    # other_resources = [(RT_MANIFEST, 1, manifest_template % dict(prog="smedit", level="asInvoker")),
-    #                    (RT_BITMAP, 1, open("bitmap.bmp).read()[14:])]),
+    other_resources = [(RT_MANIFEST, 1, (manifest_template % dict(prog="$myapp", level="asInvoker")).encode("utf-8")),
+    # for bitmap resources, the first 14 bytes must be skipped when reading the file:
+    #                    (RT_BITMAP, 1, open("bitmap.bmp", "rb").read()[14:]),
+                      ]
     )
 """
 
@@ -126,15 +173,17 @@ setup(name="name",
 
 def write_setup(args):
     from string import Template
-    import sys
-    print(sys.argv[1:])
+    import os, sys
+
     with open(args.setup_path, "w", encoding="utf-8") as ofi:
 
         header = Template(HEADER)
+        created_by = " ".join([os.path.basename(sys.executable), "-m", "py2exe"] + sys.argv[1:])
         print(header.substitute(locals()), file=ofi)
         console = []
-        for script in args.script:
-            myapp = os.path.splitext(script)[0]
+        for target in args.script:
+            script = target.script
+            myapp = os.path.splitext(target.script)[0]
             target = Template(TARGET)
             print(target.substitute(locals()), file=ofi)
             console.append(myapp)
