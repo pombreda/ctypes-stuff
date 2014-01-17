@@ -230,7 +230,7 @@ class py2exe(Command):
                             destdir = self.dist_dir,
                             libname = dist.zipfile,
 
-                            verbose = False,
+                            verbose = self.verbose,
                             report = False,
                             summary = False,
                             show_from = None,
