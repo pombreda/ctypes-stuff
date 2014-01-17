@@ -1,0 +1,18 @@
+Bugs:
+
+- py2exe\dll.dll is not installed.
+- extensions are in the wrong directory when library is in a subdirectory
+
+- (String) Versioninfo not build?  (Needs 'self.version = "6.5"' attribute in Target???)
+   Must include this into setup_template.py!
+
+Ideas:
+
+- add some scripts to inspect executables, like dump_manifest.py
+- dump_versioninfo.py
+- or even a general resource dumper?
+
+TODO:
+
+- services not yet implemented
+- DLL com servers not yet implemented
