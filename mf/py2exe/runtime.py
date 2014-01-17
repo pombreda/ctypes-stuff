@@ -161,6 +161,7 @@ class Runtime(object):
                 # warn if modules are know to work only for a minimum
                 # bundle_files value
                 print("OOPS:", name, value)
+                raise SystemExit(-1)
 
     def build(self):
         """Build everything.
@@ -385,21 +386,26 @@ class Runtime(object):
 
         arc.close()
 
-    def copy_files(self, dlldir):
+    def copy_files(self, destdir):
         """Copy files (pyds, dlls, depending on the bundle_files value,
-        into the library directory.
+        into the dist resp. library directory.
         """
+        if self.options.libname is not None:
+            libdir = os.path.join(destdir, os.path.dirname(self.options.libname))
+        else:
+            libdir = destdir
+
         if self.options.bundle_files >= 2:
-            # Python dll is not bundled; copy it.
-            dst = os.path.join(dlldir, os.path.basename(pydll))
+            # Python dll is not bundled; copy it into destdir
+            dst = os.path.join(destdir, os.path.basename(pydll))
             if self.options.verbose:
-                print("Copy DLL %s to %s" % (pydll, dlldir))
+                print("Copy DLL %s to %s" % (pydll, destdir))
             shutil.copy2(pydll, dst)
             with UpdateResources(dst, delete_existing=False) as resource:
                 resource.add_string(1000, "py2exe")
 
         if self.options.bundle_files == 3:
-            # copy extension modules:
+            # copy extension modules; they go to libdir
             for mod in self.mf.modules.values():
                 if mod.__code__:
                     # nothing to do for python modules.
@@ -408,7 +414,7 @@ class Runtime(object):
                     assert mod.__file__.endswith(EXTENSION_SUFFIXES[0])
                     pydfile = mod.__name__ + EXTENSION_SUFFIXES[0]
 
-                    dst = os.path.join(dlldir, pydfile)
+                    dst = os.path.join(libdir, pydfile)
                     if self.options.verbose:
                         print("Copy PYD %s to %s" % (mod.__file__, dst))
                     shutil.copy2(mod.__file__, dst)
@@ -417,17 +423,22 @@ class Runtime(object):
             return
 
         for src in self.mf.real_dlls():
-            dst = os.path.join(dlldir, os.path.basename(src))
+            # Strange, but was tested with numpy built with
+            # libiomp5md.dll...
+            if self.options.bundle_files == 3:
+                extdlldir = libdir
+            else:
+                extdlldir = destdir
             if self.options.verbose:
-                print("Copy DLL %s to %s" % (src, dlldir))
-            shutil.copy2(src, dlldir)
+                print("Copy DLL %s to %s" % (src, extdlldir))
+            shutil.copy2(src, extdlldir)
 
         if self.options.bundle_files == 3:
+            # extension dlls go to libdir
             for src in self.mf.extension_dlls():
-                dst = os.path.join(dlldir, os.path.basename(src))
                 if self.options.verbose:
-                    print("Copy ExtensionDLL %s to %s" % (src, dlldir))
-                shutil.copy2(src, dlldir)
+                    print("Copy ExtensionDLL %s to %s" % (src, libdir))
+                shutil.copy2(src, libdir)
 
     def _create_script_data(self, script):
         # We create a list of code objects, and return it as a
@@ -487,7 +498,7 @@ def __load():
     try:
         mod = imp.load_dynamic(__name__, dllpath)
     except ImportError as details:
-        raise ImportError('(%s) %s' % (details, os.path.basename(dllpath))) from None
+        raise ImportError('(%s) %r' % (details, dllpath)) from None
     mod.frozen = 1
 __load()
 del __load
