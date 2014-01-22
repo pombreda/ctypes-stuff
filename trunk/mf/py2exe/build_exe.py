@@ -58,12 +58,6 @@ def main():
                         dest="compress",
                         action="store_true")
 
-    # exe files to build...
-    parser.add_argument("script",
-                        metavar="script",
-                        nargs="+",
-                        )
-
     # what to build
     parser.add_argument("-d", "--dest",
 ##                        required=True,
@@ -88,19 +82,38 @@ def main():
                         default=3)
 
     parser.add_argument("-W", "--write-setup-script",
-                        help="""Instead of building the executables write a setup script
-                        that allows further customizations of the build process.""",
+                        help="""Do not build the executables; instead write a setup script that allows
+                        further customizations of the build process.""",
                         metavar="setup_path",
                         dest="setup_path")
 
+    # exe files to build...
+    parser.add_argument("script",
+                        metavar="script",
+                        nargs="*",
+                        )
+
+    parser.add_argument("-svc", "--service",
+                        help="""Build a service""",
+                        metavar="service",
+                        action="append",
+                        )
+
+
     options = parser.parse_args()
+    if not options.service and not options.script:
+        parser.error("nothing to build")
+
+    options.service = runtime.fixup_targets(options.service, "modules")
+    for target in options.service:
+        target.exe_type = "service"
 
     options.script = runtime.fixup_targets(options.script, "script")
-    for script in options.script:
-        if script.script.endswith(".pyw"):
-            script.exe_type = "windows_exe"
+    for target in options.script:
+        if target.script.endswith(".pyw"):
+            target.exe_type = "windows_exe"
         else:
-            script.exe_type = "console_exe"
+            target.exe_type = "console_exe"
     
     if options.setup_path:
         if os.path.isfile(options.setup_path):

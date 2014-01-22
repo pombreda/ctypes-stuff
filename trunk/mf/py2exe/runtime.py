@@ -65,6 +65,22 @@ class Target:
             if not os.path.isfile(r_filename):
                 raise DistutilsOptionError("Resource filename '%s' does not exist" % r_filename)
 
+    def analyze(self, modulefinder):
+        """Run modulefinder on anything that is needed for this target.
+
+        This may be the script or one or more modules.
+        """
+        if hasattr(self, "script"):
+            modulefinder.run_script(self.script)
+        elif hasattr(self, "modules"):
+            for mod in self.modules:
+                modulefinder.import_hook(mod)
+        else:
+            raise RuntimeError("Don't know how to build", self)
+
+    def __repr__(self):
+        return "Target(dest_base=%r, exe_type=%r)" % (self.get_dest_base(), self.exe_type)
+
 
 def fixup_targets(targets, default_attribute):
     """Fixup the targets; and ensure that the default_attribute is
@@ -74,7 +90,7 @@ def fixup_targets(targets, default_attribute):
     Return a list of Target instances.
     """
     if not targets:
-        return targets
+        return []
     ret = []
     for target_def in targets:
         if isinstance(target_def, str):
@@ -108,8 +124,21 @@ class Runtime(object):
     def __init__(self, options):
         self.options = options
 
-        self.targets = fixup_targets(self.options.script, "script")
-        del self.options.script
+        self.targets = self.options.script + self.options.service
+
+##         # build the executables
+##         for target in dist.console:
+##             dst = self.build_executable(target, self.get_console_template(),
+##                                         arcname, target.script)
+##             self.console_exe_files.append(dst)
+##         for target in dist.windows:
+##             dst = self.build_executable(target, self.get_windows_template(),
+##                                         arcname, target.script)
+##             self.windows_exe_files.append(dst)
+##         for target in dist.service:
+##             dst = self.build_service(target, self.get_service_template(),
+##                                      arcname)
+##             self.service_exe_files.append(dst)
 
         if self.options.bundle_files < 3:
             self.bootstrap_modules.add("zipextimporter")
@@ -138,7 +167,7 @@ class Runtime(object):
                 mf.import_package(modname)
 
         for target in self.targets:
-            mf.run_script(target.script)
+            target.analyze(mf)
 
         mf.finish()
 
@@ -221,10 +250,12 @@ class Runtime(object):
 
     def get_runstub_bytes(self, target):
         from distutils.util import get_platform
-        if target.exe_type == "console_exe":
+        if target.exe_type in ("console_exe", "service"):
             run_stub = 'run-py%s.%s-%s.exe' % (sys.version_info[0], sys.version_info[1], get_platform())
-        else:
+        elif target.exe_type == "windows_exe":
             run_stub = 'run_w-py%s.%s-%s.exe' % (sys.version_info[0], sys.version_info[1], get_platform())
+        else:
+            raise ValueError("Unknown exe_type %r" % target.exe_type)
         if self.options.verbose:
             print("Using exe-stub %r" % run_stub)
         exe_bytes = pkgutil.get_data("py2exe", run_stub)
@@ -243,7 +274,7 @@ class Runtime(object):
         optimize = self.options.optimize
         unbuffered = False # XXX
 
-        script_data = self._create_script_data(target.script)
+        script_data = self._create_script_data(target)
 
         if libname is None:
             zippath = b""
@@ -440,7 +471,7 @@ class Runtime(object):
                     print("Copy ExtensionDLL %s to %s" % (src, libdir))
                 shutil.copy2(src, libdir)
 
-    def _create_script_data(self, script):
+    def _create_script_data(self, target):
         # We create a list of code objects, and return it as a
         # marshaled stream.  The framework code then just exec's these
         # in order.
@@ -468,6 +499,7 @@ class Runtime(object):
         code_objects.append(
             compile("import os, sys; sys.base_prefix = sys.prefix = os.path.dirname(sys.executable); del os, sys",
                     "<bootstrap2>", "exec"))
+
         if self.options.bundle_files < 3:
             # XXX do we need this one?
             ## obj = compile("import sys, os; sys.path.append(os.path.dirname(sys.path[0])); del sys, os",
@@ -477,15 +509,29 @@ class Runtime(object):
                           "<install zipextimporter>", "exec")
             code_objects.append(obj)
 
-        boot = os.path.join(os.path.dirname(__file__), "boot_common.py")
-        boot_code = compile(open(boot, "U").read(),
-                            os.path.abspath(boot), "exec")
-        code_objects.append(boot_code)
-
-        with open(script, "U") as script_file:
+        if target.exe_type == "service":
+            # code for services
             code_objects.append(
-                compile(script_file.read() + "\n",
-                        os.path.basename(script), "exec"))
+                compile("cmdline_style = 'py2exe'; service_module_names = ['svc']",
+                        "<service_info>", "exec"))
+
+            boot = os.path.join(os.path.dirname(__file__), "boot_service.py")
+            boot_code = compile(open(boot, "U").read(),
+                                os.path.abspath(boot), "exec")
+            code_objects.append(boot_code)
+
+        elif target.exe_type in ("console_exe", "windows_exe"):
+            boot = os.path.join(os.path.dirname(__file__), "boot_common.py")
+            boot_code = compile(open(boot, "U").read(),
+                                os.path.abspath(boot), "exec")
+            code_objects.append(boot_code)
+
+            with open(target.script, "U") as script_file:
+                code_objects.append(
+                    # XXX what about compiler options?
+                    # XXX what about source file encodings?
+                    compile(script_file.read() + "\n",
+                            os.path.basename(target.script), "exec"))
 
         return marshal.dumps(code_objects)
 
