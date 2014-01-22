@@ -108,7 +108,9 @@ if __name__ == "__main__":
           interpreters = interpreters,
           py_modules=['zipextimporter'],
           packages=['py2exe'],
-          zip_safe=True, # pip does unpack anyway, only .egg uses this.
+          data_files=[('py2exe',
+                      ["py2exe\\dll.dll"])],
+##          zip_safe=True, # pip does unpack anyway, only .egg uses this.
           )
 
 # Local Variables:
