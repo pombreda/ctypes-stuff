@@ -207,20 +207,16 @@ void set_vars(HMODULE hmod_pydll)
 {
 	int *pflag;
 
-	printf("BEFORE NoSite: %d\n", Py_NoSiteFlag);
-
 	pflag = (int *)MyGetProcAddress(hmod_pydll, "Py_NoSiteFlag");
-//	printf("GetProcAddress(%p, 'Py_NoSiteFlag') -> %p\n", hmod_pydll, pflag);
 	*pflag = 1;
-	printf("AFTER NoSite: %d\n", Py_NoSiteFlag);
 
 	pflag = (int *)MyGetProcAddress(hmod_pydll, "Py_OptimizeFlag");
-//	printf("GetProcAddress(%p, 'Py_OptimizeFlag') -> %p\n", hmod_pydll, pflag);
 	if (pflag)
 		*pflag = p_script_info->optimize;
-
+/*
 	Py_NoSiteFlag = 1;
 	Py_OptimizeFlag = 1;
+*/
 }
 
 /*
