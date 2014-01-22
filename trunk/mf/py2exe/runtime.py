@@ -256,8 +256,8 @@ class Runtime(object):
             run_stub = 'run_w-py%s.%s-%s.exe' % (sys.version_info[0], sys.version_info[1], get_platform())
         else:
             raise ValueError("Unknown exe_type %r" % target.exe_type)
-        if self.options.verbose:
-            print("Using exe-stub %r" % run_stub)
+        ## if self.options.verbose:
+        ##     print("Using exe-stub %r" % run_stub)
         exe_bytes = pkgutil.get_data("py2exe", run_stub)
         if exe_bytes is None:
             raise RuntimeError("run-stub not found")
@@ -289,42 +289,50 @@ class Runtime(object):
                                   len(script_data))
         script_info += zippath + b"\0" + script_data + b"\0"
 
+        # It seems resources must be updated in chunks if there are
+        # many, otherwise EndUpdateResource will fail with
+        # WindowsError 13 (invalid data)
         with UpdateResources(exe_path, delete_existing=True) as resource:
-            if self.options.verbose:
-                print("Add RSC %s/%s(%d bytes) to %s"
-                      % ("PYTHONSCRIPT", 1, len(script_info), exe_path))
+            ## if self.options.verbose:
+            ##     print("Add RSC %s/%s(%d bytes) to %s"
+            ##           % ("PYTHONSCRIPT", 1, len(script_info), exe_path))
             resource.add(type="PYTHONSCRIPT", name=1, value=script_info)
 ##            # XXX testing
 ##            resource.add_string(1000, "foo bar")
 ##            resource.add_string(1001, "Hallöle €")
 
-            for res_id, ico_file in getattr(target, "icon_resources", ()):
-                resource.add_icon(res_id, ico_file)
-
+        with UpdateResources(exe_path, delete_existing=False) as resource:
             for res_type, res_name, res_data in getattr(target, "other_resources", ()):
                 if res_type == RT_MANIFEST and isinstance(res_data, str):
                     res_data = res_data.encode("utf-8")
                 resource.add(type=res_type, name=res_name, value=res_data)
 
-            # Build and add a versioninfo resource
-            def get(name):
-                return getattr(target, name, None)
+        # Build and add a versioninfo resource
+        def get(name):
+            return getattr(target, name, None)
 
-            if hasattr(target, "version"):
-                version = Version(target.version,
-                                  file_description = get("description"),
-                                  comments = get("comments"),
-                                  company_name = get("company_name"),
-                                  legal_copyright = get("copyright"),
-                                  legal_trademarks = get("trademarks"),
-                                  original_filename = os.path.basename(exe_path),
-                                  product_name = get("product_name"),
-                                  product_version = get("product_version") or target.version)
+        if hasattr(target, "version"):
+            version = Version(target.version,
+                              file_description = get("description"),
+                              comments = get("comments"),
+                              company_name = get("company_name"),
+                              legal_copyright = get("copyright"),
+                              legal_trademarks = get("trademarks"),
+                              original_filename = os.path.basename(exe_path),
+                              product_name = get("product_name"),
+                              product_version = get("product_version") or target.version)
                                   
-                from ._wapi import RT_VERSION
-                resource.add(type=RT_VERSION,
-                             name=1,
-                             value=version.resource_bytes())
+        with UpdateResources(exe_path, delete_existing=False) as resource:
+            from ._wapi import RT_VERSION
+            resource.add(type=RT_VERSION,
+                         name=1,
+                         value=version.resource_bytes())
+
+        for res_id, ico_file in getattr(target, "icon_resources", ()):
+            with UpdateResources(exe_path, delete_existing=False) as resource:
+                resource.add_icon(res_id, ico_file)
+
+
 
     def build_archive(self, libpath):
         """Build the archive containing the Python library.
