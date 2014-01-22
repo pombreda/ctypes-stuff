@@ -523,15 +523,14 @@ class Runtime(object):
                 compile("cmdline_style = 'py2exe'; service_module_names = ['svc']",
                         "<service_info>", "exec"))
 
-            boot = os.path.join(os.path.dirname(__file__), "boot_service.py")
-            boot_code = compile(open(boot, "U").read(),
-                                os.path.abspath(boot), "exec")
+            boot_code = compile(pkgutil.get_data("py2exe", "boot_service.py"),
+                                "boot_service.py", "exec")
             code_objects.append(boot_code)
 
         elif target.exe_type in ("console_exe", "windows_exe"):
-            boot = os.path.join(os.path.dirname(__file__), "boot_common.py")
-            boot_code = compile(open(boot, "U").read(),
-                                os.path.abspath(boot), "exec")
+            boot_code = compile(pkgutil.get_data("py2exe", "boot_common.py"),
+                                "boot_common.py", "exec")
+
             code_objects.append(boot_code)
 
             with open(target.script, "U") as script_file:

@@ -4,15 +4,6 @@ Bugs:
 
 - distutils_buildexe needs to import DistutilsOptionError (or so)
 
-- extensions are in the wrong directory when library is in a subdirectory
-
-- (String) Versioninfo not build?  (Needs 'self.version = "6.5"' attribute in Target???)
-   Must include this into setup_template.py!
-
-- when installed as egg, py2exe/boot_common.py is not a file and so not found.
-
-- number of icons (or icon images) is limited for whatever reason.
-
 Ideas:
 
 - add some scripts to inspect executables, like dump_manifest.py
@@ -21,8 +12,15 @@ Ideas:
 
 TODO:
 
-- services not yet implemented
 - DLL com servers not yet implemented
+- test services
 
 Fixed bugs:
-  rev336: - py2exe\dll.dll is not installed.
+  rev 336: - py2exe\dll.dll is not installed.
+  rev 342: - when installed as egg, py2exe/boot_common.py is not a file and so not found.
+  rev 342: - number of icons (or icon images) is limited for whatever reason.
+  rev 342: - extensions are in the wrong directory when library is in a subdirectory
+  rev 342: - (String) Versioninfo not build?  (Needs 'self.version = "6.5"' attribute in Target???)
+              Must include this into setup_template.py!
+  rev 342: - services not yet implemented
+

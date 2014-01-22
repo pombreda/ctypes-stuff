@@ -110,7 +110,7 @@ if __name__ == "__main__":
           packages=['py2exe'],
           data_files=[('py2exe',
                       ["py2exe\\dll.dll"])],
-##          zip_safe=True, # pip does unpack anyway, only .egg uses this.
+          zip_safe=True, # pip does unpack anyway, only .egg uses this.
           )
 
 # Local Variables:
