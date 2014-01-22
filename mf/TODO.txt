@@ -1,10 +1,11 @@
 Bugs:
 
-- py2exe\dll.dll is not installed.
 - extensions are in the wrong directory when library is in a subdirectory
 
 - (String) Versioninfo not build?  (Needs 'self.version = "6.5"' attribute in Target???)
    Must include this into setup_template.py!
+
+- when installed as egg, py2exe/boot_common.py is not a file and so not found.
 
 Ideas:
 
@@ -16,3 +17,6 @@ TODO:
 
 - services not yet implemented
 - DLL com servers not yet implemented
+
+Fixed bugs:
+  rev336: - py2exe\dll.dll is not installed.
