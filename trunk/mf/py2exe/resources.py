@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """resources for py3exe
 """
-from collections import defaultdict
+import collections
 import contextlib
 import ctypes
 
@@ -62,7 +62,7 @@ class ResourceWriter(object):
     def flush(self):
         """Flush all buffered data."""
         # Strings in the string resources are grouped in groups of 16.
-        groups = defaultdict(dict)
+        groups = collections.defaultdict(dict)
         for i in sorted(self._strings):
             sectnum, tabnum = divmod(i, 16)
             table = groups[sectnum+1]
@@ -101,9 +101,14 @@ class ResourceWriter(object):
 
         # CreateGrpIconDirHeader creates RT_ICON resources for each
         # image in the icon file; for this it needs separate resource
-        # ids.  We start with resource_id*100 and increment it for
+        # ids.  We start with resource_id*10 and increment it for
         # each image.  All these ids must be unique for the exe-file.
-        grp_header = icons.CreateGrpIconDirHeader(hdr, resource_id*100)
+        #
+        # This assumes that there are no more than 10 images per icon.
+        #
+        # XXX for an unknown reason, py2exe limits the number of icons
+        # or icon images to an arbitrary limit. Need to explor this.
+        grp_header = icons.CreateGrpIconDirHeader(hdr, resource_id*10)
 
         # Maybe we should manage the resource ids for the RT_ICON
         # resources here, in this class?

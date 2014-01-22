@@ -1,11 +1,17 @@
 Bugs:
 
+- distutils catches errors different from DistutilsError (or so)
+
+- distutils_buildexe needs to import DistutilsOptionError (or so)
+
 - extensions are in the wrong directory when library is in a subdirectory
 
 - (String) Versioninfo not build?  (Needs 'self.version = "6.5"' attribute in Target???)
    Must include this into setup_template.py!
 
 - when installed as egg, py2exe/boot_common.py is not a file and so not found.
+
+- number of icons (or icon images) is limited for whatever reason.
 
 Ideas:
 
