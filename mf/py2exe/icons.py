@@ -84,7 +84,8 @@ def CreateGrpIconDirHeader(iconheader, icoid):
                     ("idEntries", GRPICONDIRENTRY * iconheader.idCount)]
         def tobytes(self):
             return memoryview(self).tobytes()
-
+    if iconheader.idCount > 10:
+        raise ValueError("too many images for this icon: %d" % iconheader.idCount)
     grpheader = GRPICONDIRHEADER(
         idReserved = iconheader.idReserved,
         idType = iconheader.idType,
@@ -100,6 +101,8 @@ def CreateGrpIconDirHeader(iconheader, icoid):
         dst.wBitCount = src.wBitCount
         dst.dwBytesInRes = src.dwBytesInRes
         dst.nID = icoid + i
+        if dst.nID > 32767:
+            raise ValueError("Invalid resource id %s" % dst.nID)
     return grpheader
 
 ################################################################
