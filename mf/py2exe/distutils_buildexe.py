@@ -186,6 +186,10 @@ class py2exe(Command):
             sys.path.insert(0, build.build_lib)
         try:
             self._run()
+            # Hm, distutils catches errors different from DistutilsError ???
+        except Exception as details:
+            print("ERROR", details)
+            # XXX need another way to report (?)
         finally:
             sys.path = sys_old_path
 
@@ -203,11 +207,23 @@ class py2exe(Command):
         ##                   for target in dist.windows + dist.console]
 
         dist.console = runtime.fixup_targets(dist.console, "script")
-
         for target in dist.console:
             target.exe_type = "console_exe"
+
+        dist.windows = runtime.fixup_targets(dist.windows, "script")
         for target in dist.windows:
             target.exe_type = "windows_exe"
+
+        dist.service = runtime.fixup_targets(dist.service, "modules")
+        for target in dist.service:
+            target.exe_type = "service"
+
+##         # Convert our args into target objects.
+##         dist.com_server = FixupTargets(dist.com_server, "modules")
+##         dist.ctypes_com_server = FixupTargets(dist.ctypes_com_server, "modules")
+##         dist.windows = FixupTargets(dist.windows, "script")
+##         dist.console = FixupTargets(dist.console, "script")
+##         dist.isapi = FixupTargets(dist.isapi, "script")
 
         from argparse import Namespace
         options = Namespace(xref = self.xref,
@@ -227,6 +243,7 @@ class py2exe(Command):
                             custom_boot_script = self.custom_boot_script,
 
                             script = dist.console + dist.windows,
+                            service = dist.service,
                             destdir = self.dist_dir,
                             libname = dist.zipfile,
 
