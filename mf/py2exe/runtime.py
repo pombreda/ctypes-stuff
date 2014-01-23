@@ -59,7 +59,7 @@ class Target:
         resources = getattr(self, "bitmap_resources", []) + \
                     getattr(self, "icon_resources", [])
         for r_id, r_filename in resources:
-            if type(r_id) != type(0):
+            if not isinstance(r_id, int):
                 # Hm, strings are also allowed as resource ids...
                 raise DistutilsOptionError("Resource ID must be an integer")
             if not os.path.isfile(r_filename):
@@ -76,7 +76,7 @@ class Target:
             for mod in self.modules:
                 modulefinder.import_hook(mod)
         else:
-            raise RuntimeError("Don't know how to build", self)
+            raise TypeError("Don't know how to build", self)
 
     def __repr__(self):
         return "Target(dest_base=%r, exe_type=%r)" % (self.get_dest_base(), self.exe_type)
@@ -322,11 +322,11 @@ class Runtime(object):
                               product_name = get("product_name"),
                               product_version = get("product_version") or target.version)
                                   
-        with UpdateResources(exe_path, delete_existing=False) as resource:
-            from ._wapi import RT_VERSION
-            resource.add(type=RT_VERSION,
-                         name=1,
-                         value=version.resource_bytes())
+            with UpdateResources(exe_path, delete_existing=False) as resource:
+                from ._wapi import RT_VERSION
+                resource.add(type=RT_VERSION,
+                             name=1,
+                             value=version.resource_bytes())
 
         for res_id, ico_file in getattr(target, "icon_resources", ()):
             with UpdateResources(exe_path, delete_existing=False) as resource:
@@ -520,7 +520,7 @@ class Runtime(object):
         if target.exe_type == "service":
             # code for services
             code_objects.append(
-                compile("cmdline_style = 'py2exe'; service_module_names = ['svc']",
+                compile("cmdline_style = 'py2exe'; service_module_names = %r" % (target.modules,),
                         "<service_info>", "exec"))
 
             boot_code = compile(pkgutil.get_data("py2exe", "boot_service.py"),
