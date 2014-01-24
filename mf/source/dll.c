@@ -1,5 +1,4 @@
 /*
-  create this resource-only dll by running
-  'cl /LD dll.c /link /noentry'
-  from a visual C command prompt.
+  Will be compiled to a resource-only dll.
+  No code here.
 */

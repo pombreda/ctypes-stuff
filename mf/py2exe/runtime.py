@@ -230,7 +230,7 @@ class Runtime(object):
             if not os.path.exists(os.path.dirname(libpath)):
                 os.mkdir(os.path.dirname(libpath))
 
-            dll_bytes = pkgutil.get_data("py2exe", "dll.dll")
+            dll_bytes = pkgutil.get_data("py2exe", "resources.dll")
             with open(libpath, "wb") as ofi:
                   ofi.write(dll_bytes)
             self.build_archive(libpath)
