@@ -82,14 +82,25 @@ run_w = Interpreter("py2exe.run_w",
                     extra_link_args=extra_link_args,
                     )
 
-interpreters = [run, run_w]
+# The py2exe.resources name is special handled in BuildInterpreters;
+# it will not include the python version and platform name. The final
+# name will be 'resources.dll'.
+#
+# This is a resource only dll, so it needs no entry point.
+resource_dll = Interpreter("py2exe.resources",
+                           ["source/dll.c"],
+                           target_desc = "shared_library",
+                           extra_link_args=["/NOENTRY"],
+                           )
+
+interpreters = [run, run_w, resource_dll]
 
 if __name__ == "__main__":
     import py2exe
     setup(name="py2exe",
           version=py2exe.__version__,
           description="Build standalone executables for Windows (python 3 version)",
-          long_description=__doc__,
+          long_description=open("README.rst").read(),
           author="Thomas Heller",
           author_email="theller@ctypes.org",
     ##      maintainer="Jimmy Retzlaff",
@@ -98,7 +109,24 @@ if __name__ == "__main__":
           license="MIT/X11",
           platforms="Windows",
     ##      download_url="http://sourceforge.net/project/showfiles.php?group_id=15583",
-    ##      classifiers=["Development Status :: 5 - Production/Stable"],
+
+          classifiers=[
+              "Development Status :: 4 - Beta",
+              "Environment :: Console",
+              "Environment :: Win32 (MS Windows)",
+              "Operating System :: Microsoft :: Windows",
+              "Programming Language :: C",
+              "Programming Language :: Python :: 3",
+              "Programming Language :: Python :: 3.2",
+              "Programming Language :: Python :: 3.3",
+              "Programming Language :: Python :: Implementation :: CPython",
+              "Topic :: Software Development",
+              "Topic :: Software Development :: Libraries",
+              "Topic :: Software Development :: Libraries :: Python Modules",
+              "Topic :: System :: Software Distribution",
+              "Topic :: Utilities",
+              ],
+
           distclass = Dist,
           cmdclass = {'build_interpreters': BuildInterpreters},
 ##          scripts = ["build_exe.py"],
@@ -108,8 +136,6 @@ if __name__ == "__main__":
           interpreters = interpreters,
           py_modules=['zipextimporter'],
           packages=['py2exe'],
-          data_files=[('py2exe',
-                      ["py2exe\\dll.dll"])],
           zip_safe=True, # pip does unpack anyway, only .egg uses this.
           )
 

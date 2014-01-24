@@ -67,11 +67,17 @@ class BuildInterpreters(build_ext.build_ext):
 
                 build_py = self.get_finalized_command('build_py')
                 package_dir = build_py.get_package_dir(package)
-                exe_filename = os.path.join(package_dir,
-                                            self.get_exe_filename(base))
+                if fullname == "py2exe.resources":
+                    exe_filename = os.path.join(package_dir, "resources")
+                else:
+                    exe_filename = os.path.join(package_dir,
+                                                self.get_exe_filename(base))
             else:
-                exe_filename = os.path.join(self.build_lib,
-                                            self.get_exe_filename(fullname))
+                if fullname == "py2exe.resources":
+                    exe_filename = os.path.join(self.build_lib, "resources")
+                else:
+                    exe_filename = os.path.join(self.build_lib,
+                                                self.get_exe_filename(fullname))
             if inter.target_desc == "executable":
                 exe_filename += ".exe"
             else:
