@@ -97,6 +97,70 @@ def hook_matplotlib(finder, module):
     finder.add_datadirectory("mpl-data", mpl_data_path, recursive=True)
     finder.excludes.append("wx")
 
+def hook_numpy(finder, module):
+    """numpy for Python 3 still tries to import some Python 2 modules;
+    exclude them."""
+    finder.excludes.append("compiler")
+    finder.excludes.append("new")
+    finder.excludes.append("md5")
+
+def hook_numpy_random_mtrand(finder, module):
+    """the numpy.random.mtrand module is an extension module and the
+    numpy.random module imports * from this module; define the list of
+    global names available to this module in order to avoid spurious
+    errors about missing modules.
+    """
+    module.__globalnames__.add('RandomState')
+    module.__globalnames__.add('beta')
+    module.__globalnames__.add('binomial')
+    module.__globalnames__.add('bytes')
+    module.__globalnames__.add('chisquare')
+    module.__globalnames__.add('choice')
+    module.__globalnames__.add('dirichlet')
+    module.__globalnames__.add('exponential')
+    module.__globalnames__.add('f')
+    module.__globalnames__.add('gamma')
+    module.__globalnames__.add('geometric')
+    module.__globalnames__.add('get_state')
+    module.__globalnames__.add('gumbel')
+    module.__globalnames__.add('hypergeometric')
+    module.__globalnames__.add('laplace')
+    module.__globalnames__.add('logistic')
+    module.__globalnames__.add('lognormal')
+    module.__globalnames__.add('logseries')
+    module.__globalnames__.add('multinomial')
+    module.__globalnames__.add('multivariate_normal')
+    module.__globalnames__.add('negative_binomial')
+    module.__globalnames__.add('noncentral_chisquare')
+    module.__globalnames__.add('noncentral_f')
+    module.__globalnames__.add('normal')
+    module.__globalnames__.add('np')
+    module.__globalnames__.add('operator')
+    module.__globalnames__.add('pareto')
+    module.__globalnames__.add('permutation')
+    module.__globalnames__.add('poisson')
+    module.__globalnames__.add('power')
+    module.__globalnames__.add('rand')
+    module.__globalnames__.add('randint')
+    module.__globalnames__.add('randn')
+    module.__globalnames__.add('random_integers')
+    module.__globalnames__.add('random_sample')
+    module.__globalnames__.add('rayleigh')
+    module.__globalnames__.add('seed')
+    module.__globalnames__.add('set_state')
+    module.__globalnames__.add('shuffle')
+    module.__globalnames__.add('standard_cauchy')
+    module.__globalnames__.add('standard_exponential')
+    module.__globalnames__.add('standard_gamma')
+    module.__globalnames__.add('standard_normal')
+    module.__globalnames__.add('standard_t')
+    module.__globalnames__.add('triangular')
+    module.__globalnames__.add('uniform')
+    module.__globalnames__.add('vonmises')
+    module.__globalnames__.add('wald')
+    module.__globalnames__.add('weibull')
+    module.__globalnames__.add('zipf')
+
 def hook_numpy_distutils(finder, module):
     """In a 'if sys.version_info[0] < 3:' block numpy.distutils does
     an implicit relative import: 'import __config__'.  This will not
