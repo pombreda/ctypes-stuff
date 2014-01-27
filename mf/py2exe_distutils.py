@@ -67,17 +67,11 @@ class BuildInterpreters(build_ext.build_ext):
 
                 build_py = self.get_finalized_command('build_py')
                 package_dir = build_py.get_package_dir(package)
-                if fullname == "py2exe.resources":
-                    exe_filename = os.path.join(package_dir, "resources")
-                else:
-                    exe_filename = os.path.join(package_dir,
-                                                self.get_exe_filename(base))
+                exe_filename = os.path.join(package_dir,
+                                            self.get_exe_filename(base))
             else:
-                if fullname == "py2exe.resources":
-                    exe_filename = os.path.join(self.build_lib, "resources")
-                else:
-                    exe_filename = os.path.join(self.build_lib,
-                                                self.get_exe_filename(fullname))
+                exe_filename = os.path.join(self.build_lib,
+                                            self.get_exe_filename(fullname))
             if inter.target_desc == "executable":
                 exe_filename += ".exe"
             else:
@@ -146,6 +140,8 @@ class BuildInterpreters(build_ext.build_ext):
             fnm = os.path.join(*ext_path) + '_d'
         else:
             fnm = os.path.join(*ext_path)
+        if ext_path[-1] == "resources":
+            return fnm
         return '%s-py%s.%s-%s' % (fnm, sys.version_info[0], sys.version_info[1], get_platform())
 
     def setup_compiler(self):
