@@ -1,7 +1,8 @@
-from distutils.core import Command
 import os
 import sys
 import warnings
+
+from distutils.core import Command
 
 ## from distutils.spawn import spawn
 ## from distutils.errors import *
@@ -180,22 +181,19 @@ class py2exe(Command):
         build = self.reinitialize_command('build')
         build.run()
         sys_old_path = sys.path[:]
-        if build.build_platlib is not None:
-            sys.path.insert(0, build.build_platlib)
-        if build.build_lib is not None:
-            sys.path.insert(0, build.build_lib)
         try:
+            if build.build_platlib is not None:
+                sys.path.insert(0, build.build_platlib)
+            if build.build_lib is not None:
+                sys.path.insert(0, build.build_lib)
             self._run()
-            # Hm, distutils catches errors different from DistutilsError ???
         except Exception as details:
-            print("ERROR", details)
+            import traceback; traceback.print_exc()
             # XXX need another way to report (?)
         finally:
             sys.path = sys_old_path
 
     def _run(self):
-        print("run")
-
         dist = self.distribution
 
         ## # all of these contain module names
