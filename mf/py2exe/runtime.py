@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 from .dllfinder import Scanner, pydll
 
-import distutils.util
 import imp
 import io
 import logging
@@ -16,6 +15,7 @@ import zipfile
 
 from .resources import UpdateResources
 from .versioninfo import Version
+from .icons import BuildIcons
 
 logger = logging.getLogger("runtime")
 
@@ -61,9 +61,9 @@ class Target:
         for r_id, r_filename in resources:
             if not isinstance(r_id, int):
                 # Hm, strings are also allowed as resource ids...
-                raise DistutilsOptionError("Resource ID must be an integer")
+                raise TypeError("Resource ID must be an integer")
             if not os.path.isfile(r_filename):
-                raise DistutilsOptionError("Resource filename '%s' does not exist" % r_filename)
+                raise FileNotFoundError("Resource filename '%s' does not exist" % r_filename)
 
     def analyze(self, modulefinder):
         """Run modulefinder on anything that is needed for this target.
@@ -99,7 +99,7 @@ def fixup_targets(targets, default_attribute):
         else:
             d = getattr(target_def, "__dict__", target_def)
             if not default_attribute in d:
-                raise DistutilsOptionError(
+                raise TypeError(
                       "This target class requires an attribute '%s'" % default_attribute)
             target = Target(**d)
         target.validate()
@@ -301,37 +301,36 @@ class Runtime(object):
 ##            resource.add_string(1000, "foo bar")
 ##            resource.add_string(1001, "Hallöle €")
 
-        with UpdateResources(exe_path, delete_existing=False) as resource:
+        with UpdateResources(exe_path, delete_existing=False) as res_writer:
             for res_type, res_name, res_data in getattr(target, "other_resources", ()):
                 if res_type == RT_MANIFEST and isinstance(res_data, str):
                     res_data = res_data.encode("utf-8")
-                resource.add(type=res_type, name=res_name, value=res_data)
+                res_writer.add(type=res_type, name=res_name, value=res_data)
 
-        # Build and add a versioninfo resource
-        def get(name):
-            return getattr(target, name, None)
+            # Build and add a versioninfo resource
 
-        if hasattr(target, "version"):
-            version = Version(target.version,
-                              file_description = get("description"),
-                              comments = get("comments"),
-                              company_name = get("company_name"),
-                              legal_copyright = get("copyright"),
-                              legal_trademarks = get("trademarks"),
-                              original_filename = os.path.basename(exe_path),
-                              product_name = get("product_name"),
-                              product_version = get("product_version") or target.version)
+            # XXX better use resource.add_version(target) ???  would look nicer...
+            if hasattr(target, "version"):
+                def get(name):
+                    return getattr(target, name, None)
+                version = Version(target.version,
+                                  file_description = get("description"),
+                                  comments = get("comments"),
+                                  company_name = get("company_name"),
+                                  legal_copyright = get("copyright"),
+                                  legal_trademarks = get("trademarks"),
+                                  original_filename = os.path.basename(exe_path),
+                                  product_name = get("product_name"),
+                                  product_version = get("product_version") or target.version)
                                   
-            with UpdateResources(exe_path, delete_existing=False) as resource:
                 from ._wapi import RT_VERSION
-                resource.add(type=RT_VERSION,
+                res_writer.add(type=RT_VERSION,
                              name=1,
                              value=version.resource_bytes())
 
-        for res_id, ico_file in getattr(target, "icon_resources", ()):
-            with UpdateResources(exe_path, delete_existing=False) as resource:
-                resource.add_icon(res_id, ico_file)
-
+        for res_type, res_name, res_data in BuildIcons(getattr(target, "icon_resources", ())):
+            with UpdateResources(exe_path, delete_existing=False) as res_writer:
+                res_writer.add(type=res_type, name=res_name, value=res_data)
 
 
     def build_archive(self, libpath):
@@ -364,8 +363,6 @@ class Runtime(object):
         # Create a zipfile and append it to the library file
         arc = zipfile.ZipFile(libpath, "a",
                               compression=compression)
-
-        dlldir = os.path.dirname(libpath)
 
         for mod in self.mf.modules.values():
             if mod.__code__:
@@ -519,6 +516,10 @@ class Runtime(object):
 
         if target.exe_type == "service":
             # code for services
+            # cmdline_style is one of:
+            # py2exe
+            # pywin32
+            # custom
             code_objects.append(
                 compile("cmdline_style = 'py2exe'; service_module_names = %r" % (target.modules,),
                         "<service_info>", "exec"))
