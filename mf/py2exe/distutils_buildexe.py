@@ -1,4 +1,3 @@
-import os
 import sys
 import warnings
 
@@ -159,15 +158,15 @@ class py2exe(Command):
         self.ignores = fancy_split(self.ignores)
         self.bundle_files = int(self.bundle_files)
         if self.bundle_files < 1 or self.bundle_files > 3:
-            raise DistutilsOptionError("bundle-files must be 1, 2, or 3, not %s"
-                                       % self.bundle_files)
+            raise ValueError("bundle-files must be 1, 2, or 3, not %s"
+                             % self.bundle_files)
         if self.ascii:
             warnings.warn("The 'ascii' option is no longer supported, ignored.")
         if self.skip_archive:
             if self.compressed:
-                raise DistutilsOptionError("can't compress when skipping archive")
+                raise ValueError("can't compress when skipping archive")
             if self.distribution.zipfile is None:
-                raise DistutilsOptionError("zipfile cannot be None when skipping archive")
+                raise ValueError("zipfile cannot be None when skipping archive")
         # includes is stronger than excludes
         for m in self.includes:
             if m in self.excludes:
@@ -187,7 +186,7 @@ class py2exe(Command):
             if build.build_lib is not None:
                 sys.path.insert(0, build.build_lib)
             self._run()
-        except Exception as details:
+        except Exception:
             import traceback; traceback.print_exc()
             # XXX need another way to report (?)
         finally:
