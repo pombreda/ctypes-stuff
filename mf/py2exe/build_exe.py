@@ -3,11 +3,13 @@
 import argparse
 import logging
 import os
+import textwrap
 from . import runtime
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Build runtime archive for a script")
+    parser = argparse.ArgumentParser(description="Build runtime archive for a script",
+                                     formatter_class=argparse.RawTextHelpFormatter)
 
     # what to include, what to exclude...
     parser.add_argument("-i", "--include",
@@ -70,20 +72,22 @@ def main():
                         dest="libname")
 
     parser.add_argument("-b", "--bundle-files",
-                        help="""How to bundle the files. 3 - create an .exe, a zip-archive, and .pyd
-                        files in the file system.  2 - create .exe and
-                        a zip-archive that contains the pyd files.
-                        XXX more
-                        pyd files are extracted on demand to a
-                        temporary directory, this directory is removed
-                        after the program has finished.""",
+                        help=textwrap.dedent("""\
+                        How to bundle the files:
+                          3 - create script.exe, python.dll, extensions.pyd, others.dll.
+                          2 - create script.exe, python.dll, others.dll.
+                          1 - create script.exe, others.dll.
+                          0 - create script.exe.
+                          """),
                         choices=[0, 1, 2, 3],
                         type=int,
                         default=3)
 
     parser.add_argument("-W", "--write-setup-script",
-                        help="""Do not build the executables; instead write a setup script that allows
-                        further customizations of the build process.""",
+                        help=textwrap.dedent("""\
+                        Do not build the executables; instead write a setup script that allows
+                        further customizations of the build process.
+                        """),
                         metavar="setup_path",
                         dest="setup_path")
 
