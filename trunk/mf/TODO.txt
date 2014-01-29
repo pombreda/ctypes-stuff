@@ -4,16 +4,21 @@ Bugs:
 
 - distutils_buildexe needs to import DistutilsOptionError (or so)
 
+- Does probably not work with extensions built against the limited API
+  (python3.dll)???
+
 Ideas:
 
-- add some scripts to inspect executables, like dump_manifest.py
-- dump_versioninfo.py
+- add some scripts to inspect executables, like:
+-     dump_manifest.py
+-     dump_versioninfo.py
 - or even a general resource dumper?
 
 TODO:
 
 - DLL com servers not yet implemented
 - test services
+- services cmdline_style not yet implemented
 
 Fixed bugs:
   rev 336: - py2exe\dll.dll is not installed.
