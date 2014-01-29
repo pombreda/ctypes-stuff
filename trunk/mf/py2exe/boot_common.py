@@ -49,26 +49,23 @@ import ctypes
 ##print("PATH", repr(sys.path[0]), "thats it.")
 
 if sys.frozen == "windows_exe":
-    MessageBox = ctypes.windll.user32.MessageBoxW
     class Stderr(object):
-        softspace = 0
         _file = None
         _error = None
-        def write(self, text, alert=MessageBox,
+        def write(self, text, alert=ctypes.windll.user32.MessageBoxW,
                   fname=os.path.splitext(sys.executable)[0] + '.log'):
             if self._file is None and self._error is None:
+                import atexit, os, sys
                 try:
                     self._file = open(fname, 'a')
                 except Exception as details:
                     self._error = details
-                    import atexit
                     atexit.register(alert, 0,
                                     "The logfile '%s' could not be opened:\n %s" % \
                                     (fname, details),
                                     "Errors in %r" % os.path.basename(sys.executable),
                                     0)
                 else:
-                    import atexit
                     atexit.register(alert, 0,
                                     "See the logfile '%s' for details" % fname,
                                     "Errors in %r" % os.path.basename(sys.executable),
@@ -81,7 +78,6 @@ if sys.frozen == "windows_exe":
                 self._file.flush()
     sys.stderr = Stderr()
     del Stderr
-    del MessageBox
 
     class Blackhole(object):
         softspace = 0
