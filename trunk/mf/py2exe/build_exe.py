@@ -7,7 +7,6 @@ import textwrap
 from . import runtime
 
 def main():
-    import argparse
     parser = argparse.ArgumentParser(description="Build runtime archive for a script",
                                      formatter_class=argparse.RawTextHelpFormatter)
 

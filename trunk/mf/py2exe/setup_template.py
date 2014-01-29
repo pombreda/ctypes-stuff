@@ -1,8 +1,9 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-import os
-import string
+from string import Template
+import os, sys
+
 
 HEADER = """\
 #!/usr/bin/python3
@@ -172,9 +173,6 @@ setup(name="name",
 """
 
 def write_setup(args):
-    from string import Template
-    import os, sys
-
     with open(args.setup_path, "w", encoding="utf-8") as ofi:
 
         header = Template(HEADER)

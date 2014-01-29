@@ -7,7 +7,6 @@ import contextlib
 import ctypes
 
 from . import _wapi
-from . import icons
 
 @contextlib.contextmanager
 def UpdateResources(filename, *, delete_existing=False):

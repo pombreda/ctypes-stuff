@@ -282,7 +282,7 @@ class Scanner(ModuleFinder):
             self.import_package(pkg)
         while self._safe_import_hook_later:
             args = self._safe_import_hook_later.pop()
-            name, caller, freomlist, level = args
+            name, caller, fromlist, level = args
             self.safe_import_hook(name,
                                   caller=caller,
                                   fromlist=fromlist,

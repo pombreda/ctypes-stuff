@@ -131,7 +131,7 @@ class ModuleFinder:
         self._indent = self._indent + INDENT
         try:
             self.import_hook(name, caller, fromlist, level)
-        except ImportError as exc:
+        except ImportError:
             if self._verbose > 1:
                 print("%s# -> ImportError" % self._indent[:-len(INDENT)])
         finally:
@@ -582,7 +582,7 @@ class Module:
                                                    optimize=self.__optimize__)
                 elif hasattr(self, "__file__") and not self.__file__.endswith(".pyd"):
                     # XXX Remove the following line if the Bug is never triggered!
-                    raise Bug("should read __file__ to get the source???")
+                    raise RuntimeError("should read __file__ to get the source???")
         return self.__code_object__
 
 
