@@ -2,10 +2,12 @@
 # -*- coding: utf-8 -*-
 """win32 icons
 """
+import itertools
 
 # John Hornick, "Icons in Win32", September 29, 1995
 # http://msdn.microsoft.com/en-us/library/ms997538.aspx
-
+# The Old New Thing, "The format of icon resources"
+# http://blogs.msdn.com/b/oldnewthing/archive/2012/07/20/10331787.aspx
 from . import _wapi
 
 # dwBytesInRes is the size of the ICONIMAGE blob, dwImageOffset is the
@@ -71,7 +73,7 @@ class GRPICONDIRENTRY(_wapi.Structure):
                 ("nID", _wapi.WORD)]
 
 
-def CreateGrpIconDirHeader(iconheader, icoid):
+def CreateGrpIconDirHeader(iconheader, id_generator):
     """Create a GRPICONDIRHEADER from an ICONDIRHEADER.
     """
     # ctypes doesn't support variable type structures; so we
@@ -100,10 +102,34 @@ def CreateGrpIconDirHeader(iconheader, icoid):
         dst.wPlanes = src.wPlanes
         dst.wBitCount = src.wBitCount
         dst.dwBytesInRes = src.dwBytesInRes
-        dst.nID = icoid + i
+        dst.nID = next(id_generator)
         if dst.nID > 32767:
             raise ValueError("Invalid resource id %s" % dst.nID)
     return grpheader
+
+################################################################
+
+def BuildIcons(icon_resources):
+    """Create RT_ICON and RT_GROUP_ICON resources from a list of
+    (icon id, icon file) tuples.
+    """
+    result = []
+
+    id_generator = itertools.count(10)
+
+    for resource_id, iconpath in icon_resources:
+        with open(iconpath, "rb") as iconfile:
+            header = ICONDIRHEADER.readfrom(iconfile)
+
+        grp_header = CreateGrpIconDirHeader(header, id_generator)
+
+        for i, entry in enumerate(grp_header.idEntries):
+            # type, name, data
+            result.append((_wapi.RT_ICON, entry.nID, header.iconimages[i]))
+
+        result.append((_wapi.RT_GROUP_ICON, resource_id, grp_header.tobytes()))
+
+    return result
 
 ################################################################
 
