@@ -1,5 +1,3 @@
-This file and ``_memimporter.pyd`` is also part of the ``py2exe`` package.
-
 r"""py2exeimporter - an importer which can import extension modules
 from zipfiles without unpacking them to the file system.
 
