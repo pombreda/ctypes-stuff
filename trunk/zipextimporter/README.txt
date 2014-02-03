@@ -1,7 +1,8 @@
 py2exeimporter - an importer which can import extension modules
 from zipfiles without unpacking them to the file system.
 
-This file and ``_memimporter.pyd`` is also part of the ``py2exe`` package.
+This technology is also used by py2exe to create single-file
+executables.
 
 Overview
 ========
