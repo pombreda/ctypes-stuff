@@ -1,31 +1,31 @@
-r"""zipextimporter - an importer which can import extension modules
-from zipfiles without unpacking them to the file system.
+This file and ``_memimporter.pyd`` is also part of the ``py2exe`` package.
 
-This file and _memimporter.pyd is part of the py2exe package.
+r"""py2exeimporter - an importer which can import extension modules
+from zipfiles without unpacking them to the file system.
 
 Overview
 ========
 
-zipextimporter.py contains the ZipExtImporter class which allows to
+py2exeimporter.py contains the ZipExtImporter class which allows to
 load Python binary extension modules contained in a zip.archive,
-without unpacking them to the file system.
+*without unpacking them to the file system*.
 
-Call the zipextimporter.install() function to install the import hook,
-add a zip-file containing .pyd or .dll extension modules to sys.path,
-and import them.
+Call the ``py2exeimporter.install()`` function to install the import
+hook, add a zip-file containing .pyd or .dll extension modules to
+sys.path, and import them.
 
 It uses the _memimporter extension which uses code from Joachim
 Bauch's MemoryModule library.  This library emulates the win32 api
 function LoadLibrary.
 
-Sample usage
-============
+Usage example
+=============
 
-You have to prepare a zip-archive 'lib.zip' containing
+You have to prepare a zip-archive ``lib.zip`` containing
 your Python's _socket.pyd for this example to work.
 
->>> import zipextimporter
->>> zipextimporter.install()
+>>> import py2exeimporter
+>>> py2exeimporter.install()
 >>> import sys
 >>> sys.path.insert(0, "lib.zip")
 >>> import _socket
@@ -122,7 +122,7 @@ class ZipExtensionImporter(zipimport.zipimporter):
         return "<%s object %r>" % (self.__class__.__name__, self.archive)
 
 def install():
-    "Install the zipextimporter"
+    "Install the py2exeimporter"
     sys.path_hooks.insert(0, ZipExtensionImporter)
     # Not sure if this is needed...
     sys.path_importer_cache.clear()
@@ -137,8 +137,7 @@ if __name__ == "__main__":
     import glob
     import os
     import struct
-    import sys
-    import zipextimporter
+    import py2exeimporter
     import zipfile
 
     try:
@@ -178,11 +177,10 @@ if __name__ == "__main__":
     extensions = [os.path.splitext(name)[0]
                   for name in z.namelist()]
 
-##    print(extensions)
     extensions = [name[:len(name) - len(suffix)] for name in extensions
                   if name not in sys.modules]
 
-    zipextimporter.install()
+    py2exeimporter.install()
     sys.path.insert(0, zippath)
 
     for ext in extensions:
@@ -196,7 +194,7 @@ if __name__ == "__main__":
             else:
                 print(x)
 
-    import _socket
-    print(_socket)
-    reload(_socket)
-    print(_socket)
+    ## import _socket
+    ## print(_socket)
+    ## reload(_socket)
+    ## print(_socket)
