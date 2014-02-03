@@ -211,7 +211,7 @@ static PyMethodDef methods[] = {
 
 static struct PyModuleDef moduledef = {
 	PyModuleDef_HEAD_INIT,
-	"_memimporter", /* m_name */
+	"_py2exeimporter", /* m_name */
 	module_doc, /* m_doc */
 	-1, /* m_size */
 	methods, /* m_methods */
@@ -230,9 +230,9 @@ PyMODINIT_FUNC PyInit__memimporter(void)
 #else
 
 DL_EXPORT(void)
-init_memimporter(void)
+init_py2exeimporter(void)
 {
-	Py_InitModule3("_memimporter", methods, module_doc);
+	Py_InitModule3("_py2exeimporter", methods, module_doc);
 }
 
 #endif

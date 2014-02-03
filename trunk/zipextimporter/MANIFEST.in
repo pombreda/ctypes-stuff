@@ -1,0 +1,5 @@
+include source/*.c
+include source/*.h
+include py2exeimporter.py
+include README.txt
+include MANIFEST.in
