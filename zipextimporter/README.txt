@@ -1,4 +1,4 @@
-zipextimporter - an importer which can import extension modules
+py2exeimporter - an importer which can import extension modules
 from zipfiles without unpacking them to the file system.
 
 This file and ``_memimporter.pyd`` is also part of the ``py2exe`` package.
@@ -6,11 +6,11 @@ This file and ``_memimporter.pyd`` is also part of the ``py2exe`` package.
 Overview
 ========
 
-zipextimporter.py contains the ZipExtImporter class which allows to
+py2exeimporter.py contains the ZipExtImporter class which allows to
 load Python binary extension modules contained in a zip.archive,
 *without unpacking them to the file system*.
 
-Call the ``zipextimporter.install()`` function to install the import
+Call the ``py2exeimporter.install()`` function to install the import
 hook, add a zip-file containing .pyd or .dll extension modules to
 sys.path, and import them.
 
@@ -24,8 +24,8 @@ Usage example
 You have to prepare a zip-archive ``lib.zip`` containing
 your Python's _socket.pyd for this example to work.
 
->>> import zipextimporter
->>> zipextimporter.install()
+>>> import py2exeimporter
+>>> py2exeimporter.install()
 >>> import sys
 >>> sys.path.insert(0, "lib.zip")
 >>> import _socket
