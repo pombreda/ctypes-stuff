@@ -180,6 +180,7 @@ class DllFinder:
 #
 # _memimporter can be excluded because it is built into the run-stub.
 windows_excludes = """
+_curses
 _dummy_threading
 _emx_link
 _gestalt
