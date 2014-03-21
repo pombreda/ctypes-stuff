@@ -25,6 +25,14 @@ def hook_PIL(finder, module):
     finder.excludes.append("Tkinter")
     finder.import_package_later("PIL")
 
+def hook__socket(finder, module):
+    """
+    _socket.pyd uses the 'idna' encoding; and that requires
+    'unicodedata.pyd'.
+    """
+    finder.import_hook("encodings.idna")
+    finder.import_hook("unicodedata")
+
 def hook_pyreadline(finder, module):
     """
     """
