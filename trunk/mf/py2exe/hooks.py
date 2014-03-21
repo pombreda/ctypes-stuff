@@ -111,6 +111,9 @@ def hook_numpy(finder, module):
     finder.excludes.append("compiler")
     finder.excludes.append("new")
     finder.excludes.append("md5")
+    finder.excludes.append("urllib2")
+    finder.excludes.append("urlparse")
+    finder.excludes.append("future_builtins")
 
 def hook_numpy_random_mtrand(finder, module):
     """the numpy.random.mtrand module is an extension module and the
