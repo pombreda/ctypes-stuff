@@ -9,9 +9,67 @@
 #
 import os, sys
 
+# Exclude modules that the standard library imports (conditionally),
+# but which are not present on windows.
+#
+# _memimporter can be excluded because it is built into the run-stub.
+windows_excludes = """
+_curses
+_dummy_threading
+_emx_link
+_gestalt
+_posixsubprocess
+ce
+clr
+console
+fcntl
+grp
+java
+org
+os2
+posix
+pwd
+site
+termios
+vms_lib
+_memimporter
+""".split()
+
+def init_finder(finder):
+    # what about renamed functions, like urllib.pathname2url?
+    #
+    # We should use ignore() for Python 2 names so that my py2to3
+    # importhook works.  For modules that are not present on Windows,
+    # we should probably use excludes.append()
+    finder.excludes.extend(windows_excludes)
+
+    # python2 modules are ignored (but not excluded)
+    finder.ignore("BaseHTTPServer")
+    finder.ignore("ConfigParser")
+    finder.ignore("IronPython")
+    finder.ignore("SimpleHTTPServer")
+    finder.ignore("StringIO")
+    finder.ignore("__builtin__")
+    finder.ignore("_winreg")
+    finder.ignore("cPickle")
+    finder.ignore("cStringIO")
+    finder.ignore("commands")
+    finder.ignore("compiler")
+    finder.ignore("copy_reg")
+    finder.ignore("future_builtins")
+    finder.ignore("htmlentitydefs")
+    finder.ignore("httplib")
+    finder.ignore("md5")
+    finder.ignore("new")
+    finder.ignore("unittest2")
+    finder.ignore("urllib2")
+    finder.ignore("urlparse")
+    
+
 def hook_multiprocessing(finder, module):
     module.__globalnames__.add("AuthenticationError")
     module.__globalnames__.add("BufferTooShort")
+    module.__globalnames__.add("Manager")
     module.__globalnames__.add("TimeoutError")
     module.__globalnames__.add("cpu_count")
     module.__globalnames__.add("current_process")
@@ -31,7 +89,6 @@ def hook_PIL(finder, module):
     # c:\Python33-64\lib\site-packages\PIL
     """Pillow loads plugins"""
     # Exclude python 2 imports
-    finder.excludes.append("__builtin__")
     finder.excludes.append("Tkinter")
     finder.import_package_later("PIL")
 
@@ -46,17 +103,17 @@ def hook__socket(finder, module):
 def hook_pyreadline(finder, module):
     """
     """
-    finder.excludes.append("IronPythonConsole")
+    finder.ignore("IronPythonConsole")
     finder.excludes.append("StringIO") # in pyreadline.py3k_compat
-    finder.excludes.append("System")
+    finder.ignore("System")
     finder.excludes.append("sets")
-    finder.excludes.append("startup")
+    finder.ignore("startup")
 
 def hook_xml_etree_ElementTree(finder, module):
     """ElementC14N is an optional extension. Ignore if it is not
     found.
     """
-    finder.excludes.append("ElementC14N")
+    finder.ignore("ElementC14N")
 
 def hook_urllib_request(finder, module):
     """urllib.request imports _scproxy on darwin
@@ -80,11 +137,14 @@ def hook_pywintypes(finder, module):
 def hook_win32com(finder, module):
     """The win32com package extends it's __path__ at runtime.
     """
+    finder.import_hook("pywintypes")
+    finder.import_hook("pythoncom")
     import win32com
     module.__path__ = win32com.__path__
 
 def hook_win32api(finder, module):
     """win32api.FindFiles(...) needs this."""
+    finder.import_hook("pywintypes")
     finder.import_hook("win32timezone")
 
 def hook_tkinter(finder, module):
@@ -103,7 +163,7 @@ def hook_six(finder, module):
     """six.py is a python2/python3 compaibility library.  Exclude the
     python2 modules.
     """
-    finder.excludes.append("StringIO")
+    finder.ignore("StringIO")
 
 def hook_matplotlib(finder, module):
     """matplotlib requires data files in a 'mpl-data' subdirectory in
@@ -118,19 +178,22 @@ def hook_matplotlib(finder, module):
 def hook_numpy(finder, module):
     """numpy for Python 3 still tries to import some Python 2 modules;
     exclude them."""
-    finder.excludes.append("compiler")
-    finder.excludes.append("new")
-    finder.excludes.append("md5")
-    finder.excludes.append("urllib2")
-    finder.excludes.append("urlparse")
-    finder.excludes.append("future_builtins")
-    finder.excludes.append("__builtin__")
-    finder.excludes.append("copy_reg")
-    finder.excludes.append("commands")
     # I'm not sure if we can safely exclude these:
-    finder.excludes.append("Numeric")
-    finder.excludes.append("numarray")
-    finder.excludes.append("numpy_distutils")
+    finder.ignore("Numeric")
+    finder.ignore("numarray")
+    finder.ignore("numpy_distutils")
+    finder.ignore("setuptools")
+    finder.ignore("Pyrex")
+    finder.ignore("nose")
+    finder.ignore("scipy")
+
+def hook_nose(finder, module):
+    finder.ignore("IronPython")
+    finder.ignore("cStringIO")
+    finder.ignore("unittest2")
+
+def hook_sysconfig(finder, module):
+    finder.ignore("_sysconfigdata")
 
 def hook_numpy_random_mtrand(finder, module):
     """the numpy.random.mtrand module is an extension module and the

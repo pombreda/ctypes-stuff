@@ -175,44 +175,18 @@ class DllFinder:
 
 ################################################################
 
-# Exclude modules that the standard library imports (conditionally),
-# but which are not present on windows.
-#
-# _memimporter can be excluded because it is built into the run-stub.
-windows_excludes = """
-_curses
-_dummy_threading
-_emx_link
-_gestalt
-_posixsubprocess
-ce
-clr
-console
-fcntl
-grp
-java
-org
-os2
-posix
-pwd
-site
-termios
-vms_lib
-_memimporter
-""".split()
-
 class Scanner(ModuleFinder):
     """A ModuleFinder subclass which allows to find binary
     dependencies.
     """
     def __init__(self, path=None, verbose=0, excludes=[], optimize=0):
-        excludes = list(excludes) + windows_excludes
         super().__init__(path, verbose, excludes, optimize)
         self.dllfinder = DllFinder()
         self._data_directories = {}
         self._min_bundle = {}
         self._import_package_later = []
         self._safe_import_hook_later = []
+        hooks.init_finder(self)
 
     def set_min_bundle(self, name, value):
         self._min_bundle[name] = value

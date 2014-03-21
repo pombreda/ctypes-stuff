@@ -49,8 +49,10 @@ del __patch_py33
 
 
 class ModuleFinder:
-    def __init__(self, path=None, verbose=0, excludes=[], optimize=0):
-        self.excludes = excludes
+    def __init__(self, path=None, verbose=0, excludes=None, optimize=0,
+                 ignores=None):
+        self.excludes = list(excludes) if excludes is not None else []
+        self.ignores = ignores if ignores is not None else []
         self.path = path
         self._optimize = optimize
         self._verbose = verbose
@@ -321,7 +323,8 @@ class ModuleFinder:
 
 
     def _add_badmodule(self, name):
-        self.badmodules.add(name)
+        if name not in self.ignores:
+            self.badmodules.add(name)
 
 
     def _add_module(self, name, mod):
@@ -388,9 +391,15 @@ class ModuleFinder:
             else:
                 code = code[1:]
 
+    def ignore(self, name):
+        """If the module or package with the given name is not found,
+        don't record this as an error.  If is is found, however,
+        include it.
+        """
+        self.ignores.append(name)
 
     def missing(self):
-        """Return a list of modules that appear to be missing. Use
+        """Return a set of modules that appear to be missing. Use
         any_missing_maybe() if you want to know which modules are
         certain to be missing, and which *may* be missing.
 
@@ -407,11 +416,11 @@ class ModuleFinder:
                 missing.add(name)
         return missing
 
-
     def missing_maybe(self):
-        """Return two lists, one with modules that are certainly missing
-        and one with modules that *may* be missing. The latter names could
-        either be submodules *or* just global names in the package.
+        """Return two sets, one with modules that are certainly
+        missing and one with modules that *may* be missing. The latter
+        names could either be submodules *or* just global names in the
+        package.
 
         The reason it can't always be determined is that it's impossible to
         tell which names are imported when "from module import *" is done
