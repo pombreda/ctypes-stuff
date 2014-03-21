@@ -9,6 +9,16 @@
 #
 import os, sys
 
+def hook_multiprocessing(finder, module):
+    module.__globalnames__.add("AuthenticationError")
+    module.__globalnames__.add("BufferTooShort")
+    module.__globalnames__.add("TimeoutError")
+    module.__globalnames__.add("cpu_count")
+    module.__globalnames__.add("current_process")
+    module.__globalnames__.add("get_context")
+    module.__globalnames__.add("get_start_method")
+    module.__globalnames__.add("set_start_method")
+
 def import_psutil(finder, module):
     """Exclude stuff for other operating systems."""
     finder.excludes.append("_psutil_bsd")
@@ -116,6 +126,10 @@ def hook_numpy(finder, module):
     finder.excludes.append("future_builtins")
     finder.excludes.append("__builtin__")
     finder.excludes.append("copy_reg")
+    finder.excludes.append("commands")
+    # I'm not sure if we can safely exclude these:
+    finder.excludes.append("numarray")
+    finder.excludes.append("numpy_distutils")
 
 def hook_numpy_random_mtrand(finder, module):
     """the numpy.random.mtrand module is an extension module and the
