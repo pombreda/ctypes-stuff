@@ -128,6 +128,7 @@ def hook_numpy(finder, module):
     finder.excludes.append("copy_reg")
     finder.excludes.append("commands")
     # I'm not sure if we can safely exclude these:
+    finder.excludes.append("Numeric")
     finder.excludes.append("numarray")
     finder.excludes.append("numpy_distutils")
 
