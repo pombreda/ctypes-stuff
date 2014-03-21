@@ -578,8 +578,12 @@ class Module:
                 if source is not None:
                     # XXX??? for py3exe:
                     __file__ = self.__file__ if hasattr(self, "__file__") else "<string>"
-                    self.__code_object__ = compile(source, __file__, "exec",
-                                                   optimize=self.__optimize__)
+                    try:
+                        self.__code_object__ = compile(source, __file__, "exec",
+                                                       optimize=self.__optimize__)
+                    except Exception as details:
+                        import traceback; traceback.print_exc()
+                        raise RuntimeError("compiling %r" % self) from None
                 elif hasattr(self, "__file__") and not self.__file__.endswith(".pyd"):
                     # XXX Remove the following line if the Bug is never triggered!
                     raise RuntimeError("should read __file__ to get the source???")
