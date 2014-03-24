@@ -393,7 +393,8 @@ class Runtime(object):
                     pydfile = mod.__name__ + EXTENSION_SUFFIXES[0]
                     loader = LOAD_FROM_DIR.format(pydfile)
 
-                    code = compile(loader, "<loader>", "exec")
+                    code = compile(loader, "<loader>", "exec",
+                                   optimize=self.options.optimize)
                     if hasattr(mod, "__path__"):
                         path = mod.__name__.replace(".", "\\") + "\\__init__" + bytecode_suffix
                     else:
@@ -503,7 +504,8 @@ class Runtime(object):
         # XXX should this be done in the exe-stub?
         code_objects.append(
             compile("import os, sys; sys.base_prefix = sys.prefix = os.path.dirname(sys.executable); del os, sys",
-                    "<bootstrap2>", "exec"))
+                    "<bootstrap2>", "exec",
+                    optimize=self.options.optimize))
 
         if self.options.bundle_files < 3:
             # XXX do we need this one?
@@ -511,7 +513,8 @@ class Runtime(object):
             ##               "<bootstrap>", "exec")
             ## code_objects.append(obj)
             obj = compile("import zipextimporter; zipextimporter.install(); del zipextimporter",
-                          "<install zipextimporter>", "exec")
+                          "<install zipextimporter>", "exec",
+                          optimize=self.options.optimize)
             code_objects.append(obj)
 
         if target.exe_type == "service":
@@ -522,15 +525,18 @@ class Runtime(object):
             # custom
             code_objects.append(
                 compile("cmdline_style = 'py2exe'; service_module_names = %r" % (target.modules,),
-                        "<service_info>", "exec"))
+                        "<service_info>", "exec",
+                        optimize=self.options.optimize))
 
             boot_code = compile(pkgutil.get_data("py2exe", "boot_service.py"),
-                                "boot_service.py", "exec")
+                                "boot_service.py", "exec",
+                                optimize=self.options.optimize)
             code_objects.append(boot_code)
 
         elif target.exe_type in ("console_exe", "windows_exe"):
             boot_code = compile(pkgutil.get_data("py2exe", "boot_common.py"),
-                                "boot_common.py", "exec")
+                                "boot_common.py", "exec",
+                                optimize=self.options.optimize)
 
             code_objects.append(boot_code)
 
@@ -539,7 +545,8 @@ class Runtime(object):
                     # XXX what about compiler options?
                     # XXX what about source file encodings?
                     compile(script_file.read() + "\n",
-                            os.path.basename(target.script), "exec"))
+                            os.path.basename(target.script), "exec",
+                            optimize=self.options.optimize))
 
         return marshal.dumps(code_objects)
 
