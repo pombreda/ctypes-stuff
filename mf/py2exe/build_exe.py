@@ -130,6 +130,8 @@ def main():
         # no further action
         return
 
+    options.data_files = None
+
     level = logging.INFO if options.verbose else logging.WARNING
     logging.basicConfig(level=level)
 

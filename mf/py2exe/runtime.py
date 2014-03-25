@@ -143,14 +143,14 @@ class Runtime(object):
         if self.options.bundle_files < 3:
             self.bootstrap_modules.add("zipextimporter")
 
+        self.options.excludes = self.options.excludes if self.options.excludes else ()
+        self.options.optimize = self.options.optimize if self.options.optimize else 0
+
     def analyze(self):
         logger.info("Analyzing the code")
 
-        excludes = self.options.excludes if self.options.excludes else ()
-        optimize = self.options.optimize if self.options.optimize else 0
-
-        mf = self.mf = Scanner(excludes=excludes,
-                               optimize=optimize)
+        mf = self.mf = Scanner(excludes=self.options.excludes,
+                               optimize=self.options.optimize)
 
         for modname in self.bootstrap_modules:
             if modname.endswith(".*"):
@@ -237,7 +237,7 @@ class Runtime(object):
 
         self.copy_files(destdir)
 
-        # data files
+        # data files from modulefinder
         for name, (src, recursive) in self.mf._data_directories.items():
             if recursive:
                 dst = os.path.join(destdir, name)
@@ -247,6 +247,14 @@ class Runtime(object):
                 shutil.copytree(src, dst)
             else:
                 raise RuntimeError("not yet supported")
+
+        # other data files
+        if self.options.data_files:
+            for subdir, files in self.options.data_files:
+                os.makedirs(os.path.join(destdir, subdir), exist_ok=True)
+                for src in files:
+                    dst = os.path.join(destdir, subdir)
+                    shutil.copy2(src, dst)
 
     def get_runstub_bytes(self, target):
         from distutils.util import get_platform
