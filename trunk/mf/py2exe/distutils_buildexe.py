@@ -181,13 +181,13 @@ class py2exe(Command):
         build.run()
         sys_old_path = sys.path[:]
         try:
-            if build.build_platlib is not None:
-                sys.path.insert(0, build.build_platlib)
-            if build.build_lib is not None:
-                sys.path.insert(0, build.build_lib)
+            ## if build.build_platlib is not None:
+            ##     sys.path.insert(0, build.build_platlib)
+            ## if build.build_lib is not None:
+            ##     sys.path.insert(0, build.build_lib)
             self._run()
-        except Exception:
-            import traceback; traceback.print_exc()
+        ## except Exception:
+        ##     import traceback; traceback.print_exc()
             # XXX need another way to report (?)
         finally:
             sys.path = sys_old_path
@@ -249,6 +249,8 @@ class py2exe(Command):
                             summary = False,
                             show_from = None,
 
+                            data_files = self.distribution.data_files,
+                            
                             compress = self.compressed,
                             )
 
