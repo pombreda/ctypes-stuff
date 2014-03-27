@@ -124,7 +124,7 @@ class Runtime(object):
     def __init__(self, options):
         self.options = options
 
-        self.targets = self.options.script + self.options.service
+        self.targets = self.options.script + self.options.service + self.options.com_servers
 
 ##         # build the executables
 ##         for target in dist.console:
@@ -167,7 +167,12 @@ class Runtime(object):
                 mf.import_package(modname)
 
         for target in self.targets:
+            if target.exe_type == "ctypes_comdll":
+                mf.import_hook("_ctypes")
             target.analyze(mf)
+            modules = getattr(target, "modules", [])
+            for m in modules:
+                mf.import_hook(m)
 
         mf.finish()
 
@@ -204,9 +209,13 @@ class Runtime(object):
         for i, target in enumerate(self.targets):
             # basename of the exe to create
             dest_base = target.get_dest_base()
-
-            # full path to exe-file
-            exe_path = os.path.join(destdir, dest_base + ".exe")
+            
+            if target.exe_type in ("ctypes_comdll"):
+                # full path to exe-file
+                exe_path = os.path.join(destdir, dest_base + ".dll")
+            else:
+                # full path to exe-file
+                exe_path = os.path.join(destdir, dest_base + ".exe")
 
             if os.path.isfile(exe_path):
                 os.remove(exe_path)
@@ -262,6 +271,8 @@ class Runtime(object):
             run_stub = 'run-py%s.%s-%s.exe' % (sys.version_info[0], sys.version_info[1], get_platform())
         elif target.exe_type == "windows_exe":
             run_stub = 'run_w-py%s.%s-%s.exe' % (sys.version_info[0], sys.version_info[1], get_platform())
+        elif target.exe_type == "ctypes_comdll":
+            run_stub = 'run_ctypes_dll-py%s.%s-%s.dll' % (sys.version_info[0], sys.version_info[1], get_platform())
         else:
             raise ValueError("Unknown exe_type %r" % target.exe_type)
         ## if self.options.verbose:
@@ -273,6 +284,7 @@ class Runtime(object):
 
     def build_exe(self, target, exe_path, libname):
         """Build the exe-file."""
+##        print("Building exe '%s'" % exe_path)
         logger.info("Building exe '%s'", exe_path)
 
         exe_bytes = self.get_runstub_bytes(target)
@@ -555,6 +567,20 @@ class Runtime(object):
                     compile(script_file.read() + "\n",
                             os.path.basename(target.script), "exec",
                             optimize=self.options.optimize))
+
+        elif target.exe_type == "ctypes_comdll":
+            code_objects.append(
+                compile("com_module_names = %r" % target.modules,
+                        "com_module_names", "exec",
+                        optimize=self.options.optimize))
+
+            boot_code = compile(pkgutil.get_data("py2exe", "boot_ctypes_com_server.py"),
+                                "boot_ctypes_com_server.py", "exec",
+                                optimize=self.options.optimize)
+
+            code_objects.append(boot_code)
+        else:
+            raise RuntimeError("target_type '%s' not yet supported")
 
         return marshal.dumps(code_objects)
 

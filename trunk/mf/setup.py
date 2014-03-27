@@ -1,6 +1,6 @@
 #!/usr/bin/python3.3
 # -*- coding: utf-8 -*-
-"""Hello, World.
+"""setup script for py2exe.
 """
 
 import os
@@ -45,6 +45,30 @@ if 0:
     extra_compile_args.append("/Z7")
     extra_link_args.append("/DEBUG")
     macros.append(("VERBOSE", "1"))
+
+run_ctypes_dll = Interpreter("py2exe.run_ctypes_dll",
+                             ["source/run_ctypes_dll.c",
+                              "source/start.c",
+                              "source/icon.rc",
+
+                              "source/MemoryModule.c",
+                              "source/MyLoadLibrary.c",
+                              "source/_memimporter.c",
+                              "source/actctx.c",
+
+                              "source/python-dynload.c",
+                              ],
+                             libraries=["user32", "shell32"],
+                             export_symbols=["DllCanUnloadNow,PRIVATE",
+                                             "DllGetClassObject,PRIVATE",
+                                             "DllRegisterServer,PRIVATE",
+                                             "DllUnregisterServer,PRIVATE",
+                                             ],
+                             target_desc = "shared_library",
+                             define_macros=macros,
+                             extra_compile_args=extra_compile_args,
+                             extra_link_args=extra_link_args,
+                             )
 
 run = Interpreter("py2exe.run",
                   ["source/run.c",
@@ -93,7 +117,8 @@ resource_dll = Interpreter("py2exe.resources",
                            extra_link_args=["/NOENTRY"],
                            )
 
-interpreters = [run, run_w, resource_dll]
+interpreters = [run, run_w, resource_dll,
+                run_ctypes_dll]
 
 if __name__ == "__main__":
     import py2exe

@@ -4,8 +4,6 @@
 import sys
 import _ctypes
 
-import pdb; pdb.set_trace()
-
 if 1:
     ################################################################
     # XXX Remove later!
@@ -46,11 +44,13 @@ try:
 except NameError:
     print("This script is designed to be run from inside py2exe % s" % str(details))
     sys.exit(1)
-    
+
 com_modules = []
 for name in com_module_names:
     __import__(name)
     com_modules.append(sys.modules[name])
+
+print("C", com_modules)
 
 def get_classes(module):
     return [ob
@@ -75,11 +75,11 @@ del build_class_map
 
 def DllRegisterServer():
     # Enumerate each module implementing an object
-    import pdb; pdb.set_trace()
     from comtypes.server.register import register
     for mod in com_modules:
         # register each class
         for cls in get_classes(mod):
+            print("REGISTER", cls)
             register(cls)
 
 

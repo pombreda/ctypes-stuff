@@ -57,6 +57,18 @@ int *_Py_VerboseFlag_PTR()
 
 ////////////////////////////////////////////////////////////////
 
+int Py_IsInitialized(void)
+{
+  FUNC(int, Py_IsInitialized, (void));
+  return proc();
+}
+
+PyObject *PyLong_FromVoidPtr(void *p)
+{
+  FUNC(PyObject *, PyLong_FromVoidPtr, (void *));
+  return proc(p);
+}
+
 PyObject *PyErr_SetImportError(PyObject *msg, PyObject *name, PyObject *path)
 {
   FUNC(PyObject *, PyErr_SetImportError, (PyObject *, PyObject *, PyObject *));
@@ -79,6 +91,24 @@ int PyRun_InteractiveLoopFlags(FILE *fp, const char *filename, PyCompilerFlags *
 {
   FUNC(int, PyRun_InteractiveLoopFlags, (FILE *, const char *, PyCompilerFlags *));
   return proc(fp, filename, flags);
+}
+
+int PyRun_SimpleStringFlags(const char *command, PyCompilerFlags *flags)
+{
+  FUNC(int, PyRun_SimpleStringFlags, (const char *, PyCompilerFlags *));
+  return proc(command, flags);
+}
+
+void PyGILState_Release(PyGILState_STATE state)
+{
+  FUNC(void, PyGILState_Release, (PyGILState_STATE));
+  proc(state);
+}
+
+PyGILState_STATE PyGILState_Ensure(void)
+{
+  FUNC(PyGILState_STATE, PyGILState_Ensure, (void));
+  return proc();
 }
 
 wchar_t *Py_GetPath(void)
