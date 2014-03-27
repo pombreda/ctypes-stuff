@@ -142,7 +142,7 @@ BOOL locate_script(HMODULE hmod)
 	pScript = p_script_info->zippath + strlen(p_script_info->zippath) + 1;
 
 	// get full pathname of the 'library.zip' file
-	if(p_script_info->zippath[0]) {
+	if (p_script_info->zippath[0]) {
 		_snwprintf(libfilename, sizeof(libfilename),
 			   L"%s\\%S", dirname, p_script_info->zippath);
 	} else {
@@ -253,7 +253,7 @@ HMODULE load_pythondll(void)
 	return hmod_pydll;
 }
 
-int init(char *frozen)
+int init_with_instance(HMODULE hmod_exe, char *frozen)
 {
 
 	int rc = 0;
@@ -262,22 +262,25 @@ int init(char *frozen)
 /*	Py_NoSiteFlag = 1; /* Suppress 'import site' */
 /*	Py_InspectFlag = 1; /* Needed to determine whether to exit at SystemExit */
 
-	calc_dirname(NULL);
+	calc_dirname(hmod_exe);
 //	wprintf(L"modulename %s\n", modulename);
 //	wprintf(L"dirname %s\n", dirname);
 
-	if (!locate_script(GetModuleHandle(NULL))) {
-		printf("FATAL ERROR locating script\n");
+	if (!locate_script(hmod_exe)) {
+		SystemError(-1, "FATAL ERROR: Could not locate script");
+//		printf("FATAL ERROR locating script\n");
 		return -1;
 	}
 
 	hmod_pydll = load_pythondll();
 	if (hmod_pydll == NULL) {
-		printf("FATAL Error: could not load python library\n");
+		SystemError(-1, "FATAL ERROR: Could not load python library");
+//		printf("FATAL Error: could not load python library\n");
 		return -1;
 	}
 	if (PythonLoaded(hmod_pydll) < 0) {
-		printf("FATAL Error: failed to load some Python symbols\n");
+		SystemError(-1, "FATAL ERROR: Failed to load some Python symbols");
+//		printf("FATAL Error: failed to load some Python symbols\n");
 		return -1;
 	}
 
@@ -317,6 +320,11 @@ int init(char *frozen)
 		}
 	}
 	return rc;
+}
+
+int init(char *frozen)
+{
+	return init_with_instance(NULL, frozen);
 }
 
 static PyObject *Py_MessageBox(PyObject *self, PyObject *args)
