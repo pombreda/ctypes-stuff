@@ -75,7 +75,6 @@ def patch_distutils():
             self.service = attrs.pop("service", [])
             self.windows = attrs.pop("windows", [])
             self.console = attrs.pop("console", [])
-            self.ctypes_comserver = attrs.pop("ctypes_comserver", [])
             self.isapi = attrs.pop("isapi", [])
             self.zipfile = attrs.pop("zipfile", "library.zip")
 
