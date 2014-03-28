@@ -50,8 +50,6 @@ for name in com_module_names:
     __import__(name)
     com_modules.append(sys.modules[name])
 
-print("C", com_modules)
-
 def get_classes(module):
     return [ob
             for ob in module.__dict__.values()
@@ -79,7 +77,6 @@ def DllRegisterServer():
     for mod in com_modules:
         # register each class
         for cls in get_classes(mod):
-            print("REGISTER", cls)
             register(cls)
 
 
