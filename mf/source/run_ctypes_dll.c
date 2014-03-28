@@ -140,6 +140,8 @@ int load_ctypes(void)
 int check_init()
 {
 	if (!have_init) {
+//		if (IDYES == MessageBox(NULL, "Attach Debugger?", "run_ctypes_dll", MB_YESNO))
+//			DebugBreak();
 		EnterCriticalSection(&csInit);
 		// Check the flag again - another thread may have beat us to it!
 		if (!have_init) {

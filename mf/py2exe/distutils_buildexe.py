@@ -215,8 +215,8 @@ class py2exe(Command):
         for target in dist.service:
             target.exe_type = "service"
 
-        dist.ctypes_comserver = runtime.fixup_targets(dist.ctypes_comserver, "modules")
-        for target in dist.ctypes_comserver:
+        dist.ctypes_com_server = runtime.fixup_targets(dist.ctypes_com_server, "modules")
+        for target in dist.ctypes_com_server:
             target.exe_type = "ctypes_comdll"
 
 ##         # Convert our args into target objects.
@@ -245,7 +245,7 @@ class py2exe(Command):
 
                             script = dist.console + dist.windows,
                             service = dist.service,
-                            com_servers = dist.ctypes_comserver,
+                            com_servers = dist.ctypes_com_server,
 
                             destdir = self.dist_dir,
                             libname = dist.zipfile,
