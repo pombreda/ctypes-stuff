@@ -111,8 +111,13 @@ run_w = Interpreter("py2exe.run_w",
 # name will be 'resources.dll'.
 #
 # This is a resource only dll, so it needs no entry point.
+#
+# It seems that on SOME systems resources cannot be added correctly to
+# this DLL when there are no resources in the dll initially; so for
+# simplicity add the py2exe-icon.
 resource_dll = Interpreter("py2exe.resources",
-                           ["source/dll.c"],
+                           ["source/dll.c",
+                            "source/icon.rc"],
                            target_desc = "shared_library",
                            extra_link_args=["/NOENTRY"],
                            )
