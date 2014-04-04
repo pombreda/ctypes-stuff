@@ -1,9 +1,8 @@
 Bugs:
 
-- ctypes_com_server which uses sqlite3.  The sqlite3.dll is copied
-  into the dll-directory, but it will not be found...  DLL-Loading
-  problem with dll COM servers!  Probably have to adjust the DLL
-  loader path...  Would including sqlite3.dll into the zip work?
+- debug the 'verbose' argument to py2exe.  It defaults to 1, using
+  '-q' sets it to 0, '-v' doesn't change it, '-vv' sets it to 2.
+  Strange.
 
 - Is this true any longer ???:
   ctypes com servers (inproc) do not work with bundle_files 2 or 3
@@ -39,6 +38,8 @@ TODO:
 - services cmdline_style not yet implemented
 
 Fixed bugs:
+
+  rev 380: - ctypes DLL COM servers can now load dlls (like sqlite3.dll) correctly.
   rev 343: - DLL com servers are now implemented
   rev 336: - py2exe\dll.dll is not installed.
   rev 342: - when installed as egg, py2exe/boot_common.py is not a file and so not found.

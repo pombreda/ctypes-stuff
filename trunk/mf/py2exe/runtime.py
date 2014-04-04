@@ -242,6 +242,8 @@ class Runtime(object):
             dll_bytes = pkgutil.get_data("py2exe", "resources.dll")
             with open(libpath, "wb") as ofi:
                   ofi.write(dll_bytes)
+            if options.verbose:
+                print("Building shared code archive '%s'." % libpath)
             # Archive is appended to resources.dll; remove the icon
             # from the dll.  The icon is only present because on some
             # systems resources otherwise cannot be updated correctly.
@@ -316,9 +318,9 @@ class Runtime(object):
         # many, otherwise EndUpdateResource will fail with
         # WindowsError 13 (invalid data)
         with UpdateResources(exe_path, delete_existing=True) as resource:
-            ## if self.options.verbose:
-            ##     print("Add RSC %s/%s(%d bytes) to %s"
-            ##           % ("PYTHONSCRIPT", 1, len(script_info), exe_path))
+            if self.options.verbose > 1:
+                print("Add resource %s/%s(%d bytes) to %s"
+                      % ("PYTHONSCRIPT", 1, len(script_info), exe_path))
             resource.add(type="PYTHONSCRIPT", name=1, value=script_info)
 ##            # XXX testing
 ##            resource.add_string(1000, "foo bar")
@@ -375,8 +377,8 @@ class Runtime(object):
                 # in the python dll since it will be loaded via
                 # MemoryLoadLibrary, and so python cannot find the
                 # string resources anyway.
-                if self.options.verbose:
-                    print("Add RSC %s/%s(%d bytes) to %s"
+                if self.options.verbose > 1:
+                    print("Add resource %s/%s(%d bytes) to %s"
                           % (os.path.basename(pydll), 1, len(pydll_bytes), libpath))
                 resource.add(type=os.path.basename(pydll), name=1, value=pydll_bytes)
 
@@ -412,8 +414,8 @@ class Runtime(object):
                 if self.options.bundle_files <= 2:
                     # put .pyds into the archive
                     arcfnm = mod.__name__.replace(".", "\\") + EXTENSION_SUFFIXES[0]
-                    if self.options.verbose:
-                        print("Add PYD %s to %s" % (os.path.basename(mod.__file__), libpath))
+                    if self.options.verbose > 1:
+                        print("Add %s to %s" % (os.path.basename(mod.__file__), libpath))
                     arc.write(mod.__file__, arcfnm)
                 else:
                     # The extension modules will be copied into
@@ -421,6 +423,8 @@ class Runtime(object):
                     # being on sys.path, create a loader module and
                     # put that into the archive.
                     pydfile = mod.__name__ + EXTENSION_SUFFIXES[0]
+                    if self.options.verbose > 1:
+                        print("Add Loader for %s to %s" % (os.path.basename(mod.__file__), libpath))
                     loader = LOAD_FROM_DIR.format(pydfile)
 
                     code = compile(loader, "<loader>", "exec",
@@ -447,7 +451,7 @@ class Runtime(object):
             return
 
         for src in files:
-            if self.options.verbose:
+            if self.options.verbose > 1:
                 print("Add DLL %s to %s" % (os.path.basename(src), libpath))
             arc.write(src, os.path.basename(src))
 
@@ -466,7 +470,7 @@ class Runtime(object):
             # Python dll is not bundled; copy it into destdir
             dst = os.path.join(destdir, os.path.basename(pydll))
             if self.options.verbose:
-                print("Copy DLL %s to %s" % (pydll, destdir))
+                print("Copy %s to %s" % (pydll, destdir))
             shutil.copy2(pydll, dst)
             with UpdateResources(dst, delete_existing=False) as resource:
                 resource.add_string(1000, "py2exe")
@@ -483,7 +487,7 @@ class Runtime(object):
 
                     dst = os.path.join(libdir, pydfile)
                     if self.options.verbose:
-                        print("Copy PYD %s to %s" % (mod.__file__, dst))
+                        print("Copy %s to %s" % (mod.__file__, dst))
                     shutil.copy2(mod.__file__, dst)
 
         if self.options.bundle_files < 1:
