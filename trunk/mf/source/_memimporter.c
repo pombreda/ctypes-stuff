@@ -1,3 +1,6 @@
+// Need to define these to be able to use SetDllDirectory.
+#define _WIN32_WINNT 0x0502
+#define NTDDI_VERSION 0x05020000
 #include <Python.h>
 #include <windows.h>
 
@@ -7,6 +10,20 @@ static char module_doc[] =
 #include "MyLoadLibrary.h"
 #include "actctx.h"
 #include "python-dynload.h"
+
+/*
+static int dprintf(char *fmt, ...)
+{
+	char Buffer[4096];
+	va_list marker;
+	int result;
+
+	va_start(marker, fmt);
+	result = vsprintf(Buffer, fmt, marker);
+	OutputDebugString(Buffer);
+	return result;
+}
+*/
 
 #if (PY_VERSION_HEX >= 0x03030000)
 
@@ -98,6 +115,7 @@ int do_import(FARPROC init_func, char *modname)
 
 #endif
 
+extern wchar_t dirname[]; // executable/dll directory
 
 static PyObject *
 import_module(PyObject *self, PyObject *args)
@@ -110,6 +128,7 @@ import_module(PyObject *self, PyObject *args)
 
 	ULONG_PTR cookie = 0;
 	PyObject *findproc;
+	BOOL res;
 
 	//	MessageBox(NULL, "ATTACH", "NOW", MB_OK);
 	//	DebugBreak();
@@ -121,9 +140,40 @@ import_module(PyObject *self, PyObject *args)
 			      &findproc))
 		return NULL;
     
-	cookie = _My_ActivateActCtx();//try some windows manifest magic...
+	cookie = _My_ActivateActCtx(); // some windows manifest magic...
+	/*
+	 * The following problem occurs when we are a ctypes COM dll server
+	 * build with bundle_files == 1 which uses dlls that are not in the
+	 * library.zip. sqlite3.dll is such a DLL - py2exe copies it into the
+	 * exe/dll directory.
+	 *
+	 * The COM dll server is in some directory, but the client exe is
+	 * somewhere else.  So, the dll server directory is NOT on th default
+	 * dll search path.
+	 *
+	 * We use SetDllDirectory(dirname) to add the dll server directory to
+	 * the search path. Which works fine.  However, SetDllDirectory(NULL)
+	 * restores the DEFAULT dll search path; so it may remove directories
+	 * the the client has installed.  Do we have to call GetDllDirectory()
+	 * and save the result to be able to restore the path afterwards
+	 * again?
+	 *
+	 * Best would probably be to use AddDllDirectory / RemoveDllDirectory
+	 * but these are not even available by default on windows7...
+	 *
+	 * Are there other ways to allow loading of these dlls?  Application manifests?
+	 *
+	 * What about this activation context stuff?
+	 *
+	 * Note: py2exe 0.6 doesn't have this problem since it packs the
+	 * sqlite3.dll into the zip-archve when bundle_files == 1, but we want
+	 * to avoid that since it fails for other dlls (libiomp5.dll from
+	 * numpy is such an example).
+	 */
+	res = SetDllDirectoryW(dirname); // Add a directory to the search path
 	hmem = MyLoadLibrary(pathname, NULL, findproc);
-	_My_DeactivateActCtx(cookie);
+	if (res)
+		SetDllDirectory(NULL); // restore the default dll directory search path
 
 	if (!hmem) {
 	        char *msg;
