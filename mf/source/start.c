@@ -48,7 +48,7 @@ char *pZipBaseName;
 int numScriptBytes;
 wchar_t modulename[_MAX_PATH + _MAX_FNAME + _MAX_EXT]; // from GetModuleName()
 wchar_t dirname[_MAX_PATH]; // directory part of GetModuleName()
-wchar_t libdirname[_MAX_PATH]; // library directory - probably same as above.
+// Hm, do we need this? wchar_t libdirname[_MAX_PATH]; // library directory - probably same as above.
 wchar_t libfilename[_MAX_PATH + _MAX_FNAME + _MAX_EXT]; // library filename
 struct scriptinfo *p_script_info;
 
@@ -148,7 +148,7 @@ BOOL locate_script(HMODULE hmod)
 	} else {
 		GetModuleFileNameW(hmod, libfilename, sizeof(libfilename));
 	}
-	
+	// if needed, libdirname should be initialized here.
 	return TRUE; // success
 }
 
