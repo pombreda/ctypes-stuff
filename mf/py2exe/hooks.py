@@ -77,6 +77,12 @@ def hook_multiprocessing(finder, module):
     module.__globalnames__.add("get_start_method")
     module.__globalnames__.add("set_start_method")
 
+    module.__globalnames__.add("JoinableQueue")
+    module.__globalnames__.add("Lock")
+    module.__globalnames__.add("Process")
+    module.__globalnames__.add("Queue")
+    module.__globalnames__.add("freeze_support")
+
 def import_psutil(finder, module):
     """Exclude stuff for other operating systems."""
     finder.excludes.append("_psutil_bsd")
