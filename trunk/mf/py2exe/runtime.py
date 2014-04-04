@@ -242,7 +242,10 @@ class Runtime(object):
             dll_bytes = pkgutil.get_data("py2exe", "resources.dll")
             with open(libpath, "wb") as ofi:
                   ofi.write(dll_bytes)
-            self.build_archive(libpath)
+            # Archive is appended to resources.dll; remove the icon
+            # from the dll.  The icon is only present because on some
+            # systems resources otherwise cannot be updated correctly.
+            self.build_archive(libpath, delete_existing_resources=True)
 
         self.copy_files(destdir)
 
@@ -284,8 +287,8 @@ class Runtime(object):
 
     def build_exe(self, target, exe_path, libname):
         """Build the exe-file."""
-##        print("Building exe '%s'" % exe_path)
-        logger.info("Building exe '%s'", exe_path)
+        print("Building '%s'." % exe_path)
+##        logger.info("Building exe '%s'", exe_path)
 
         exe_bytes = self.get_runstub_bytes(target)
         with open(exe_path, "wb") as ofi:
@@ -341,7 +344,11 @@ class Runtime(object):
                                   legal_trademarks = get("trademarks"),
                                   original_filename = os.path.basename(exe_path),
                                   product_name = get("product_name"),
-                                  product_version = get("product_version") or target.version)
+                                  product_version = get("product_version") or target.version,
+                                  internal_name = get("internal_name"),
+                                  private_build = get("private_build"),
+                                  special_build = get("special_build"))
+
                                   
                 from ._wapi import RT_VERSION
                 res_writer.add(type=RT_VERSION,
@@ -352,13 +359,16 @@ class Runtime(object):
             with UpdateResources(exe_path, delete_existing=False) as res_writer:
                 res_writer.add(type=res_type, name=res_name, value=res_data)
 
-
-    def build_archive(self, libpath):
+    def build_archive(self, libpath, delete_existing_resources=False):
         """Build the archive containing the Python library.
         """
         if self.options.bundle_files <= 1:
             # Add pythonXY.dll as resource into the library file
-            with UpdateResources(libpath, delete_existing=False) as resource:
+            #
+            # XXX We should add a flag to the exe so that it does not try to load pythonXY.dll
+            # from the file system.
+            # XXX XXX XXX
+            with UpdateResources(libpath, delete_existing=delete_existing_resources) as resource:
                 with open(pydll, "rb") as ifi:
                     pydll_bytes = ifi.read()
                 # We do not need to replace the winver string resource
