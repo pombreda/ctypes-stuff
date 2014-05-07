@@ -29,6 +29,9 @@
 #include "MyLoadLibrary.h"
 #include "python-dynload.h"
 
+#include <fcntl.h>
+
+
 struct scriptinfo {
 	int tag;
 	int optimize;
@@ -203,20 +206,65 @@ int run_script(void)
 
 
 /* XXX XXX XXX flags should be set elsewhere */
+/*
+  c:\Python34\include\Python.h
+
+PyAPI_DATA(int) Py_DebugFlag;
+PyAPI_DATA(int) Py_VerboseFlag;
+PyAPI_DATA(int) Py_QuietFlag;
+PyAPI_DATA(int) Py_InteractiveFlag;
+PyAPI_DATA(int) Py_InspectFlag;
+PyAPI_DATA(int) Py_OptimizeFlag;
+PyAPI_DATA(int) Py_NoSiteFlag;
+PyAPI_DATA(int) Py_BytesWarningFlag;
+PyAPI_DATA(int) Py_UseClassExceptionsFlag;
+PyAPI_DATA(int) Py_FrozenFlag;
+PyAPI_DATA(int) Py_IgnoreEnvironmentFlag;
+PyAPI_DATA(int) Py_DontWriteBytecodeFlag;
+PyAPI_DATA(int) Py_NoUserSiteDirectory;
+PyAPI_DATA(int) Py_UnbufferedStdioFlag;
+PyAPI_DATA(int) Py_HashRandomizationFlag;
+PyAPI_DATA(int) Py_IsolatedFlag;
+
+ */
 void set_vars(HMODULE hmod_pydll)
 {
 	int *pflag;
 
+/* I'm not sure if the unbuffered code really works... */
+	if (p_script_info->unbuffered) {
+		_setmode(fileno(stdin), O_BINARY);
+		_setmode(fileno(stdout), O_BINARY);
+		setvbuf(stdin,	(char *)NULL, _IONBF, 0);
+		setvbuf(stdout, (char *)NULL, _IONBF, 0);
+		setvbuf(stderr, (char *)NULL, _IONBF, 0);
+
+		pflag = (int *)MyGetProcAddress(hmod_pydll, "Py_UnbufferedStdioFlag");
+		if (pflag) *pflag = 1;
+	}
+
+	pflag = (int *)MyGetProcAddress(hmod_pydll, "Py_IsolatedFlag");
+	if (pflag) *pflag = 1;
+
 	pflag = (int *)MyGetProcAddress(hmod_pydll, "Py_NoSiteFlag");
-	*pflag = 1;
+	if (pflag) *pflag = 1;
+
+	pflag = (int *)MyGetProcAddress(hmod_pydll, "Py_IgnoreEnvironmentFlag");
+	if (pflag) *pflag = 1;
+
+	pflag = (int *)MyGetProcAddress(hmod_pydll, "Py_NoUserSiteDirectory");
+	if (pflag) *pflag = 1;
 
 	pflag = (int *)MyGetProcAddress(hmod_pydll, "Py_OptimizeFlag");
-	if (pflag)
-		*pflag = p_script_info->optimize;
-/*
-	Py_NoSiteFlag = 1;
-	Py_OptimizeFlag = 1;
-*/
+	if (pflag) *pflag = p_script_info->optimize;
+
+	pflag = (int *)MyGetProcAddress(hmod_pydll, "Py_VerboseFlag");
+	if (pflag) {
+		if (getenv("PY2EXE_VERBOSE"))
+			*pflag = atoi(getenv("PY2EXE_VERBOSE"));
+		else
+			*pflag = 0;
+	}
 }
 
 /*

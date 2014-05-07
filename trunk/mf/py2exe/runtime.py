@@ -297,7 +297,7 @@ class Runtime(object):
             ofi.write(exe_bytes)
 
         optimize = self.options.optimize
-        unbuffered = False # XXX
+        unbuffered = self.options.unbuffered
 
         script_data = self._create_script_data(target)
 
@@ -310,7 +310,7 @@ class Runtime(object):
         script_info = struct.pack("IIII",
                                   0x78563412,
                                   optimize if optimize is not None else 0,
-                                  unbuffered,
+                                  unbuffered if unbuffered is not None else 0,
                                   len(script_data))
         script_info += zippath + b"\0" + script_data + b"\0"
 
