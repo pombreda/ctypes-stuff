@@ -1,0 +1,3 @@
+include source *.c *.h *.rc *.ico
+include py2exe_distutils.py
+include LICENSE.txt MIT-License.txt MPL2-License.txt
