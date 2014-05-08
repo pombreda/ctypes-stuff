@@ -9,7 +9,7 @@ import sys
 from setuptools import setup
 ##from distutils.core import setup
 
-from py2exe_distutils import Dist, Interpreter, BuildInterpreters
+from py2exe.py2exe_distutils import Dist, Interpreter, BuildInterpreters
 
 ############################################################################
 
@@ -125,8 +125,30 @@ resource_dll = Interpreter("py2exe.resources",
 interpreters = [run, run_w, resource_dll,
                 run_ctypes_dll]
 
+try:
+    from wheel import bdist_wheel
+except ImportError:
+    my_bdist_wheel = None
+else:
+    class my_bdist_wheel(bdist_wheel.bdist_wheel):
+        """We change the bdist_wheel command so that it creates a
+        wheel-file compatible with Python 3.3 and Python 3.4 only by
+        setting the impl_tag to py34.py33.
+        """
+        def get_tag(self):
+            impl_tag, abi_tag, plat_tag = super().get_tag()
+            return "py34.py33", abi_tag, plat_tag
+
+
 if __name__ == "__main__":
     import py2exe
+    from py2exe.py2exe_distutils import my_bdist_wheel
+
+    cmdclass = {'build_interpreters': BuildInterpreters}
+    if my_bdist_wheel is not None:
+        cmdclass['bdist_wheel'] = my_bdist_wheel
+    
+
     setup(name="py2exe",
           version=py2exe.__version__,
           description="Build standalone executables for Windows (python 3 version)",
@@ -159,7 +181,7 @@ if __name__ == "__main__":
               ],
 
           distclass = Dist,
-          cmdclass = {'build_interpreters': BuildInterpreters},
+          cmdclass = cmdclass,
 ##          scripts = ["build_exe.py"],
           entry_points = {
               'console_scripts': ['build_exe = py2exe.build_exe:main'],

@@ -1,3 +1,4 @@
+# This file is only used when BUILDING py2exe.
 import os, sys
 
 from distutils.core import Extension
