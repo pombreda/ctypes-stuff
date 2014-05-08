@@ -131,6 +131,8 @@ def main():
         return
 
     options.data_files = None
+    options.com_servers = []
+    options.unbuffered = False
 
     level = logging.INFO if options.verbose else logging.WARNING
     logging.basicConfig(level=level)
