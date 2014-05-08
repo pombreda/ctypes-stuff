@@ -143,12 +143,11 @@ if __name__ == "__main__":
           classifiers=[
               "Development Status :: 4 - Beta",
               "Environment :: Console",
-              "Environment :: Win32 (MS Windows)",
               "Operating System :: Microsoft :: Windows",
               "Programming Language :: C",
               "Programming Language :: Python :: 3",
-              "Programming Language :: Python :: 3.2",
               "Programming Language :: Python :: 3.3",
+              "Programming Language :: Python :: 3.4",
               "Programming Language :: Python :: Implementation :: CPython",
               "Topic :: Software Development",
               "Topic :: Software Development :: Libraries",
@@ -166,7 +165,6 @@ if __name__ == "__main__":
           interpreters = interpreters,
           py_modules=['zipextimporter'],
           packages=['py2exe'],
-          zip_safe=True, # pip does unpack anyway, only .egg uses this.
           )
 
 # Local Variables:
