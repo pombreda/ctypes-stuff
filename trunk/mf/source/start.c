@@ -233,8 +233,8 @@ void set_vars(HMODULE hmod_pydll)
 
 /* I'm not sure if the unbuffered code really works... */
 	if (p_script_info->unbuffered) {
-		_setmode(fileno(stdin), O_BINARY);
-		_setmode(fileno(stdout), O_BINARY);
+		_setmode(_fileno(stdin), O_BINARY);
+		_setmode(_fileno(stdout), O_BINARY);
 		setvbuf(stdin,	(char *)NULL, _IONBF, 0);
 		setvbuf(stdout, (char *)NULL, _IONBF, 0);
 		setvbuf(stderr, (char *)NULL, _IONBF, 0);
